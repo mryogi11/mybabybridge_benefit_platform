@@ -1,0 +1,3 @@
+@echo off
+echo Building production version...
+npm run build
