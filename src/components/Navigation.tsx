@@ -30,7 +30,8 @@ import {
   CalendarMonth as CalendarIcon,
   Assignment as AssignmentIcon,
   LocalHospital as PackagesIcon,
-  Message as MessageIcon
+  Message as MessageIcon,
+  Home as HomeIcon
 } from '@mui/icons-material';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -141,11 +142,25 @@ export default function Navigation() {
             py: 0.75,
           }}
         >
-          {/* Logo for desktop */}
+          {/* Logo for desktop - Replace with Home button */}
           <Box sx={{ display: { xs: 'none', md: 'flex' }, mr: 2, alignItems: 'center', height: '100%' }}>
-            <Link href="/dashboard" passHref style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
-              <Logo height={28} />
-            </Link>
+            {/* Add the Home button */}
+            <Button
+              onClick={() => handleNavigation('/')}
+              startIcon={<HomeIcon fontSize="small" />}
+              sx={{
+                mx: 0.25, // Consistent spacing
+                px: 1, // Consistent padding
+                color: 'white',
+                textTransform: 'none', // Keep 'Home' casing
+                fontSize: '0.85rem', // Match other nav items
+                fontWeight: pathname === '/' ? 600 : 400, // Highlight if active
+                opacity: pathname === '/' ? 1 : 0.8, // Highlight if active
+                borderRadius: '4px', // Consistent styling
+              }}
+            >
+              Home
+            </Button>
           </Box>
 
           {/* Mobile menu */}
