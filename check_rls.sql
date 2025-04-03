@@ -1,0 +1,1 @@
+SELECT policyname, cmd, qual FROM pg_catalog.pg_policies WHERE schemaname = 'public' AND tablename = 'users'; 

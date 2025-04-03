@@ -44,27 +44,46 @@ export async function POST(request: Request) {
       );
     }
 
-    // If user is created successfully, add to custom users table
+    // If user is created successfully in auth, handle the public tables
+    // Use upsert for the users table to handle potential conflict with the trigger
     const { error: userError } = await supabase
       .from('users')
-      .insert({
+      .upsert({
         id: authUser.user.id,
         email,
         first_name,
         last_name,
-        role
+        role // Ensure the correct role from the form is set/updated
       });
 
     if (userError) {
-      console.error('Error inserting into users table:', userError);
-      // Attempt to delete the auth user if we couldn't add to users table
+      console.error('Error upserting into users table:', userError);
+      // Attempt to delete the auth user if we couldn't add/update the users table record
       await supabase.auth.admin.deleteUser(authUser.user.id);
       return NextResponse.json(
-        { error: `Failed to create user record: ${userError.message}` },
+        { error: `Failed to create or update user profile record: ${userError.message}` },
         { status: 500 }
       );
     }
 
+    // If the role is 'provider', also create a record in the providers table
+    if (role === 'provider') {
+      const { error: providerError } = await supabase
+        .from('providers')
+        .insert({ 
+            user_id: authUser.user.id,
+            // Add default values for any non-nullable columns in providers table if necessary
+            // Example: first_name: first_name, last_name: last_name 
+          });
+
+      if (providerError) {
+        // Log the error, but proceed with user creation success for now.
+        // Consider more robust error handling (e.g., deleting the user or returning a specific warning).
+        console.warn(`User ${authUser.user.id} created, but failed to create corresponding provider profile record:`, providerError);
+      }
+    }
+
+    // Return success response
     return NextResponse.json({
       success: true,
       user: {

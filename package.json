@@ -44,6 +44,7 @@
     "eslint": "^8.56.0",
     "eslint-config-next": "14.1.0",
     "node-fetch": "^3.3.2",
+    "supabase": "^2.20.5",
     "typescript": "^5.3.3"
   }
 }

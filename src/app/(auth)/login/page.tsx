@@ -20,6 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import Logo from '@/components/Logo';
 import { supabase } from '@/lib/supabase/client';
 import { Favorite, ChildCare, FamilyRestroom } from '@mui/icons-material';
+import { User } from '@/types/user';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -28,6 +29,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [redirectCountdown, setRedirectCountdown] = useState(3);
+  const [userRole, setUserRole] = useState<User['role'] | null>(null);
   const router = useRouter();
   const { signIn, isLoading } = useAuth();
   const theme = useTheme();
@@ -37,7 +39,18 @@ export default function LoginPage() {
       const { data } = await supabase.auth.getSession();
       
       if (data.session) {
-        setLoginSuccess(true);
+        const { data: profileData, error: profileError } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', data.session.user.id)
+          .single();
+
+        if (profileError) {
+           console.warn('Session exists but failed to fetch profile on initial load:', profileError.message);
+        } else if (profileData) {
+          setUserRole(profileData.role);
+          setLoginSuccess(true);
+        }
       }
     } catch (err) {
       console.error('Error checking session:', err);
@@ -48,92 +61,117 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    
+    setUserRole(null);
+
     try {
-      // Clear any existing auth state first
       await supabase.auth.signOut();
-      
+      localStorage.removeItem('sb-access-token');
+      localStorage.removeItem('sb-refresh-token');
+      document.cookie = 'loggedIn=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+
       const result = await signIn(email, password);
-      
-      if (result?.session) {
-        setLoginSuccess(true);
-        
-        // Check if the Supabase client has the session
-        const { data } = await supabase.auth.getSession();
-        
-        // Store auth token in localStorage in the correct format
-        if (data.session?.access_token) {
-          localStorage.setItem('sb-access-token', data.session.access_token);
-          if (data.session.refresh_token) {
-            localStorage.setItem('sb-refresh-token', data.session.refresh_token);
-          }
+
+      if (result?.session?.user?.id) {
+        const { data: profileData, error: profileError } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', result.session.user.id)
+          .single();
+
+        if (profileError) {
+          console.error('Error fetching user profile:', profileError);
+          setError('Login successful, but failed to retrieve user role. Please contact support.');
+          setLoading(false);
+          return;
         }
-        
-        // Set a direct cookie that can be used for access detection
-        document.cookie = `loggedIn=true; path=/;`;
+
+        if (profileData?.role) {
+          setUserRole(profileData.role);
+          setLoginSuccess(true);
+
+          setLoggedInCookie();
+
+          if (result.session?.access_token) {
+              localStorage.setItem('sb-access-token', result.session.access_token);
+          }
+          if (result.session?.refresh_token) {
+              localStorage.setItem('sb-refresh-token', result.session.refresh_token);
+          }
+
+        } else {
+          setError('Login successful, but no role found for this user. Please contact support.');
+          setLoading(false);
+        }
+
       } else {
-        setError('Login successful but session not created. Please try again.');
+        setError(result?.error?.message || 'Login failed. Please check your credentials.');
         setLoading(false);
       }
     } catch (err: any) {
       console.error('Login error:', err);
-      // Show the actual error message from Supabase if available
-      setError(err?.message || 'Invalid email or password. Please try again.');
+      setError(err?.message || 'An unexpected error occurred during login.');
       setLoading(false);
     }
   };
 
-  // Helper function to directly set the loggedIn cookie
   const setLoggedInCookie = () => {
     document.cookie = 'loggedIn=true; path=/;';
   };
 
-  // Auto-redirect countdown
+  const getRedirectPath = (role: User['role'] | null): string => {
+    switch (role) {
+      case 'admin':
+      case 'staff':
+        return '/admin';
+      case 'provider':
+        return '/provider/provider';
+      case 'patient':
+      default:
+        return '/dashboard';
+    }
+  };
+
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
-    
+
     if (loginSuccess && redirectCountdown > 0) {
       timer = setTimeout(() => {
         setRedirectCountdown(prev => prev - 1);
       }, 1000);
     }
-    
-    if (loginSuccess && redirectCountdown === 0) {
-      goToDashboard();
+
+    if (loginSuccess && userRole && redirectCountdown === 0) {
+      const path = getRedirectPath(userRole);
+      window.location.href = path;
     }
-    
+
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [loginSuccess, redirectCountdown]);
+  }, [loginSuccess, redirectCountdown, userRole]);
 
-  // Direct navigation to dashboard (bypassing middleware)
-  const goToDashboard = () => {
-    // Set the cookie first to ensure access
-    setLoggedInCookie();
-    // Navigate to dashboard
-    window.location.href = '/dashboard';
+  const goToDesignatedDashboard = () => {
+    if (userRole) {
+      const path = getRedirectPath(userRole);
+      setLoggedInCookie();
+      window.location.href = path;
+    } else {
+       setError("Cannot redirect yet, user role not determined.");
+    }
   };
 
   useEffect(() => {
-    // Configure Supabase auth to use secure, http-only cookies
     const setupAuth = async () => {
-      await supabase.auth.setSession({
-        access_token: '',
-        refresh_token: '',
-      });
     };
     
     setupAuth();
     
-    // Check for any existing session on page load
     checkSession();
   }, []);
 
   return (
     <Container component="main" maxWidth={false} disableGutters>
       <Grid container sx={{ minHeight: '100vh' }}>
-        {/* Left side - Login Form */}
         <Grid item xs={12} md={6} 
           sx={{ 
             display: 'flex', 
@@ -181,23 +219,32 @@ export default function LoginPage() {
                   <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
                     Login successful!
                   </Typography>
-                  <Typography variant="body2" sx={{ mb: 1 }}>
-                    Redirecting to dashboard in {redirectCountdown} seconds...
-                  </Typography>
-                  <Button 
-                    variant="contained" 
-                    color="primary" 
-                    fullWidth 
-                    size="large"
-                    sx={{ mt: 1, py: 1, fontSize: '1rem' }}
-                    onClick={goToDashboard}
-                  >
-                    Go To Dashboard Now
-                  </Button>
+                  {userRole ? (
+                    <>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        Redirecting in {redirectCountdown} seconds...
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        fullWidth
+                        size="large"
+                        sx={{ mt: 1, py: 1, fontSize: '1rem' }}
+                        onClick={goToDesignatedDashboard}
+                      >
+                        Go Now
+                      </Button>
+                    </>
+                  ) : (
+                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                      <CircularProgress size={20} sx={{ mr: 1 }}/>
+                      <Typography variant="body2">Fetching user details...</Typography>
+                    </Box>
+                  )}
                 </Alert>
               )}
 
-              <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
+              <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, opacity: loginSuccess ? 0.5 : 1, pointerEvents: loginSuccess ? 'none' : 'auto' }}>
                 <TextField
                   margin="normal"
                   required
@@ -247,7 +294,6 @@ export default function LoginPage() {
           </Box>
         </Grid>
 
-        {/* Right side - Gradient */}
         <Grid item xs={12} md={6} sx={{ display: { xs: 'none', md: 'block' }, position: 'relative' }}>
           <Box
             sx={{
@@ -258,7 +304,6 @@ export default function LoginPage() {
               overflow: 'hidden',
             }}
           >
-            {/* Decorative elements */}
             <Box sx={{ 
               position: 'absolute', 
               top: '20%', 
