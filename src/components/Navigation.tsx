@@ -143,25 +143,26 @@ export default function Navigation() {
           }}
         >
           {/* Logo for desktop - Replace with Home button */}
+          {/* 
           <Box sx={{ display: { xs: 'none', md: 'flex' }, mr: 2, alignItems: 'center', height: '100%' }}>
-            {/* Add the Home button */}
             <Button
               onClick={() => handleNavigation('/')}
               startIcon={<HomeIcon fontSize="small" />}
               sx={{
-                mx: 0.25, // Consistent spacing
-                px: 1, // Consistent padding
+                mx: 0.25, 
+                px: 1, 
                 color: 'white',
-                textTransform: 'none', // Keep 'Home' casing
-                fontSize: '0.85rem', // Match other nav items
-                fontWeight: pathname === '/' ? 600 : 400, // Highlight if active
-                opacity: pathname === '/' ? 1 : 0.8, // Highlight if active
-                borderRadius: '4px', // Consistent styling
+                textTransform: 'none', 
+                fontSize: '0.85rem', 
+                fontWeight: pathname === '/' ? 600 : 400, 
+                opacity: pathname === '/' ? 1 : 0.8, 
+                borderRadius: '4px', 
               }}
             >
               Home
             </Button>
           </Box>
+           */}
 
           {/* Mobile menu */}
           <Box sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }}>

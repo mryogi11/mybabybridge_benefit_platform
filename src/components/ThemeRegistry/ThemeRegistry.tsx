@@ -3,12 +3,13 @@ import * as React from 'react';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import NextAppDirEmotionCacheProvider from './EmotionCache';
+import type { ThemeOptions } from '@mui/material/styles';
 
 // Define your theme options here
-// You can customize colors, typography, etc.
-const themeOptions = {
+// Explicitly type themeOptions
+const themeOptions: ThemeOptions = {
   palette: {
-    mode: 'light', // or 'dark'
+    mode: 'light', // Now correctly typed as 'light'
     primary: {
       main: '#1976d2', // Example primary color
     },
