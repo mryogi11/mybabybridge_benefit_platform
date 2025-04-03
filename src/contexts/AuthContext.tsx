@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 
@@ -30,6 +30,7 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   isLoading: boolean;
+  isProfileLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ user: User | null; session: Session | null } | undefined>;
   signUp: (email: string, password: string) => Promise<{ user: User | null; session: Session | null } | undefined>;
   signOut: () => Promise<void>;
@@ -41,6 +42,7 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   profile: null,
   isLoading: true,
+  isProfileLoading: false,
   signIn: async () => undefined,
   signUp: async () => undefined,
   signOut: async () => {},
@@ -52,37 +54,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
+  const initialAuthCheckComplete = useRef(false);
 
   // --- Function to fetch profile ---
   const fetchAndSetProfile = async (userId: string) => {
+    if (!userId) {
+        debugLog('fetchAndSetProfile called with no userId, skipping.');
+        setProfile(null);
+        return;
+    }
     debugLog('Fetching profile for user ID:', userId);
+    setIsProfileLoading(true);
     try {
       const { data, error } = await supabase
-        .from('profiles') // Assuming your table is named 'profiles'
+        .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single(); // Assuming one profile per user ID
-
+        .single();
       if (error) {
         debugLog('Error fetching profile:', error);
-        if (error.code !== 'PGRST116') { // PGRST116: "relation [...] does not exist" or "0 rows returned"
-           setProfile(null); // Clear profile on fetch error (unless it's just 'not found')
-           throw error; // Rethrow other errors
-        } else {
-             debugLog('Profile not found for user, setting profile to null.');
-             setProfile(null); // Set profile to null if not found
-        }
-      } else if (data) {
+        setProfile(null);
+      } else {
         debugLog('Profile fetched successfully:', data);
         setProfile(data as Profile);
-      } else {
-         debugLog('No profile data returned for user.');
-         setProfile(null);
       }
     } catch (err) {
-      // Error already logged, just ensure profile is null
       debugLog('Caught exception during profile fetch:', err);
       setProfile(null);
+    } finally {
+        setIsProfileLoading(false);
     }
   };
 
@@ -210,70 +211,97 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Run the initialization
-    initializeAuth();
+    debugLog('Auth Provider useEffect running. Setting up listener.');
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        debugLog(`Auth state changed: ${event}`);
+        debugLog(`>>> Auth state change event START: ${event}`);
         // Safely log user email only if session and user exist
-        debugLog('New session:', currentSession && currentSession.user ? `User: ${currentSession.user.email}` : 'No session or no user');
-        
-        setIsLoading(true);
+        debugLog('Auth Event - New session details:', currentSession && currentSession.user ? `User: ${currentSession.user.email}` : 'No session or no user');
 
-        // If signed in, make sure we update local state
-        if (event === 'SIGNED_IN' && currentSession) {
-          debugLog('Handling SIGNED_IN');
-          setSession(currentSession);
-          setUser(currentSession.user);
-          await fetchAndSetProfile(currentSession.user.id);
-        } 
-        // If signed out, clear local state
-        else if (event === 'SIGNED_OUT') {
-          debugLog('Handling SIGNED_OUT');
-          setSession(null);
-          setUser(null);
-          setProfile(null);
+        try {
+            // If signed in, make sure we update local state
+            if (event === 'SIGNED_IN' && currentSession) {
+              debugLog('Handling SIGNED_IN event...');
+              setSession(currentSession);
+              setUser(currentSession.user);
+              await fetchAndSetProfile(currentSession.user.id);
+              debugLog('SIGNED_IN handling complete.');
+            }
+            // If signed out, clear local state
+            else if (event === 'SIGNED_OUT') {
+              debugLog('Handling SIGNED_OUT event...');
+              setSession(null);
+              setUser(null);
+              setProfile(null);
+              debugLog('SIGNED_OUT handling complete.');
+            }
+            // Handle token refresh, password recovery etc. if needed
+            else if (event === 'TOKEN_REFRESHED' && currentSession) {
+              debugLog('Handling TOKEN_REFRESHED event...');
+              setSession(currentSession);
+              setUser(currentSession.user);
+              await fetchAndSetProfile(currentSession.user.id);
+              debugLog('TOKEN_REFRESHED handling complete.');
+            } else if (event === 'USER_UPDATED' && currentSession) {
+              debugLog('Handling USER_UPDATED event...');
+              setSession(currentSession);
+              setUser(currentSession.user);
+              await fetchAndSetProfile(currentSession.user.id);
+              debugLog('USER_UPDATED handling complete.');
+            } else if (event === 'PASSWORD_RECOVERY') {
+                debugLog('Handling PASSWORD_RECOVERY event...');
+                 debugLog('PASSWORD_RECOVERY handling complete.');
+            } else if (event === 'INITIAL_SESSION') {
+                debugLog('Handling INITIAL_SESSION event...');
+                if (currentSession) {
+                    debugLog('INITIAL_SESSION: Session found.');
+                    setSession(currentSession);
+                    setUser(currentSession.user);
+                    debugLog('INITIAL_SESSION: Skipping profile fetch for testing.');
+                } else {
+                    debugLog('INITIAL_SESSION: No session found.');
+                    setSession(null);
+                    setUser(null);
+                    setProfile(null);
+                }
+                debugLog('INITIAL_SESSION handling complete.');
+            } else {
+                debugLog(`Unhandled auth event received: ${event}`);
+            }
+        } catch (error) {
+            debugLog('!!! ERROR during auth event handling:', { event, error });
+        } finally {
+            debugLog(`Setting isLoading to false after handling event: ${event}`);
+            setIsLoading(false);
+            debugLog(`<<< Auth state change event END: ${event}`);
         }
-        // Handle token refresh, password recovery etc. if needed
-        else if (event === 'TOKEN_REFRESHED' && currentSession) {
-          debugLog('Handling TOKEN_REFRESHED');
-          setSession(currentSession);
-          setUser(currentSession.user);
-          await fetchAndSetProfile(currentSession.user.id);
-        } else if (event === 'USER_UPDATED' && currentSession) {
-          debugLog('Handling USER_UPDATED');
-          setSession(currentSession);
-          setUser(currentSession.user);
-          await fetchAndSetProfile(currentSession.user.id);
-        } else if (event === 'PASSWORD_RECOVERY') {
-             debugLog('Handling PASSWORD_RECOVERY');
-        } else if (event === 'INITIAL_SESSION') {
-             debugLog('Handling INITIAL_SESSION');
-             if (currentSession) {
-                 setSession(currentSession);
-                 setUser(currentSession.user);
-                 await fetchAndSetProfile(currentSession.user.id);
-             } else {
-                 // No initial session, user is logged out
-                 setSession(null);
-                 setUser(null);
-                 setProfile(null);
-             }
-        } else {
-             debugLog(`Unhandled auth event: ${event}`);
-        }
-        setIsLoading(false);
       }
     );
 
     // Cleanup on unmount
     return () => {
-      debugLog('Auth provider unmounting, cleaning up subscription');
+      debugLog('Auth provider unmounting, cleaning up subscription.');
       subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    // Fetch profile if:
+    // 1. Initial auth check is complete (isLoading is false)
+    // 2. We have a user
+    // 3. We either don't have a profile OR the profile ID doesn't match the user ID
+    if (!isLoading && user && (!profile || profile.id !== user.id)) {
+      debugLog('Profile Fetch Effect: Conditions met, fetching profile for user:', user.id);
+      fetchAndSetProfile(user.id);
+    } 
+    // Clear profile if user becomes null (and profile exists)
+    else if (!isLoading && !user && profile) {
+      debugLog('Profile Fetch Effect: User is null, clearing profile.');
+      setProfile(null);
+    }
+  }, [user, isLoading, profile]);
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -390,6 +418,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session, 
       profile,
       isLoading, 
+      isProfileLoading,
       signIn, 
       signUp, 
       signOut,
