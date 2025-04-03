@@ -4,6 +4,15 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 
+// Define a simple Profile type (adjust based on your actual profiles table)
+interface Profile {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  role?: string;
+  // Add other profile fields as needed
+}
+
 // Enhanced debug logging function
 const debugLog = (message: string, data?: any) => {
   const timestamp = new Date().toISOString().substring(11, 19);
@@ -19,6 +28,7 @@ const debugLog = (message: string, data?: any) => {
 interface AuthContextType {
   user: User | null;
   session: Session | null;
+  profile: Profile | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ user: User | null; session: Session | null } | undefined>;
   signUp: (email: string, password: string) => Promise<{ user: User | null; session: Session | null } | undefined>;
@@ -29,6 +39,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
+  profile: null,
   isLoading: true,
   signIn: async () => undefined,
   signUp: async () => undefined,
@@ -39,7 +50,41 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // --- Function to fetch profile ---
+  const fetchAndSetProfile = async (userId: string) => {
+    debugLog('Fetching profile for user ID:', userId);
+    try {
+      const { data, error } = await supabase
+        .from('profiles') // Assuming your table is named 'profiles'
+        .select('*')
+        .eq('id', userId)
+        .single(); // Assuming one profile per user ID
+
+      if (error) {
+        debugLog('Error fetching profile:', error);
+        if (error.code !== 'PGRST116') { // PGRST116: "relation [...] does not exist" or "0 rows returned"
+           setProfile(null); // Clear profile on fetch error (unless it's just 'not found')
+           throw error; // Rethrow other errors
+        } else {
+             debugLog('Profile not found for user, setting profile to null.');
+             setProfile(null); // Set profile to null if not found
+        }
+      } else if (data) {
+        debugLog('Profile fetched successfully:', data);
+        setProfile(data as Profile);
+      } else {
+         debugLog('No profile data returned for user.');
+         setProfile(null);
+      }
+    } catch (err) {
+      // Error already logged, just ensure profile is null
+      debugLog('Caught exception during profile fetch:', err);
+      setProfile(null);
+    }
+  };
 
   // Initialize auth and check for existing session
   const initializeAuth = async () => {
@@ -82,6 +127,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (error) {
         debugLog('Error getting session:', error);
+        setSession(null);
+        setUser(null);
+        setProfile(null);
         return;
       }
       
@@ -111,11 +159,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         setSession(data.session);
         setUser(data.session.user);
+        await fetchAndSetProfile(data.session.user.id);
       } else {
         debugLog('No session found during initialization');
+        setSession(null);
+        setUser(null);
+        setProfile(null);
       }
     } catch (error) {
       debugLog('Error initializing auth:', error);
+      setSession(null);
+      setUser(null);
+      setProfile(null);
     } finally {
       setIsLoading(false);
     }
@@ -125,10 +180,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshSession = async () => {
     try {
       debugLog('Manually refreshing session...');
-      const { data, error } = await supabase.auth.getSession();
+      const { data, error } = await supabase.auth.refreshSession();
       
       if (error) {
         debugLog('Error refreshing session:', error);
+        setSession(null);
+        setUser(null);
+        setProfile(null);
         return;
       }
       
@@ -136,13 +194,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         debugLog(`Session refreshed for user: ${data.session.user.email}`);
         setSession(data.session);
         setUser(data.session.user);
+        await fetchAndSetProfile(data.session.user.id);
       } else {
         debugLog('No session found after refresh');
         setSession(null);
         setUser(null);
+        setProfile(null);
       }
     } catch (error) {
       debugLog('Error during session refresh:', error);
+      setSession(null);
+      setUser(null);
+      setProfile(null);
     }
   };
 
@@ -157,47 +220,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Safely log user email only if session and user exist
         debugLog('New session:', currentSession && currentSession.user ? `User: ${currentSession.user.email}` : 'No session or no user');
         
+        setIsLoading(true);
+
         // If signed in, make sure we update local state
         if (event === 'SIGNED_IN' && currentSession) {
           debugLog('Handling SIGNED_IN');
           setSession(currentSession);
-          // Fetch profile immediately after sign-in
+          setUser(currentSession.user);
           await fetchAndSetProfile(currentSession.user.id);
-          setIsLoading(false);
         } 
         // If signed out, clear local state
         else if (event === 'SIGNED_OUT') {
           debugLog('Handling SIGNED_OUT');
           setSession(null);
           setUser(null);
-          setIsLoading(false);
+          setProfile(null);
         }
         // Handle token refresh, password recovery etc. if needed
         else if (event === 'TOKEN_REFRESHED' && currentSession) {
           debugLog('Handling TOKEN_REFRESHED');
           setSession(currentSession);
-          setIsLoading(false);
+          setUser(currentSession.user);
+          await fetchAndSetProfile(currentSession.user.id);
         } else if (event === 'USER_UPDATED' && currentSession) {
           debugLog('Handling USER_UPDATED');
           setSession(currentSession);
-           await fetchAndSetProfile(currentSession.user.id); // Re-fetch profile on user update
-          setIsLoading(false);
+          setUser(currentSession.user);
+          await fetchAndSetProfile(currentSession.user.id);
         } else if (event === 'PASSWORD_RECOVERY') {
              debugLog('Handling PASSWORD_RECOVERY');
-             setIsLoading(false); // Allow UI to proceed for password reset flow
-        } else {
-             debugLog(`Unhandled auth event: ${event}`);
-             // Potentially handle INITIAL_SESSION differently if needed
-             if (event === 'INITIAL_SESSION' && currentSession) {
+        } else if (event === 'INITIAL_SESSION') {
+             debugLog('Handling INITIAL_SESSION');
+             if (currentSession) {
                  setSession(currentSession);
+                 setUser(currentSession.user);
                  await fetchAndSetProfile(currentSession.user.id);
-             } else if (event === 'INITIAL_SESSION' && !currentSession) {
+             } else {
                  // No initial session, user is logged out
                  setSession(null);
                  setUser(null);
+                 setProfile(null);
              }
-             setIsLoading(false);
+        } else {
+             debugLog(`Unhandled auth event: ${event}`);
         }
+        setIsLoading(false);
       }
     );
 
@@ -210,6 +277,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
+      setIsLoading(true);
       debugLog(`Signing in with email: ${email}`);
       
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -219,6 +287,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (error) {
         debugLog('Sign in error:', error);
+        setIsLoading(false);
         throw error;
       }
       
@@ -256,19 +325,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         debugLog('No session created after sign in');
       }
       
-      // Update context state
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
-      
+      setIsLoading(false);
       return { user: data.user, session: data.session };
     } catch (error) {
       debugLog('Error during sign in:', error);
+      setIsLoading(false);
       throw error;
     }
   };
 
   const signUp = async (email: string, password: string) => {
     try {
+      setIsLoading(true);
       debugLog(`Signing up with email: ${email}`);
       
       const { data, error } = await supabase.auth.signUp({
@@ -278,45 +346,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (error) {
         debugLog('Sign up error:', error);
+        setIsLoading(false);
         throw error;
       }
       
       debugLog(`Sign up successful for user: ${data.user?.email}`);
       debugLog(`Email confirmation status: ${data.user?.email_confirmed_at ? 'Confirmed' : 'Not confirmed'}`);
       
-      // Update context state if session exists
-      if (data.session) {
-        debugLog('Session created after sign up');
-        setSession(data.session);
-        setUser(data.user);
-      } else {
-        debugLog('No session created after sign up (email confirmation may be required)');
-      }
-      
+      setIsLoading(false);
       return { user: data.user, session: data.session };
     } catch (error) {
       debugLog('Error during sign up:', error);
+      setIsLoading(false);
       throw error;
     }
   };
 
   const signOut = async () => {
     try {
+      setIsLoading(true);
       debugLog('Signing out...');
       const { error } = await supabase.auth.signOut();
       
       if (error) {
         debugLog('Sign out error:', error);
+        setIsLoading(false);
         throw error;
       }
       
       debugLog('Sign out successful');
       
-      // Clear context state
-      setSession(null);
-      setUser(null);
+      setIsLoading(false);
     } catch (error) {
       debugLog('Error during sign out:', error);
+      setIsLoading(false);
       throw error;
     }
   };
@@ -325,6 +388,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider value={{ 
       user, 
       session, 
+      profile,
       isLoading, 
       signIn, 
       signUp, 
