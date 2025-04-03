@@ -104,7 +104,7 @@ export default function LoginPage() {
         }
 
       } else {
-        setError(result?.error?.message || 'Login failed. Please check your credentials.');
+        setError('Login failed. Please check your credentials or try again.');
         setLoading(false);
       }
     } catch (err: any) {
