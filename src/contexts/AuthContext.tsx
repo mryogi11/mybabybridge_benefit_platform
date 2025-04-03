@@ -150,34 +150,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Run the initialization
     initializeAuth();
 
-    // Set up listener for auth state changes
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
         debugLog(`Auth state changed: ${event}`);
-        debugLog('New session:', currentSession ? `User: ${currentSession.user.email}` : 'No session');
+        // Safely log user email only if session and user exist
+        debugLog('New session:', currentSession && currentSession.user ? `User: ${currentSession.user.email}` : 'No session or no user');
         
         // If signed in, make sure we update local state
         if (event === 'SIGNED_IN' && currentSession) {
-          debugLog('User signed in, updating session and user state');
-          if (currentSession.expires_at) {
-            debugLog(`Session expires at: ${new Date(currentSession.expires_at * 1000).toISOString()}`);
-          }
+          debugLog('Handling SIGNED_IN');
           setSession(currentSession);
-          setUser(currentSession.user);
-        }
-        
-        // If signed out, clear state
-        if (event === 'SIGNED_OUT') {
-          debugLog('User signed out, clearing session and user state');
+          // Fetch profile immediately after sign-in
+          await fetchAndSetProfile(currentSession.user.id);
+          setIsLoading(false);
+        } 
+        // If signed out, clear local state
+        else if (event === 'SIGNED_OUT') {
+          debugLog('Handling SIGNED_OUT');
           setSession(null);
           setUser(null);
+          setIsLoading(false);
         }
-        
-        // General update for other events
-        if (event !== 'SIGNED_IN' && event !== 'SIGNED_OUT') {
-          debugLog(`Handling auth event: ${event}`);
+        // Handle token refresh, password recovery etc. if needed
+        else if (event === 'TOKEN_REFRESHED' && currentSession) {
+          debugLog('Handling TOKEN_REFRESHED');
           setSession(currentSession);
-          setUser(currentSession?.user ?? null);
+          setIsLoading(false);
+        } else if (event === 'USER_UPDATED' && currentSession) {
+          debugLog('Handling USER_UPDATED');
+          setSession(currentSession);
+           await fetchAndSetProfile(currentSession.user.id); // Re-fetch profile on user update
+          setIsLoading(false);
+        } else if (event === 'PASSWORD_RECOVERY') {
+             debugLog('Handling PASSWORD_RECOVERY');
+             setIsLoading(false); // Allow UI to proceed for password reset flow
+        } else {
+             debugLog(`Unhandled auth event: ${event}`);
+             // Potentially handle INITIAL_SESSION differently if needed
+             if (event === 'INITIAL_SESSION' && currentSession) {
+                 setSession(currentSession);
+                 await fetchAndSetProfile(currentSession.user.id);
+             } else if (event === 'INITIAL_SESSION' && !currentSession) {
+                 // No initial session, user is logged out
+                 setSession(null);
+                 setUser(null);
+             }
+             setIsLoading(false);
         }
       }
     );

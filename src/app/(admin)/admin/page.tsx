@@ -3,8 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   Grid,
-  Card,
-  CardContent,
   Typography,
   Box,
   LinearProgress,
@@ -20,6 +18,9 @@ import { supabase } from '@/lib/supabase/client';
 
 import { BarChart } from '@mui/x-charts/BarChart';
 import { LineChart } from '@mui/x-charts/LineChart';
+
+// Import the new widget
+import DashboardWidget from '@/components/admin/DashboardWidget';
 
 interface DashboardStats {
   totalUsers: number;
@@ -216,30 +217,31 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const statCards = [
+  // Define stat data with theme color keys instead of hex
+  const statCardsData = [
     {
       title: 'Total Users',
       value: stats.totalUsers,
-      icon: <PeopleIcon sx={{ fontSize: 40 }} />,
-      color: '#1976d2',
+      icon: <PeopleIcon sx={{ fontSize: 32 }} />,
+      color: 'primary', // Use theme key
     },
     {
       title: 'Total Packages',
       value: stats.totalPackages,
-      icon: <ShoppingCartIcon sx={{ fontSize: 40 }} />,
-      color: '#2e7d32',
+      icon: <ShoppingCartIcon sx={{ fontSize: 32 }} />,
+      color: 'success', // Use theme key
     },
     {
       title: 'Active Treatments',
       value: stats.activeTreatments,
-      icon: <MedicalServicesIcon sx={{ fontSize: 40 }} />,
-      color: '#ed6c02',
+      icon: <MedicalServicesIcon sx={{ fontSize: 32 }} />,
+      color: 'warning', // Use theme key
     },
     {
       title: 'Total Revenue',
       value: `$${stats.totalRevenue.toLocaleString()}`,
-      icon: <TrendingUpIcon sx={{ fontSize: 40 }} />,
-      color: '#9c27b0',
+      icon: <TrendingUpIcon sx={{ fontSize: 32 }} />,
+      color: 'secondary', // Use theme key (maps to our soft green)
     },
   ];
 
@@ -249,31 +251,22 @@ export default function AdminDashboardPage() {
 
   return (
     <Box>
-       <Typography variant="h4" gutterBottom sx={{ mb: 3 }}>
+      <Typography variant="h4" gutterBottom sx={{ mb: 3 }}>
         Dashboard Overview
       </Typography>
-      {/* Statistics Cards Grid */}
+      {/* Statistics Grid - Now uses DashboardWidget */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-         {/* ... existing stat card mapping ... */}
-         {statCards.map((card) => (
-           <Grid item xs={12} sm={6} md={3} key={card.title}>
-             <Card elevation={2}>
-               <CardContent>
-                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                   <Box sx={{ color: card.color, mr: 1.5, display: 'flex' }}>
-                     {card.icon}
-                   </Box>
-                   <Typography variant="subtitle1" component="div" fontWeight="medium">
-                     {card.title}
-                   </Typography>
-                 </Box>
-                 <Typography variant="h4" component="div" fontWeight="bold">
-                   {card.value}
-                 </Typography>
-               </CardContent>
-             </Card>
-           </Grid>
-         ))}
+        {statCardsData.map((item) => (
+          <Grid item xs={12} sm={6} md={3} key={item.title}>
+            {/* Use the new DashboardWidget component */}
+            <DashboardWidget 
+              title={item.title}
+              value={item.value}
+              icon={item.icon}
+              color={item.color}
+            />
+          </Grid>
+        ))}
       </Grid>
 
       {/* Charts Grid */}

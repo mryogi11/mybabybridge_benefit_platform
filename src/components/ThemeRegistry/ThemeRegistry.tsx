@@ -5,96 +5,150 @@ import type { ThemeOptions } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import NextAppDirEmotionCacheProvider from './EmotionCache';
 
-// Import a font (optional, example using Roboto)
-// Make sure to install it if needed: npm install @fontsource/roboto
-// import '@fontsource/roboto/300.css';
-// import '@fontsource/roboto/400.css';
-// import '@fontsource/roboto/500.css';
-// import '@fontsource/roboto/700.css';
+// Import the font (Make sure to install: npm install @fontsource/public-sans)
+import '@fontsource/public-sans/400.css';
+import '@fontsource/public-sans/500.css';
+import '@fontsource/public-sans/600.css';
+import '@fontsource/public-sans/700.css';
 
-// Define your theme options here
+// Define your theme options here approximating Minimal UI style
 const themeOptions: ThemeOptions = {
   palette: {
-    mode: 'light', // Keep light mode for now
+    mode: 'light',
     primary: {
-      // Example using common blue shades
-      main: '#1976d2',
-      light: '#42a5f5',
-      dark: '#1565c0',
+      // Example using a slightly softer blue
+      main: '#3366FF', // Adjust as needed based on Minimal's exact blue
+      light: '#6690FF',
+      dark: '#0040CC',
       contrastText: '#fff',
     },
     secondary: {
-      // Example using common purple shades
-      main: '#9c27b0',
-      light: '#ba68c8',
-      dark: '#7b1fa2',
+      // Example using a softer green
+      main: '#00A76F', // Adjust based on Minimal's secondary/accent
+      light: '#33B88A',
+      dark: '#00754D',
       contrastText: '#fff',
     },
     error: {
-      main: '#d32f2f',
+      main: '#FF5630', // Minimal often uses a reddish-orange for error
     },
     warning: {
-      main: '#ed6c02',
+      main: '#FFAB00', // Minimal often uses amber/yellow for warning
     },
     info: {
-      main: '#0288d1',
+      main: '#00B8D9', // Minimal often uses cyan/blue for info
     },
     success: {
-      main: '#2e7d32',
+      main: '#22C55E', // Minimal often uses a clear green for success
     },
     background: {
-      default: '#f5f5f5', // Light grey background
-      paper: '#ffffff', // White background for Paper/Card components
+      default: '#F9FAFB', // Very light grey background
+      paper: '#FFFFFF', // White paper background
     },
     text: {
-      primary: 'rgba(0, 0, 0, 0.87)',
-      secondary: 'rgba(0, 0, 0, 0.6)',
-      disabled: 'rgba(0, 0, 0, 0.38)',
+      primary: '#212B36', // Darker grey for primary text
+      secondary: '#637381', // Lighter grey for secondary text
+      disabled: '#919EAB',
     },
+    divider: 'rgba(145, 158, 171, 0.2)', // Subtle divider color
   },
   typography: {
-    // fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif', // Example setting font
-    fontFamily: 'inherit', // Or keep inheriting from globals.css
-    h4: {
-      fontWeight: 500,
-    },
-    h5: {
-      fontWeight: 500,
-    },
-    // Add other typography customizations (fontSize, fontWeight, etc.)
+    fontFamily: '"Public Sans", sans-serif', // Set primary font
+    fontWeightRegular: 400,
+    fontWeightMedium: 500,
+    fontWeightBold: 700,
+    h1: { fontWeight: 700 },
+    h2: { fontWeight: 700 },
+    h3: { fontWeight: 700 },
+    h4: { fontWeight: 700 }, // Adjust weights as needed
+    h5: { fontWeight: 600 },
+    h6: { fontWeight: 600 },
+    // Add other typography customizations (fontSize, letterSpacing, etc.) if needed
   },
-  // Example component overrides
+  shape: {
+    borderRadius: 8, // Consistent border radius
+  },
+  // shadows: [...], // TODO: Add custom shadows array later if needed
   components: {
+    MuiCssBaseline: {
+        styleOverrides: {
+            body: {
+                backgroundColor: '#F9FAFB', // Ensure body background matches theme
+            }
+        }
+    },
+    MuiAppBar: {
+        styleOverrides: {
+            root: {
+                backgroundColor: '#FFFFFF',
+                color: '#212B36',
+                boxShadow: 'none', // Often minimal themes remove AppBar shadow
+                borderBottom: '1px solid rgba(145, 158, 171, 0.2)', // Use divider color for border
+            }
+        },
+        defaultProps: {
+            elevation: 0, // Reinforce no elevation
+        }
+    },
+    MuiDrawer: {
+        styleOverrides: {
+            paper: {
+                borderRight: 'none', // Remove default drawer border if desired
+                backgroundColor: '#FFFFFF', // Ensure drawer background is white
+            }
+        }
+    },
     MuiButton: {
       defaultProps: {
-        disableElevation: true, // Flatter buttons by default
+        disableElevation: true,
       },
       styleOverrides: {
         root: {
-          textTransform: 'none', // Avoid ALL CAPS buttons
+          textTransform: 'none',
+          borderRadius: 8, // Match global border radius
         },
         containedPrimary: {
-          // Specific styles for contained primary buttons
+          // Minimal themes might have specific hover/active states
+          // Example: boxShadow: 'none', '&:hover': { boxShadow: 'none' }
         },
       },
     },
     MuiPaper: {
         defaultProps: {
-            elevation: 1, // Subtle elevation for Paper/Card
+            elevation: 0, // Often use border instead of shadow
         },
         styleOverrides: {
-            rounded: {
-                borderRadius: 8, // Slightly more rounded corners
+            root: {
+                 backgroundImage: 'none', // Remove potential gradients
+                 border: '1px solid rgba(145, 158, 171, 0.2)', // Add subtle border
+                 borderRadius: 8, // Ensure consistent radius
+            }
+        }
+    },
+    MuiCard: {
+        defaultProps: {
+            elevation: 0,
+        },
+        styleOverrides: {
+            root: {
+                borderRadius: 8,
+                border: '1px solid rgba(145, 158, 171, 0.2)',
+                boxShadow: 'none', // Override potential default card shadow
             }
         }
     },
     MuiTextField: {
         defaultProps: {
-            variant: 'outlined', // Default to outlined variant
-            size: 'small', // Default to smaller size
+            variant: 'outlined',
+            size: 'small',
+        },
+        styleOverrides: {
+            root: {
+                // Minimal themes might adjust input styles
+                // Example: '& .MuiOutlinedInput-root': { borderRadius: 8 }
+            }
         }
-    }
-    // Add overrides for other components (AppBar, Card, etc.)
+    },
   },
 };
 
@@ -104,7 +158,6 @@ export default function ThemeRegistry({ children }: { children: React.ReactNode 
   return (
     <NextAppDirEmotionCacheProvider options={{ key: 'mui' }}>
       <ThemeProvider theme={theme}>
-        {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
         <CssBaseline />
         {children}
       </ThemeProvider>

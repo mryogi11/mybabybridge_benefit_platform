@@ -1,486 +1,439 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
-  Paper,
   Typography,
-  LinearProgress,
-  IconButton,
-  Menu,
-  MenuItem,
-  Chip,
-  TextField,
   Button,
+  LinearProgress,
+  Paper,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Tabs,
-  Tab,
-  List,
-  ListItem,
-  ListItemText,
-  Divider,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Chip,
+  Alert,
+  Menu,
+  ListItemIcon,
+  IconButton,
 } from '@mui/material';
 import {
-  MoreVert as MoreVertIcon,
+    Add as AddIcon,
+    MoreVert as MoreVertIcon,
+    Edit as EditIcon,
+    Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { supabase } from '@/lib/supabase/client';
-import { User, UserRole, UserActivity } from '@/types';
-
-import { DataGrid, GridColDef, GridRenderCellParams, GridValueGetter } from '@mui/x-data-grid';
+import { User, UserRole } from '@/types';
+import { DataGrid, GridColDef, GridRenderCellParams, GridToolbarContainer, GridToolbarQuickFilter, GridToolbarProps } from '@mui/x-data-grid';
 import { format } from 'date-fns';
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
+// Define the type for the complete new user data payload
+interface NewUserData {
+    first_name: string;
+    last_name: string;
+    email: string;
+    password?: string; // Password is required logic-wise, but keep optional for type flexibility if needed initially
+    role: UserRole;
 }
 
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`user-tabpanel-${index}`}
-      aria-labelledby={`user-tab-${index}`}
-      {...other}
-    >
-      {value === index && (
-        <Box sx={{ p: 3 }}>
-          {children}
-        </Box>
-      )}
-    </div>
-  );
+// --- AddUserDialog Component ---
+interface AddUserDialogProps {
+  open: boolean;
+  onClose: () => void;
+  // Prop expects a function accepting the full payload
+  onAddUser: (userData: NewUserData) => Promise<void>; 
+  error: string | null; 
 }
 
-const RoleChip = ({ role }: { role: UserRole }) => {
-  const getRoleProps = (role: UserRole) => {
-    switch (role) {
-      case 'admin': return { color: 'error' as const, label: 'Admin' };
-      case 'staff': return { color: 'warning' as const, label: 'Staff' };
-      case 'provider': return { color: 'info' as const, label: 'Provider' };
-      case 'patient': return { color: 'success' as const, label: 'Patient' };
-      default: return { color: 'default' as const, label: role };
-    }
-  };
-  const props = getRoleProps(role);
-  return <Chip label={props.label} color={props.color} size="small" />;
-};
+function AddUserDialog({ open, onClose, onAddUser, error }: AddUserDialogProps) {
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [roles, setRoles] = useState<UserRole[]>(['patient']);
+    const [dialogError, setDialogError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
 
+    // Reset form when dialog opens/closes or external error changes
+    useEffect(() => {
+        if (open) {
+            setFirstName('');
+            setLastName('');
+            setEmail('');
+            setPassword('');
+            setRoles(['patient']);
+            setDialogError(error);
+            setLoading(false);
+        } else {
+             setDialogError(null);
+        }
+    }, [open, error]);
+
+    const handleRoleChange = (event: any) => {
+        const { value } = event.target;
+        setRoles([value] as UserRole[]); // Assume single role selection
+    };
+
+    const handleAddClick = async () => {
+        // Adjust validation
+        if (!firstName.trim()) { setDialogError('First Name is required.'); return; }
+        if (!lastName.trim()) { setDialogError('Last Name is required.'); return; }
+        if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) { setDialogError('Valid Email is required.'); return; }
+        if (!password || password.length < 6) { setDialogError('Password must be at least 6 characters.'); return; }
+        if (roles.length === 0) { setDialogError('A role must be selected.'); return; }
+
+        setDialogError(null); 
+        setLoading(true);
+        try {
+            // Call onAddUser with the complete payload including password
+            await onAddUser({ 
+                first_name: firstName.trim(), 
+                last_name: lastName.trim(), 
+                email: email.trim(), 
+                password, // Include password
+                role: roles[0] // Send the first selected role
+            });
+        } catch (err) {
+           // Parent handles error display via prop
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+            <DialogTitle>Add New User</DialogTitle>
+            <DialogContent>
+                {dialogError && <Alert severity="error" sx={{ mb: 2 }}>{dialogError}</Alert>}
+                <TextField
+                    autoFocus
+                    margin="dense"
+                    id="firstName"
+                    label="First Name"
+                    type="text"
+                    fullWidth
+                    variant="outlined"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    disabled={loading}
+                />
+                 <TextField
+                    margin="dense"
+                    id="lastName"
+                    label="Last Name"
+                    type="text"
+                    fullWidth
+                    variant="outlined"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    disabled={loading}
+                />
+                <TextField
+                    margin="dense"
+                    id="email"
+                    label="Email Address"
+                    type="email"
+                    fullWidth
+                    variant="outlined"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={loading}
+                />
+                <TextField
+                    margin="dense"
+                    id="password"
+                    label="Password (min 6 characters)"
+                    type="password"
+                    fullWidth
+                    variant="outlined"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={loading}
+                />
+                <FormControl fullWidth margin="dense" disabled={loading}>
+                    <InputLabel id="role-label">Role</InputLabel> 
+                    <Select
+                        labelId="role-label"
+                        id="role"
+                        value={roles[0] || ''} // Use first element of roles array
+                        onChange={handleRoleChange}
+                        label="Role"
+                    >
+                        <MenuItem value="admin">Admin</MenuItem>
+                        <MenuItem value="provider">Provider</MenuItem>
+                        <MenuItem value="patient">Patient</MenuItem>
+                    </Select>
+                </FormControl>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose} disabled={loading}>Cancel</Button>
+                <Button onClick={handleAddClick} disabled={loading} variant="contained">
+                    {loading ? <LinearProgress sx={{ width: '80px' }} /> : 'Add User'}
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+}
+
+// --- UsersManagementPage Component ---
 export default function UsersManagementPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null); // For fetch errors
+  const [addUserDialogOpen, setAddUserDialogOpen] = useState(false);
+  const [addUserError, setAddUserError] = useState<string | null>(null); // For AddUserDialog submission error
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedUserForMenu, setSelectedUserForMenu] = useState<User | null>(null);
-  const [selectedUserForDetails, setSelectedUserForDetails] = useState<User | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [tabValue, setTabValue] = useState(0);
-  const [userActivities, setUserActivities] = useState<UserActivity[]>([]);
-  const [addUserOpen, setAddUserOpen] = useState(false);
-  const [newUser, setNewUser] = useState({
-    first_name: '',
-    last_name: '',
-    email: '',
-    password: '',
-    role: 'patient' as UserRole
-  });
-  const [addUserLoading, setAddUserLoading] = useState(false);
-  const [addUserError, setAddUserError] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const menuOpen = Boolean(anchorEl);
 
-  useEffect(() => {
-    const syncAndFetchUsers = async () => {
-      try {
-        setLoading(true);
-        // First sync users to ensure all auth.users are in our users table
-        const response = await fetch('/api/auth/sync-users');
-        if (!response.ok) {
-          console.error('Error syncing users:', await response.text());
-        } else {
-          const result = await response.json();
-          console.log('User sync result:', result);
-        }
-        
-        // Then fetch users
-        await fetchUsers();
-      } catch (error) {
-        console.error('Error in sync and fetch:', error);
-        setLoading(false);
-      }
-    };
-    
-    syncAndFetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
-    try {
-      console.log('Fetching users...');
-      
-      // Try to fetch from the users_view instead of users table
-      const { data: usersData, error: usersError } = await supabase
-        .from('users_view')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (usersError) {
-        console.error('Error fetching from users_view:', usersError);
-        
-        // Fall back to users table if view doesn't exist
-        const { data: directUsersData, error: directUsersError } = await supabase
-          .from('users')
-          .select('*')
-          .order('created_at', { ascending: false });
-          
-        if (directUsersError) {
-          console.error('Error fetching from users table directly:', directUsersError);
-          setUsers([]);
-        } else {
-          console.log('Users data from direct table:', directUsersData);
-          setUsers(directUsersData || []);
-        }
-      } else {
-        console.log('Users data from view:', usersData);
-        setUsers(usersData || []);
-      }
-    } catch (error) {
-      console.error('Unhandled error fetching users:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchUserActivities = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('user_activities')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setUserActivities(data || []);
-    } catch (error) {
-      console.error('Error fetching user activities:', error);
-    }
-  };
-
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, user: User) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedUserForMenu(user);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-    setSelectedUserForMenu(null);
-  };
-
-  const handleRoleChange = async (newRole: UserRole) => {
-    if (!selectedUserForMenu) return;
-
-    try {
-      const { error } = await supabase
-        .from('users')
-        .update({ role: newRole })
-        .eq('id', selectedUserForMenu.id);
-
-      if (error) throw error;
-
-      setUsers(users.map(user =>
-        user.id === selectedUserForMenu.id
-          ? { ...user, role: newRole }
-          : user
-      ));
-    } catch (error) {
-      console.error('Error updating user role:', error);
-    } finally {
-      handleMenuClose();
-    }
-  };
-
-  const handleDetailsOpen = async (user: User) => {
-    setSelectedUserForDetails(user);
-    setDetailsOpen(true);
-    await fetchUserActivities(user.id);
-  };
-
-  const handleDetailsClose = () => {
-    setDetailsOpen(false);
-    setSelectedUserForDetails(null);
-  };
-
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-  };
-
-  const handleAddUserOpen = () => {
-    setAddUserError(null);
-    setNewUser({
-      first_name: '',
-      last_name: '',
-      email: '',
-      password: '',
-      role: 'patient' as UserRole
-    });
-    setAddUserOpen(true);
-  };
-
-  const handleAddUserClose = () => {
-    setAddUserOpen(false);
-  };
-
-  const handleNewUserChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
-    const { name, value } = e.target;
-    setNewUser({
-      ...newUser,
-      [name as string]: value
-    });
-  };
-
-  const handleAddUser = async () => {
-    try {
-      setAddUserLoading(true);
-      setAddUserError(null);
-      
-      // Call API to create user
-      const response = await fetch('/api/admin/create-user', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newUser),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create user');
-      }
-      
-      // Refresh user list
-      await fetchUsers();
-      
-      // Close dialog
-      handleAddUserClose();
-    } catch (error: any) {
-      console.error('Error adding user:', error);
-      setAddUserError(error.message || 'An unknown error occurred');
-    } finally {
-      setAddUserLoading(false);
-    }
-  };
-
-  const columns: GridColDef<User>[] = [
-    {
-      field: 'id',
-      headerName: 'User ID',
-      width: 250,
-      sortable: false,
-      filterable: false,
-    },
-    {
-      field: 'fullName',
-      headerName: 'Full Name',
-      sortable: true,
-      width: 200,
-      renderCell: (params: GridRenderCellParams) => (
-        <>{`${params.row.first_name || ''} ${params.row.last_name || ''}`}</>
-      )
-    },
-    {
-      field: 'email',
-      headerName: 'Email',
-      sortable: true,
-      width: 250,
-    },
-    {
-      field: 'role',
-      headerName: 'Role',
-      width: 120,
-      sortable: true,
-      renderCell: (params: GridRenderCellParams) => <RoleChip role={params.value as UserRole} />,
-    },
-    {
-      field: 'createdAt',
-      headerName: 'Created At',
-      width: 180,
-      sortable: true,
-      valueGetter: (params: { value: unknown }) => 
-        params.value ? new Date(params.value as string) : null,
-      renderCell: (params: GridRenderCellParams<User, Date | null>) =>
-        params.value ? format(params.value, 'MMM d, yyyy h:mm a') : 'N/A',
-      type: 'dateTime',
-    },
-    {
-      field: 'lastSignInAt',
-      headerName: 'Last Sign In',
-      width: 180,
-      sortable: true,
-      valueGetter: (params: { value: unknown }) => 
-        params.value ? new Date(params.value as string) : null,
-      renderCell: (params: GridRenderCellParams<User, Date | null>) =>
-        params.value ? format(params.value, 'MMM d, yyyy h:mm a') : 'N/A',
-      type: 'dateTime',
-    },
-    {
-        field: 'actions',
-        headerName: 'Actions',
-        width: 150,
-        sortable: false,
-        filterable: false,
-        renderCell: (params: GridRenderCellParams) => (
-          <Box>
-             <Button size="small" onClick={() => handleDetailsOpen(params.row as User)}>
-                Details
-             </Button>
-             <IconButton
-                size="small"
-                onClick={(event) => handleMenuOpen(event, params.row as User)}
-             >
-                <MoreVertIcon fontSize="small" />
-             </IconButton>
-          </Box>
-        ),
-    },
-  ];
-
-  if (loading) {
-    return <LinearProgress />;
-  }
-
-  return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">Users Management</Typography>
-        <Button variant="contained" onClick={handleAddUserOpen}>
+  // Define the Custom Toolbar Component *inside* UsersManagementPage
+  // It now accepts GridToolbarProps and accesses setAddUserDialogOpen from the outer scope
+  function UserTableToolbarWithAdd(props: GridToolbarProps) {
+    return (
+      <GridToolbarContainer {...props} sx={{ p: 1, pb: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <GridToolbarQuickFilter 
+          sx={{ 
+              width: { xs: 1, sm: 'auto' },
+              mr: { xs: 0, sm: 2 },
+              mb: { xs: 1, sm: 0 },
+          }} 
+        />
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => setAddUserDialogOpen(true)} // Directly use the state setter from the parent scope
+          sx={{ flexShrink: 0 }} // Prevent button from shrinking
+        >
           Add User
         </Button>
+      </GridToolbarContainer>
+    );
+  }
+
+  // --- Handlers ---
+   const handleMenuClick = (event: React.MouseEvent<HTMLElement>, userId: string) => {
+     setAnchorEl(event.currentTarget);
+     setSelectedUserId(userId);
+   };
+   const handleMenuClose = () => {
+     setAnchorEl(null);
+     setSelectedUserId(null);
+   };
+
+  const fetchUsers = useCallback(async () => {
+    // Keep loading true until fetch completes or fails critically
+    setLoading(true);
+    setError(null);
+    try {
+      // Sync users first - non-critical failure
+      const syncResponse = await fetch('/api/auth/sync-users');
+      if (!syncResponse.ok) {
+           console.warn("User sync failed (non-critical):", await syncResponse.text());
+      }
+
+      // Fetch from the users table
+      const { data, error: fetchError } = await supabase
+        .from('users') 
+        .select('*')
+        // Use snake_case for ordering
+        .order('created_at', { ascending: false });
+
+      if (fetchError) {
+        throw fetchError; // Throw error to be caught below
+      }
+      setUsers(data || []);
+    } catch (err: any) {
+      console.error("Error fetching users:", err);
+      setError(err.message || 'Failed to load users.');
+      setUsers([]); // Clear users on critical error
+    } finally {
+      setLoading(false); // Set loading false after fetch attempt
+    }
+  }, []);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  // Update handleAddUser function signature to accept NewUserData
+  const handleAddUser = async (userData: NewUserData) => { 
+    setAddUserError(null); 
+    try {
+      // Pass the complete userData (including password) directly to the API
+      const response = await fetch('/api/admin/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create user');
+      }
+      setAddUserDialogOpen(false);
+      fetchUsers();
+    } catch (error: any) {
+      console.error("Add user error:", error);
+      setAddUserError(error.message || 'An unknown error occurred during user creation.');
+      throw error;
+    }
+  };
+
+    // --- Column Definitions ---
+    const columns: GridColDef<User>[] = [
+        { 
+            field: 'name', 
+            headerName: 'Name', 
+            flex: 1, 
+            minWidth: 150,
+            valueGetter: (value, row: User) => `${row.first_name || ''} ${row.last_name || ''}`,
+        }, 
+        { field: 'email', headerName: 'Email', flex: 1, minWidth: 200 },
+        {
+            field: 'role',
+            headerName: 'Role',
+            width: 150,
+            renderCell: (params: GridRenderCellParams<User, UserRole>) => (
+                 params.value ? <Chip label={params.value} size="small" sx={{ mr: 0.5 }} variant="outlined" /> : null
+            ),
+            sortComparator: (v1: UserRole, v2: UserRole) => (v1 || '').localeCompare(v2 || ''),
+        },
+        {
+            field: 'created_at',
+            headerName: 'Created At',
+            width: 180,
+            type: 'dateTime', 
+            valueGetter: (value: string | null | undefined) => value ? new Date(value) : null,
+            renderCell: (params: GridRenderCellParams<User, Date | null>) =>
+                params.value ? format(params.value, 'MMM d, yyyy h:mm a') : 'N/A',
+        },
+        {
+            field: 'last_sign_in_at',
+            headerName: 'Last Sign In',
+            width: 180,
+            type: 'dateTime', 
+             valueGetter: (value: string | null | undefined) => value ? new Date(value) : null, 
+            renderCell: (params: GridRenderCellParams<User, Date | null>) =>
+                params.value ? format(params.value, 'MMM d, yyyy h:mm a') : 'N/A',
+        },
+        {
+            field: 'actions',
+            headerName: 'Actions',
+            width: 100,
+            sortable: false,
+            disableColumnMenu: true,
+            align: 'center',
+            headerAlign: 'center',
+            renderCell: (params: GridRenderCellParams<User>) => (
+                <IconButton
+                    aria-label="actions"
+                    onClick={(event) => handleMenuClick(event, params.row.id)}
+                >
+                    <MoreVertIcon />
+                </IconButton>
+            ),
+      },
+    ];
+
+
+  // --- Render Logic ---
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px - 48px)', width: '100%' }}>
+      {/* Title Row - Remove Add User Button */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexShrink: 0 }}>
+        <Typography variant="h4" gutterBottom sx={{ mb: 0 }}>
+          Users Management
+        </Typography>
+        {/* <Button /> Removed from here */}
       </Box>
 
-      <Paper sx={{ height: 600, width: '100%' }}>
-          <DataGrid
-            rows={users}
-            columns={columns}
-            pageSizeOptions={[10, 25, 50]}
-            initialState={{
-              pagination: {
-                paginationModel: { page: 0, pageSize: 10 },
-              },
-              sorting: {
-                sortModel: [{ field: 'created_at', sort: 'desc' }],
-              },
-            }}
-            loading={loading}
-            getRowId={(row) => row.id}
-            disableRowSelectionOnClick
-          />
-      </Paper>
+      {/* Loading Indicator */}
+      {loading && <LinearProgress sx={{ width: '100%', mb: 2, flexShrink: 0 }} />}
 
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-      >
-        <MenuItem disabled>Change Role To:</MenuItem>
-        {(['admin', 'staff', 'provider', 'patient'] as UserRole[]).map((role) => (
-          <MenuItem
-            key={role}
-            selected={selectedUserForMenu?.role === role}
-            onClick={() => handleRoleChange(role)}
-          >
-            {role.charAt(0).toUpperCase() + role.slice(1)}
-          </MenuItem>
-        ))}
-      </Menu>
+      {/* Fetch Error Alert */}
+      {error && !loading && (
+          <Alert severity="error" sx={{ mb: 2, flexShrink: 0 }}>{error}</Alert>
+      )}
 
-      <Dialog open={detailsOpen} onClose={handleDetailsClose} maxWidth="md" fullWidth>
-          <DialogTitle>User Details: {selectedUserForDetails?.first_name} {selectedUserForDetails?.last_name}</DialogTitle>
-          <DialogContent> 
-          </DialogContent>
-          <DialogActions>
-              <Button onClick={handleDetailsClose}>Close</Button>
-          </DialogActions>
-      </Dialog>
+      {/* Data Grid Section */} 
+      {!loading && !error && (
+          <Paper sx={{ flexGrow: 1, width: '100%', border: 'none', display: 'flex', overflow: 'hidden' }}> 
+            <DataGrid
+              rows={users}
+              columns={columns}
+              initialState={{
+                pagination: {
+                  paginationModel: { pageSize: 10, page: 0 },
+                },
+                sorting: {
+                  sortModel: [{ field: 'created_at', sort: 'desc' }],
+                },
+              }}
+              pageSizeOptions={[5, 10, 25, 50]}
+              checkboxSelection
+              disableRowSelectionOnClick
+              getRowId={(row) => row.id}
+              autoHeight={false} 
+              // Add slots prop for the custom toolbar
+              slots={{ toolbar: UserTableToolbarWithAdd }}
+              sx={{ 
+                border: 0,
+                flexGrow: 1,
+                '& .MuiDataGrid-columnHeaders': {
+                  backgroundColor: '#F4F6F8',
+                  borderRadius: 0, 
+                  borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+                },
+                '& .MuiDataGrid-cell': {
+                  borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+                },
+                '& .MuiDataGrid-footerContainer': {
+                   borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+                },
+                '& .MuiDataGrid-columnSeparator': {
+                    display: 'none',
+                },
+                '& .MuiTablePagination-root': {},
+                 '& .MuiDataGrid-toolbarContainer .MuiButton-text': {
+                     color: 'text.secondary',
+                 },
+              }}
+            />
+          </Paper>
+      )}
+      
+      {/* Action Menu */}
+        <Menu
+            anchorEl={anchorEl}
+            open={menuOpen}
+            onClose={handleMenuClose}
+            // TODO: Add PaperProps for styling consistency if needed
+        >
+            {/* TODO: Implement Edit/Delete functionality */}
+            <MenuItem onClick={handleMenuClose}>
+                <ListItemIcon><EditIcon fontSize="small"/></ListItemIcon>
+                Edit
+            </MenuItem>
+            <MenuItem onClick={handleMenuClose} sx={{ color: 'error.main' }}>
+                 <ListItemIcon sx={{ color: 'error.main' }}><DeleteIcon fontSize="small"/></ListItemIcon>
+                 Delete
+             </MenuItem>
+            {/* TODO: Implement Role Change if needed */}
+        </Menu>
 
-      <Dialog open={addUserOpen} onClose={handleAddUserClose}>
-        <DialogTitle>Add New User</DialogTitle>
-        <DialogContent>
-           {addUserError && (
-            <Box sx={{ mb: 2, p: 1, bgcolor: 'error.light', borderRadius: 1 }}>
-              <Typography color="error">{addUserError}</Typography>
-            </Box>
-          )}
-          <Box component="form" sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-              label="First Name"
-              name="first_name"
-              value={newUser.first_name}
-              onChange={handleNewUserChange}
-              fullWidth
-              required
-              autoFocus
-              margin="dense"
-            />
-            <TextField
-              label="Last Name"
-              name="last_name"
-              value={newUser.last_name}
-              onChange={handleNewUserChange}
-              fullWidth
-              required
-              margin="dense"
-            />
-            <TextField
-              label="Email"
-              name="email"
-              type="email"
-              value={newUser.email}
-              onChange={handleNewUserChange}
-              fullWidth
-              required
-              margin="dense"
-            />
-            <TextField
-              label="Password"
-              name="password"
-              type="password"
-              value={newUser.password}
-              onChange={handleNewUserChange}
-              fullWidth
-              required
-              margin="dense"
-            />
-            <TextField
-              select
-              label="Role"
-              name="role"
-              value={newUser.role}
-              onChange={handleNewUserChange}
-              fullWidth
-              margin="dense"
-            >
-              <MenuItem value="admin">Admin</MenuItem>
-              <MenuItem value="staff">Staff</MenuItem>
-              <MenuItem value="provider">Provider</MenuItem>
-              <MenuItem value="patient">Patient</MenuItem>
-            </TextField>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleAddUserClose}>Cancel</Button>
-          <Button 
-            onClick={handleAddUser} 
-            variant="contained" 
-            color="primary"
-            disabled={addUserLoading || !newUser.email || !newUser.password || !newUser.first_name || !newUser.last_name}
-          >
-            {addUserLoading ? 'Creating...' : 'Create User'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Add User Dialog */}
+      <AddUserDialog
+         open={addUserDialogOpen}
+         onClose={() => { setAddUserDialogOpen(false); setAddUserError(null); }}
+         onAddUser={handleAddUser} 
+         error={addUserError} 
+       />
 
     </Box>
   );

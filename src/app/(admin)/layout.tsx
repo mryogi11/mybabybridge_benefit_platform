@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   AppBar,
   Box,
@@ -18,7 +18,9 @@ import {
   Menu,
   MenuItem,
   Avatar,
+  Divider,
 } from '@mui/material';
+import { useTheme, alpha } from '@mui/material/styles';
 import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
@@ -26,10 +28,19 @@ import {
   ShoppingCart as ShoppingCartIcon,
   Settings as SettingsIcon,
   Logout as LogoutIcon,
+  AccountCircle,
 } from '@mui/icons-material';
 import { useAuth } from '@/contexts/AuthContext';
+import Link from 'next/link';
 
 const drawerWidth = 240;
+
+const adminNavItems = [
+  { text: 'Dashboard', icon: <DashboardIcon />, path: '/admin' },
+  { text: 'Users', icon: <PeopleIcon />, path: '/admin/users' },
+  { text: 'Packages', icon: <ShoppingCartIcon />, path: '/admin/packages' },
+  { text: 'Settings', icon: <SettingsIcon />, path: '/admin/settings' },
+];
 
 export default function AdminLayout({
   children,
@@ -37,6 +48,8 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const theme = useTheme();
   const { user, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -54,6 +67,7 @@ export default function AdminLayout({
   };
 
   const handleLogout = async () => {
+    handleMenuClose();
     try {
       await signOut();
       router.push('/login');
@@ -62,21 +76,52 @@ export default function AdminLayout({
     }
   };
 
-  const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/admin' },
-    { text: 'Users', icon: <PeopleIcon />, path: '/admin/users' },
-    { text: 'Packages', icon: <ShoppingCartIcon />, path: '/admin/packages' },
-    { text: 'Settings', icon: <SettingsIcon />, path: '/admin/settings' },
-  ];
-
   const drawer = (
     <div>
-      <Toolbar />
-      <List>
-        {menuItems.map((item) => (
-          <ListItem key={item.text} disablePadding>
-            <ListItemButton onClick={() => router.push(item.path)}>
-              <ListItemIcon>{item.icon}</ListItemIcon>
+      <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }} />
+      <Divider />
+      <List sx={{ p: 1 }}>
+        {adminNavItems.map((item) => (
+          <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
+            <ListItemButton
+              component={Link}
+              href={item.path}
+              selected={pathname === item.path}
+              sx={{
+                borderRadius: theme.shape.borderRadius,
+                py: 1,
+                px: 1.5,
+                color: theme.palette.text.secondary,
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                },
+                '&.Mui-selected': {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.16),
+                  color: theme.palette.primary.main,
+                  fontWeight: 'fontWeightBold',
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.24),
+                  },
+                  '& .MuiListItemIcon-root': {
+                    color: theme.palette.primary.main,
+                  },
+                  '& .MuiListItemText-primary': {
+                    fontWeight: 'fontWeightBold',
+                  },
+                },
+                '& .MuiListItemIcon-root': {
+                  color: theme.palette.text.secondary,
+                  minWidth: 'auto',
+                  marginRight: theme.spacing(1.5),
+                },
+                '& .MuiListItemText-primary': {
+                  fontSize: '0.875rem',
+                },
+              }}
+            >
+              <ListItemIcon>
+                {item.icon}
+              </ListItemIcon>
               <ListItemText primary={item.text} />
             </ListItemButton>
           </ListItem>
@@ -95,7 +140,7 @@ export default function AdminLayout({
           ml: { sm: `${drawerWidth}px` },
         }}
       >
-        <Toolbar>
+        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }}>
           <IconButton
             color="inherit"
             aria-label="open drawer"
@@ -112,18 +157,31 @@ export default function AdminLayout({
             onClick={handleMenuOpen}
             sx={{ p: 0 }}
           >
-            <Avatar alt={user?.email || 'Admin'} src="/static/images/avatar/1.jpg" />
+            <Avatar alt={user?.email || 'Admin'} sx={{ width: 32, height: 32 }}>
+              {user?.email ? user.email[0].toUpperCase() : <AccountCircle />}
+            </Avatar>
           </IconButton>
           <Menu
             anchorEl={anchorEl}
             open={Boolean(anchorEl)}
             onClose={handleMenuClose}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            slotProps={{
+                paper: {
+                    sx: {
+                        mt: 1.5,
+                        borderRadius: theme.shape.borderRadius,
+                        boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.1)',
+                    },
+                },
+            }}
           >
-            <MenuItem onClick={handleLogout}>
-              <ListItemIcon>
+            <MenuItem onClick={handleLogout} sx={{ py: 1, px: 2 }}>
+              <ListItemIcon sx={{ minWidth: 'auto', mr: 1.5 }}>
                 <LogoutIcon fontSize="small" />
               </ListItemIcon>
-              Logout
+              <Typography variant="body2">Logout</Typography>
             </MenuItem>
           </Menu>
         </Toolbar>
@@ -163,9 +221,11 @@ export default function AdminLayout({
           flexGrow: 1,
           p: 3,
           width: { sm: `calc(100% - ${drawerWidth}px)` },
+          backgroundColor: theme.palette.background.default,
+          minHeight: '100vh',
         }}
       >
-        <Toolbar />
+        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }} />
         {children}
       </Box>
     </Box>
