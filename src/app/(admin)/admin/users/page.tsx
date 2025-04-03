@@ -29,7 +29,7 @@ import {
 import { supabase } from '@/lib/supabase/client';
 import { User, UserRole, UserActivity } from '@/types';
 
-import { DataGrid, GridColDef, GridValueGetterParams, GridRenderCellParams } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridRenderCellParams, GridValueGetter } from '@mui/x-data-grid';
 import { format } from 'date-fns';
 
 interface TabPanelProps {
@@ -273,7 +273,7 @@ export default function UsersManagementPage() {
     }
   };
 
-  const columns: GridColDef[] = [
+  const columns: GridColDef<User>[] = [
     {
       field: 'id',
       headerName: 'User ID',
@@ -304,14 +304,25 @@ export default function UsersManagementPage() {
       renderCell: (params: GridRenderCellParams) => <RoleChip role={params.value as UserRole} />,
     },
     {
-      field: 'created_at',
+      field: 'createdAt',
       headerName: 'Created At',
       width: 180,
       sortable: true,
-      valueGetter: (params: GridValueGetterParams) =>
-        params.value ? new Date(params.value) : null,
-      renderCell: (params: GridRenderCellParams) =>
-        params.value ? format(params.value as Date, 'PPpp') : 'N/A',
+      valueGetter: (params: { value: unknown }) => 
+        params.value ? new Date(params.value as string) : null,
+      renderCell: (params: GridRenderCellParams<User, Date | null>) =>
+        params.value ? format(params.value, 'MMM d, yyyy h:mm a') : 'N/A',
+      type: 'dateTime',
+    },
+    {
+      field: 'lastSignInAt',
+      headerName: 'Last Sign In',
+      width: 180,
+      sortable: true,
+      valueGetter: (params: { value: unknown }) => 
+        params.value ? new Date(params.value as string) : null,
+      renderCell: (params: GridRenderCellParams<User, Date | null>) =>
+        params.value ? format(params.value, 'MMM d, yyyy h:mm a') : 'N/A',
       type: 'dateTime',
     },
     {

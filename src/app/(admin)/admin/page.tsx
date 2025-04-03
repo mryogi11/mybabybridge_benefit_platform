@@ -33,6 +33,7 @@ interface MonthlyData {
   month: string;
   users: number;
   packages: number;
+  [key: string]: string | number;
 }
 
 // Interface for treatment trend data
