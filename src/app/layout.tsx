@@ -1,23 +1,25 @@
 'use client';
 
-import { AppRouterCacheProvider } from '@mui/material-nextjs/v14-appRouter'
-import { ThemeProvider, createTheme } from '@mui/material/styles'
-import CssBaseline from '@mui/material/CssBaseline'
+// Remove old MUI v5 provider
+// import { AppRouterCacheProvider } from '@mui/material-nextjs/v14-appRouter' 
+
+// Remove old ThemeProvider/createTheme imports if they were here
+// import { ThemeProvider, createTheme } from '@mui/material/styles'
+// import CssBaseline from '@mui/material/CssBaseline'
+
+import { AuthProvider } from '@/contexts/AuthContext';
 import { Inter } from 'next/font/google'
-import { themeOptions } from '@/styles/theme'
-import { AuthProvider } from '@/contexts/AuthContext'
-import './globals.css';
+import './globals.css'
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
+// Import the new ThemeRegistry
+import ThemeRegistry from '@/components/ThemeRegistry/ThemeRegistry';
 
-// Create theme instance on the client side
-const theme = createTheme(themeOptions)
+const inter = Inter({ subsets: ['latin'] })
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+// Note: Removed Metadata export as it should be defined directly in Server Components
+// export const metadata = { ... }
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
@@ -26,15 +28,14 @@ export default function RootLayout({
         <title>MyBabyBridge - Fertility Care Platform</title>
       </head>
       <body className={inter.className}>
+        {/* Wrap everything with AuthProvider first */}
         <AuthProvider>
-          <AppRouterCacheProvider>
-            <ThemeProvider theme={theme}>
-              <CssBaseline />
-              {children}
-            </ThemeProvider>
-          </AppRouterCacheProvider>
+          {/* Then wrap with the ThemeRegistry */}
+          <ThemeRegistry>
+            {children} 
+          </ThemeRegistry>
         </AuthProvider>
       </body>
     </html>
-  )
+  );
 } 
