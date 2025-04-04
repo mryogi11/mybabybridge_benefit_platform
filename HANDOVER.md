@@ -109,13 +109,15 @@ The application uses Supabase for authentication with the following key componen
 
 ## Known Issues and Challenges
 
-1. **Authentication Redirect Issues**: Sometimes there can be issues with redirection after login. The code now includes fallback mechanisms.
-2. **API Routes with Cookies**: Some API routes use cookies which causes warnings during build about dynamic server usage.
-3. **TypeScript Errors**: Ensure careful type handling when working with Supabase responses.
-4. **Data Fetching**: Dashboard pages need proper error handling during data fetching to avoid cascade failures.
-5. **Missing Routes**: New pages must be added with both the correct directory structure and authentication handling.
-6. **Image Handling**: Ensure proper configuration for Next.js Image component when adding new images.
-7. **Session Management**: Occasional session expiration requires additional handling in some edge cases.
+1. **Migration File Management (Resolved):** Previously, duplicate migration timestamps and inconsistent table naming (`patients` vs `patient_profiles`) caused issues with the Supabase CLI (`db reset`, `migrations up`). This required manual renaming of migration files and correction of SQL references. **Ensure all new migrations use unique `<YYYYMMDDHHMMSS>` prefixes.**
+2. **Non-Standard Migration Filenames (Partially Resolved):** The payment migrations (`...a_...` and `...b_...`) were skipped by `db reset` due to non-standard names. They need renaming to the standard `<timestamp>_<name>.sql` format if payment features are required.
+3. **Authentication Redirect Issues**: Sometimes there can be issues with redirection after login. The code now includes fallback mechanisms.
+4. **API Routes with Cookies**: Some API routes use cookies which causes warnings during build about dynamic server usage.
+5. **TypeScript Errors**: Ensure careful type handling when working with Supabase responses.
+6. **Data Fetching**: Dashboard pages need proper error handling during data fetching to avoid cascade failures.
+7. **Missing Routes**: New pages must be added with both the correct directory structure and authentication handling.
+8. **Image Handling**: Ensure proper configuration for Next.js Image component when adding new images.
+9. **Session Management**: Occasional session expiration requires additional handling in some edge cases.
 
 ## Code Patterns and Best Practices
 
@@ -136,18 +138,28 @@ The application uses Supabase for authentication with the following key componen
 
 ## Supabase Schema Overview
 
-The database includes the following main tables (verify against migrations):
+The database schema is managed via SQL migration files in `supabase/migrations/`. The schema was recently cleaned up and reset using `npx supabase db reset --linked`. Key tables include:
 
-- `users`: Base user data from Supabase Auth (usually referenced via auth.uid(), not queried directly often).
-- `profiles`: Stores additional user information like `first_name`, `last_name`, `role` etc. Linked via `id` (foreign key to `auth.users.id`).
-- `packages`: Details about fertility treatment packages available for purchase.
-- `treatment_plans`: Fertility treatment plans linked to users (patients) and potentially providers.
-- `treatment_milestones`: Progress tracking for treatment plans.
-- `appointments`: Patient-provider appointments with status tracking.
-- `notifications`: System notifications for users.
-- `messages`: Communication between patients and providers.
-- `education_resources`: Educational content for patients.
-- `provider_availability` (Potentially needed): Table to store provider work hours/time off.
+*   `users`: Created by `initial_schema`. Contains base user info (`email`, `role`) linked to `auth.users` via `id`.
+*   `providers`: Created by `..._create_providers_table`. Contains provider-specific details, linked to `auth.users` via `user_id`.
+*   `patient_profiles`: Created by `..._create_patient_profile_tables`. Contains patient-specific profile details, linked to `auth.users` via `user_id`.
+*   `appointments`: Created by `..._create_appointments_table`. Links `providers` (via `provider_id`) and `patient_profiles` (via `patient_id`).
+*   `packages`: Defined in `initial_schema`.
+*   `patient_packages`: Defined in `initial_schema`.
+*   `treatment_plans`: Defined in `..._create_treatment_tables`.
+*   `treatment_milestones`: Defined in `..._create_treatment_tables`.
+*   `notifications`: Defined in `..._create_notification_functions`.
+*   `messages`: Defined in `..._create_messaging_tables`.
+*   `documents`: Defined in `..._create_document_tables`.
+*   `feedback_tables` (various): Defined in `..._create_feedback_tables`.
+*   `education_tables` (various): Defined in `..._create_education_tables_v1` (commented out) and `..._create_education_tables_v2`.
+*   `analytics_tables` (various): Defined in `..._create_analytics_tables`.
+*   `payment_tables` (various - Stripe focused): Defined in `..._create_stripe_payment_tables` (Note: this migration was skipped due to filename, needs renaming to apply). Generic payment tables in `..._create_generic_payment_tables` were mostly commented out.
+
+**Important Notes:**
+*   Ensure consistency in referencing patient data via `patient_profiles`.
+*   RLS policies were updated, especially for `appointments`, to correctly join via the `providers` table.
+*   The `update_updated_at_column` function is assumed to be created early (e.g., in `initial_schema`) and reused by triggers.
 
 ## Next Steps and Future Work
 
@@ -206,7 +218,7 @@ These changes have significantly enhanced the platform's professional appearance
 
 *   **Overall:** Development in progress. Core authentication and basic layouts for Admin and Provider are functional. Admin user listing and creation (including detailed provider creation via Server Action) is implemented. Provider login and dashboard access issues have been resolved.
 *   **Auth:** Supabase Auth is used. Basic sign-up/sign-in/sign-out works. Role handling is implemented via custom claims/users table.
-*   **Database:** Supabase Postgres. Key tables include `users`, `providers`, `patients`, `appointments`, `messages`. Schema might need further refinement, especially relationships and constraints.
+*   **Database:** Supabase Postgres. Schema rebuilt via cleaned-up migrations. Key tables include `users`, `providers`, `patient_profiles`, `appointments`, `messages`. Payment migrations need filename correction to apply.
 *   **Admin Module:** User list page with search/filter implemented. User creation dialog allows adding all roles, including providers with specific details. Edit/Delete functionality is pending.
 *   **Provider Module:** Basic layout and sidebar navigation implemented. Dashboard is accessible after login. Specific pages (Profile, Patients, Appointments, etc.) are linked but need content and functionality.
 *   **Patient Module:** Layout exists but functionality is pending.
@@ -239,9 +251,9 @@ These changes have significantly enhanced the platform's professional appearance
 
 ## Handover Checklist
 
-*   [ ] Environment variables (`.env.local`) configured correctly.
-*   [ ] Necessary database migrations/seed data applied.
-*   [ ] Clear understanding of the current feature set and limitations.
+*   [x] Environment variables (`.env.local`) configured correctly.
+*   [x] Database schema applied via `npx supabase db reset --linked` using corrected migrations.
+*   [x] Clear understanding of the current feature set and limitations.
 *   [ ] Familiarity with the key code locations listed above.
 *   [ ] Review `TODO.md` for pending tasks and priorities. 
 

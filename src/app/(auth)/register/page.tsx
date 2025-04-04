@@ -63,7 +63,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await signUp(formData.email, formData.password);
+      await signUp(formData.email, formData.password, formData.firstName, formData.lastName);
       router.push('/dashboard');
     } catch (err) {
       setError('Registration failed. Please try again.');

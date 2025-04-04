@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS public.appointments (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     provider_id UUID NOT NULL REFERENCES public.providers(id) ON DELETE CASCADE,
-    patient_id UUID NOT NULL REFERENCES public.patients(id) ON DELETE CASCADE,
+    patient_id UUID NOT NULL REFERENCES public.patient_profiles(id) ON DELETE CASCADE,
     appointment_date TIMESTAMP WITH TIME ZONE NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('scheduled', 'completed', 'cancelled')),
     notes TEXT,
@@ -20,22 +20,36 @@ CREATE INDEX IF NOT EXISTS appointments_status_idx ON public.appointments(status
 ALTER TABLE public.appointments ENABLE ROW LEVEL SECURITY;
 
 -- Create policies
+DROP POLICY IF EXISTS "Providers can view their own appointments" ON public.appointments;
 CREATE POLICY "Providers can view their own appointments"
     ON public.appointments FOR SELECT
-    USING (auth.uid() = provider_id);
+    USING ( (
+        SELECT p.user_id FROM public.providers p WHERE p.id = provider_id
+    ) = auth.uid() );
 
+DROP POLICY IF EXISTS "Providers can insert their own appointments" ON public.appointments;
 CREATE POLICY "Providers can insert their own appointments"
     ON public.appointments FOR INSERT
-    WITH CHECK (auth.uid() = provider_id);
+    WITH CHECK ( (
+        SELECT p.user_id FROM public.providers p WHERE p.id = provider_id
+    ) = auth.uid() );
 
+DROP POLICY IF EXISTS "Providers can update their own appointments" ON public.appointments;
 CREATE POLICY "Providers can update their own appointments"
     ON public.appointments FOR UPDATE
-    USING (auth.uid() = provider_id)
-    WITH CHECK (auth.uid() = provider_id);
+    USING ( (
+        SELECT p.user_id FROM public.providers p WHERE p.id = provider_id
+    ) = auth.uid() )
+    WITH CHECK ( (
+        SELECT p.user_id FROM public.providers p WHERE p.id = provider_id
+    ) = auth.uid() );
 
+DROP POLICY IF EXISTS "Providers can delete their own appointments" ON public.appointments;
 CREATE POLICY "Providers can delete their own appointments"
     ON public.appointments FOR DELETE
-    USING (auth.uid() = provider_id);
+    USING ( (
+        SELECT p.user_id FROM public.providers p WHERE p.id = provider_id
+    ) = auth.uid() );
 
 -- Create function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION public.handle_updated_at()

@@ -16,7 +16,7 @@ CREATE TABLE payment_methods (
 -- Create subscriptions table
 CREATE TABLE subscriptions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    patient_id UUID REFERENCES patients(id),
+    patient_id UUID REFERENCES patient_profiles(id),
     provider_id UUID REFERENCES providers(id),
     stripe_subscription_id TEXT NOT NULL,
     stripe_customer_id TEXT NOT NULL,
@@ -47,7 +47,7 @@ CREATE TABLE subscription_plans (
 CREATE TABLE transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     subscription_id UUID REFERENCES subscriptions(id),
-    patient_id UUID REFERENCES patients(id),
+    patient_id UUID REFERENCES patient_profiles(id),
     provider_id UUID REFERENCES providers(id),
     stripe_transaction_id TEXT NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
@@ -61,7 +61,7 @@ CREATE TABLE transactions (
 CREATE TABLE invoices (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     subscription_id UUID REFERENCES subscriptions(id),
-    patient_id UUID REFERENCES patients(id),
+    patient_id UUID REFERENCES patient_profiles(id),
     provider_id UUID REFERENCES providers(id),
     stripe_invoice_id TEXT NOT NULL,
     amount_due DECIMAL(10,2) NOT NULL,
@@ -75,7 +75,7 @@ CREATE TABLE invoices (
 -- Create insurance information table
 CREATE TABLE insurance_information (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    patient_id UUID REFERENCES patients(id),
+    patient_id UUID REFERENCES patient_profiles(id),
     provider_id UUID REFERENCES providers(id),
     insurance_provider TEXT NOT NULL,
     policy_number TEXT NOT NULL,
@@ -173,14 +173,15 @@ CREATE POLICY "Users can manage their own payment methods"
     );
 
 -- Subscriptions policies
+DROP POLICY IF EXISTS "Users can view their own subscriptions" ON subscriptions;
 CREATE POLICY "Users can view their own subscriptions"
     ON subscriptions FOR SELECT
     TO authenticated
     USING (
         EXISTS (
-            SELECT 1 FROM patients
-            WHERE patients.id = subscriptions.patient_id
-            AND patients.user_id = auth.uid()
+            SELECT 1 FROM patient_profiles
+            WHERE patient_profiles.id = subscriptions.patient_id
+            AND patient_profiles.user_id = auth.uid()
         ) OR
         EXISTS (
             SELECT 1 FROM providers
@@ -189,14 +190,15 @@ CREATE POLICY "Users can view their own subscriptions"
         )
     );
 
+DROP POLICY IF EXISTS "Users can manage their own subscriptions" ON subscriptions;
 CREATE POLICY "Users can manage their own subscriptions"
     ON subscriptions FOR ALL
     TO authenticated
     USING (
         EXISTS (
-            SELECT 1 FROM patients
-            WHERE patients.id = subscriptions.patient_id
-            AND patients.user_id = auth.uid()
+            SELECT 1 FROM patient_profiles
+            WHERE patient_profiles.id = subscriptions.patient_id
+            AND patient_profiles.user_id = auth.uid()
         ) OR
         EXISTS (
             SELECT 1 FROM providers
@@ -222,14 +224,15 @@ CREATE POLICY "Only providers can manage subscription plans"
     );
 
 -- Transactions policies
+DROP POLICY IF EXISTS "Users can view their own transactions" ON transactions;
 CREATE POLICY "Users can view their own transactions"
     ON transactions FOR SELECT
     TO authenticated
     USING (
         EXISTS (
-            SELECT 1 FROM patients
-            WHERE patients.id = transactions.patient_id
-            AND patients.user_id = auth.uid()
+            SELECT 1 FROM patient_profiles
+            WHERE patient_profiles.id = transactions.patient_id
+            AND patient_profiles.user_id = auth.uid()
         ) OR
         EXISTS (
             SELECT 1 FROM providers
@@ -239,14 +242,15 @@ CREATE POLICY "Users can view their own transactions"
     );
 
 -- Invoices policies
+DROP POLICY IF EXISTS "Users can view their own invoices" ON invoices;
 CREATE POLICY "Users can view their own invoices"
     ON invoices FOR SELECT
     TO authenticated
     USING (
         EXISTS (
-            SELECT 1 FROM patients
-            WHERE patients.id = invoices.patient_id
-            AND patients.user_id = auth.uid()
+            SELECT 1 FROM patient_profiles
+            WHERE patient_profiles.id = invoices.patient_id
+            AND patient_profiles.user_id = auth.uid()
         ) OR
         EXISTS (
             SELECT 1 FROM providers
@@ -256,14 +260,15 @@ CREATE POLICY "Users can view their own invoices"
     );
 
 -- Insurance information policies
+DROP POLICY IF EXISTS "Users can view their own insurance information" ON insurance_information;
 CREATE POLICY "Users can view their own insurance information"
     ON insurance_information FOR SELECT
     TO authenticated
     USING (
         EXISTS (
-            SELECT 1 FROM patients
-            WHERE patients.id = insurance_information.patient_id
-            AND patients.user_id = auth.uid()
+            SELECT 1 FROM patient_profiles
+            WHERE patient_profiles.id = insurance_information.patient_id
+            AND patient_profiles.user_id = auth.uid()
         ) OR
         EXISTS (
             SELECT 1 FROM providers
@@ -272,14 +277,15 @@ CREATE POLICY "Users can view their own insurance information"
         )
     );
 
+DROP POLICY IF EXISTS "Users can manage their own insurance information" ON insurance_information;
 CREATE POLICY "Users can manage their own insurance information"
     ON insurance_information FOR ALL
     TO authenticated
     USING (
         EXISTS (
-            SELECT 1 FROM patients
-            WHERE patients.id = insurance_information.patient_id
-            AND patients.user_id = auth.uid()
+            SELECT 1 FROM patient_profiles
+            WHERE patient_profiles.id = insurance_information.patient_id
+            AND patient_profiles.user_id = auth.uid()
         ) OR
         EXISTS (
             SELECT 1 FROM providers

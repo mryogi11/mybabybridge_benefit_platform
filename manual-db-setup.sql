@@ -45,6 +45,21 @@ WHERE email = 'provider.test@mybaby.com';
 -- Display all users after updates
 SELECT * FROM users ORDER BY created_at DESC;
 
+-- Helper function to check current user's role without recursion
+CREATE OR REPLACE FUNCTION is_admin()
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER -- Runs with privileges of the function owner, safer
+-- Set search_path to prevent hijacking: Adjust schema if needed
+SET search_path = public
+AS $$
+    SELECT EXISTS (
+        SELECT 1
+        FROM users
+        WHERE id = auth.uid() AND role = 'admin'
+    );
+$$;
+
 -- Create any other tables needed for the admin panel
 CREATE TABLE IF NOT EXISTS user_activities (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -59,19 +74,13 @@ CREATE TABLE IF NOT EXISTS user_activities (
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow users with admin role to read all users" ON users;
 CREATE POLICY "Allow users with admin role to read all users" ON users
-    FOR SELECT USING (
-        (SELECT role FROM users WHERE id = auth.uid()) = 'admin'
-    );
+    FOR SELECT USING (is_admin());
     
 DROP POLICY IF EXISTS "Allow users to read their own data" ON users;
 CREATE POLICY "Allow users to read their own data" ON users
-    FOR SELECT USING (
-        auth.uid() = id
-    );
+    FOR SELECT USING (auth.uid() = id);
 
 -- Allow admins to update user roles
 DROP POLICY IF EXISTS "Allow admins to update user roles" ON users;
 CREATE POLICY "Allow admins to update user roles" ON users
-    FOR UPDATE USING (
-        (SELECT role FROM users WHERE id = auth.uid()) = 'admin'
-    ); 
+    FOR UPDATE USING (is_admin()); 

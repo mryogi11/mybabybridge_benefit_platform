@@ -67,20 +67,43 @@ export async function createUserAction(userData: NewUserData): Promise<{ success
         });
 
         if (authError) {
-            if (authError.message.includes('User already exists')) {
+            // Check for specific Supabase error code or message
+            const isExistingUserError = authError.message.includes('User already exists') || (authError as any).code === 'email_exists';
+
+            if (isExistingUserError) {
                 console.warn("[Server Action] Auth user already exists for email:", userData.email, ". Retrieving existing ID.");
-                const { data: existingUserData, error: getUserError } = await supabaseAdmin
+                // Attempt to find the user in auth.users via admin API to get the ID
+                const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+                    filter: `email = "${userData.email}"`
+                });
+
+                if (listError || !users || users.length === 0) {
+                     console.error("[Server Action] Auth user exists, but failed to retrieve ID via admin API:", listError);
+                     throw new Error(`Auth user exists, but couldn't retrieve ID via admin API. ${listError?.message || ''}`);
+                }
+
+                // Check if user also exists in public.users
+                const existingPublicUser = await supabaseAdmin
                     .from('users')
                     .select('id')
-                    .eq('email', userData.email)
-                    .single();
+                    .eq('id', users[0].id)
+                    .maybeSingle(); // Use maybeSingle to handle potential null
 
-                if (getUserError || !existingUserData) {
-                    console.error("[Server Action] Auth user exists, but failed to retrieve ID from public table:", getUserError);
-                    throw new Error(`Auth user exists, but couldn't retrieve ID. ${getUserError?.message || ''}`);
+                if (existingPublicUser.error) {
+                    console.error("[Server Action] Error checking public.users for existing user:", existingPublicUser.error);
+                    throw new Error(`Failed to check public.users table. ${existingPublicUser.error.message}`);
                 }
-                newUserId = existingUserData.id; // Assign existing ID
-                console.log("[Server Action] Found existing user ID:", newUserId);
+                
+                newUserId = users[0].id; // Assign existing ID from auth listing
+                console.log("[Server Action] Found existing auth user ID:", newUserId);
+
+                // If user doesn't exist in public.users yet (from a failed previous attempt), 
+                // proceed as if it's a new user insertion for subsequent steps.
+                // The upsert logic will handle creating the public.users row.
+                if (!existingPublicUser.data) {
+                     console.warn("[Server Action] Existing auth user found, but no corresponding row in public.users. Proceeding with upsert.");
+                }
+
             } else {
                 console.error("[Server Action] Supabase Auth Error:", authError);
                 if (authError.message === 'User not allowed') {
@@ -102,14 +125,16 @@ export async function createUserAction(userData: NewUserData): Promise<{ success
         console.log("[Server Action] Using User ID for upsert:", newUserId);
 
         // Step 2: Upsert into the public 'users' table using the Admin Client
+        // Ensure only columns that exist in the 'users' table are included
         const { error: usersTableError } = await supabaseAdmin // Use admin client
             .from('users')
             .upsert({
                 id: newUserId, // Use the obtained ID
                 email: userData.email,
-                role: userData.role,
-                first_name: userData.first_name,
-                last_name: userData.last_name,
+                role: userData.role
+                // Removed first_name and last_name as they don't exist in users table
+                // first_name: userData.first_name,
+                // last_name: userData.last_name,
             }, { onConflict: 'id' }); // Specify the conflict column
 
         if (usersTableError) {
@@ -138,6 +163,25 @@ export async function createUserAction(userData: NewUserData): Promise<{ success
                 throw new Error(providerTableError.message || "Failed to upsert provider details.");
             }
             console.log("[Server Action] Provider details upserted successfully for user:", newUserId);
+        }
+        // Step 3b: If the role is 'patient', upsert into the 'patient_profiles' table
+        else if (userData.role === 'patient') {
+            console.log("[Server Action] User role is patient, attempting to upsert into patient_profiles table...");
+            const { error: patientProfileTableError } = await supabaseAdmin
+                .from('patient_profiles')
+                .upsert({
+                    user_id: newUserId,
+                    first_name: userData.first_name,
+                    last_name: userData.last_name,
+                    email: userData.email // Include email if it's part of patient_profiles schema
+                    // Add other relevant patient fields if available in userData and schema
+                }, { onConflict: 'user_id'}); // Ensure conflict column is correct
+            
+            if (patientProfileTableError) {
+                console.error("[Server Action] Supabase patient_profiles table upsert Error:", patientProfileTableError);
+                throw new Error(patientProfileTableError.message || "Failed to upsert patient details.");
+            }
+            console.log("[Server Action] Patient profile details upserted successfully for user:", newUserId);
         }
 
         console.log("[Server Action] User creation/update process completed successfully for:", newUserId);

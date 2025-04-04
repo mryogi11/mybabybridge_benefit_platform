@@ -32,7 +32,7 @@ interface AuthContextType {
   isLoading: boolean;
   isProfileLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ user: User | null; session: Session | null } | undefined>;
-  signUp: (email: string, password: string) => Promise<{ user: User | null; session: Session | null } | undefined>;
+  signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<{ user: User | null; session: Session | null } | undefined>;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
 }
@@ -310,31 +310,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
+    debugLog('Signing up with email:', email);
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      debugLog(`Signing up with email: ${email}`);
-      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          // Pass first_name and last_name in the data object
+          data: { 
+            first_name: firstName,
+            last_name: lastName,
+          },
+        },
       });
-      
+
       if (error) {
         debugLog('Sign up error:', error);
-        setIsLoading(false);
+        // Propagate error to UI if needed
         throw error;
+      } else if (data.user) {
+        debugLog('Sign up successful:', data.user.email);
+        // Note: The onAuthStateChange listener will handle setting user/session/profile state
+        return { user: data.user, session: data.session };
+      } else {
+        // Handle cases like user already exists but unconfirmed, etc.
+         debugLog('Sign up returned no user but no error (e.g., needs confirmation):', data);
+         return { user: null, session: null }; // Or handle as appropriate
       }
-      
-      debugLog(`Sign up successful for user: ${data.user?.email}`);
-      debugLog(`Email confirmation status: ${data.user?.email_confirmed_at ? 'Confirmed' : 'Not confirmed'}`);
-      
+    } catch (err) {
+      debugLog('Error during sign up:', err);
+      throw err; // Re-throw to be caught by caller
+    } finally {
       setIsLoading(false);
-      return { user: data.user, session: data.session };
-    } catch (error) {
-      debugLog('Error during sign up:', error);
-      setIsLoading(false);
-      throw error;
     }
   };
 

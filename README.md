@@ -136,13 +136,21 @@ npm start
    npm install
    ```
 
-2. Run database migrations:
+2. Link Supabase CLI to your hosted project (only needs to be done once):
    ```bash
-   # Navigate to the supabase directory
-   cd supabase
+   # Replace <PROJECT_REF> with your actual Supabase project reference ID
+   npx supabase link --project-ref <PROJECT_REF>
+   ```
+
+3. Apply database migrations to your **hosted** Supabase project:
+   ```bash
+   # WARNING: This command resets the linked remote database, deleting all data!
+   # It then applies all migrations found in supabase/migrations/
+   # Ensure migration filenames use unique timestamps (<YYYYMMDDHHMMSS>_name.sql).
+   npx supabase db reset --linked
    
-   # Run migrations
-   supabase db reset
+   # Alternatively, to apply only new pending migrations (without resetting):
+   # npx supabase migrations up --linked 
    ```
 
 ## Project Structure

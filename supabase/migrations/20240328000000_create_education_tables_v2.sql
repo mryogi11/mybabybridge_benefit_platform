@@ -26,7 +26,7 @@ CREATE TABLE education_resources (
 -- Create patient education progress table
 CREATE TABLE patient_education_progress (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
+    patient_id UUID REFERENCES patient_profiles(id) ON DELETE CASCADE,
     resource_id UUID REFERENCES education_resources(id) ON DELETE CASCADE,
     status TEXT CHECK (status IN ('not_started', 'in_progress', 'completed')),
     progress_percentage INTEGER CHECK (progress_percentage >= 0 AND progress_percentage <= 100),
@@ -97,16 +97,18 @@ CREATE POLICY "Only providers can manage education resources"
     WITH CHECK (auth.uid() IN (SELECT user_id FROM providers));
 
 -- Patient education progress policies
+DROP POLICY IF EXISTS "Patients can view their own education progress" ON patient_education_progress;
 CREATE POLICY "Patients can view their own education progress"
     ON patient_education_progress FOR SELECT
     TO authenticated
-    USING (patient_id IN (SELECT id FROM patients WHERE user_id = auth.uid()));
+    USING (patient_id IN (SELECT id FROM patient_profiles WHERE user_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Patients can update their own education progress" ON patient_education_progress;
 CREATE POLICY "Patients can update their own education progress"
     ON patient_education_progress FOR UPDATE
     TO authenticated
-    USING (patient_id IN (SELECT id FROM patients WHERE user_id = auth.uid()))
-    WITH CHECK (patient_id IN (SELECT id FROM patients WHERE user_id = auth.uid()));
+    USING (patient_id IN (SELECT id FROM patient_profiles WHERE user_id = auth.uid()))
+    WITH CHECK (patient_id IN (SELECT id FROM patient_profiles WHERE user_id = auth.uid()));
 
 CREATE POLICY "Providers can view patient education progress"
     ON patient_education_progress FOR SELECT

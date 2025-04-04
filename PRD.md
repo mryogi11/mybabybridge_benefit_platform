@@ -16,6 +16,7 @@
 *   **Authentication:** Supabase Auth (@supabase/auth-helpers-nextjs ^0.9.0)
 *   **Language:** TypeScript
 *   **Package Manager:** npm (or Yarn - confirm from lock file if needed)
+*   **Development Database:** Hosted Supabase project (not local Docker instance)
 *   **Deployment:** Vercel (planned)
 
 ## Features and Functionalities

@@ -4,7 +4,7 @@ CREATE TABLE analytics_events (
     event_type TEXT NOT NULL,
     event_data JSONB,
     user_id UUID REFERENCES auth.users(id),
-    patient_id UUID REFERENCES patients(id),
+    patient_id UUID REFERENCES patient_profiles(id),
     provider_id UUID REFERENCES providers(id),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -16,7 +16,7 @@ CREATE TABLE analytics_metrics (
     metric_value JSONB,
     period_start TIMESTAMPTZ NOT NULL,
     period_end TIMESTAMPTZ NOT NULL,
-    patient_id UUID REFERENCES patients(id),
+    patient_id UUID REFERENCES patient_profiles(id),
     provider_id UUID REFERENCES providers(id),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -28,7 +28,7 @@ CREATE TABLE analytics_reports (
     report_data JSONB,
     period_start TIMESTAMPTZ NOT NULL,
     period_end TIMESTAMPTZ NOT NULL,
-    patient_id UUID REFERENCES patients(id),
+    patient_id UUID REFERENCES patient_profiles(id),
     provider_id UUID REFERENCES providers(id),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -56,15 +56,16 @@ ALTER TABLE analytics_metrics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE analytics_reports ENABLE ROW LEVEL SECURITY;
 
 -- Analytics events policies
+DROP POLICY IF EXISTS "Users can view their own analytics events" ON analytics_events;
 CREATE POLICY "Users can view their own analytics events"
     ON analytics_events FOR SELECT
     TO authenticated
     USING (
         user_id = auth.uid() OR
         EXISTS (
-            SELECT 1 FROM patients
-            WHERE patients.id = analytics_events.patient_id
-            AND patients.user_id = auth.uid()
+            SELECT 1 FROM patient_profiles
+            WHERE patient_profiles.id = analytics_events.patient_id
+            AND patient_profiles.user_id = auth.uid()
         ) OR
         EXISTS (
             SELECT 1 FROM providers
@@ -79,14 +80,15 @@ CREATE POLICY "System can insert analytics events"
     WITH CHECK (true);
 
 -- Analytics metrics policies
+DROP POLICY IF EXISTS "Users can view their own analytics metrics" ON analytics_metrics;
 CREATE POLICY "Users can view their own analytics metrics"
     ON analytics_metrics FOR SELECT
     TO authenticated
     USING (
         EXISTS (
-            SELECT 1 FROM patients
-            WHERE patients.id = analytics_metrics.patient_id
-            AND patients.user_id = auth.uid()
+            SELECT 1 FROM patient_profiles
+            WHERE patient_profiles.id = analytics_metrics.patient_id
+            AND patient_profiles.user_id = auth.uid()
         ) OR
         EXISTS (
             SELECT 1 FROM providers
@@ -101,14 +103,15 @@ CREATE POLICY "System can insert analytics metrics"
     WITH CHECK (true);
 
 -- Analytics reports policies
+DROP POLICY IF EXISTS "Users can view their own analytics reports" ON analytics_reports;
 CREATE POLICY "Users can view their own analytics reports"
     ON analytics_reports FOR SELECT
     TO authenticated
     USING (
         EXISTS (
-            SELECT 1 FROM patients
-            WHERE patients.id = analytics_reports.patient_id
-            AND patients.user_id = auth.uid()
+            SELECT 1 FROM patient_profiles
+            WHERE patient_profiles.id = analytics_reports.patient_id
+            AND patient_profiles.user_id = auth.uid()
         ) OR
         EXISTS (
             SELECT 1 FROM providers
@@ -174,7 +177,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION calculate_appointment_metrics(
-    p_patient_id UUID,
+    p_patient_profile_id UUID,
     p_start_date TIMESTAMPTZ,
     p_end_date TIMESTAMPTZ
 ) RETURNS JSONB AS $$
@@ -192,8 +195,8 @@ BEGIN
         )
     ) INTO v_metrics
     FROM appointments
-    WHERE patient_id = p_patient_id
-    AND scheduled_date BETWEEN p_start_date AND p_end_date;
+    WHERE appointments.patient_id = p_patient_profile_id
+    AND appointment_date BETWEEN p_start_date AND p_end_date;
 
     RETURN v_metrics;
 END;
@@ -223,47 +226,52 @@ BEGIN
         NEW.patient_id;
 
     -- Insert treatment success metrics
-    INSERT INTO analytics_metrics (
-        metric_type,
-        metric_value,
-        period_start,
-        period_end,
-        patient_id
-    )
-    SELECT
-        'treatment_success',
-        calculate_treatment_success_metrics(
-            NEW.patient_id,
+    IF EXISTS (SELECT 1 FROM treatment_plans WHERE patient_id = NEW.patient_id) THEN
+        INSERT INTO analytics_metrics (
+            metric_type,
+            metric_value,
+            period_start,
+            period_end,
+            patient_id
+        )
+        SELECT
+            'treatment_success',
+            calculate_treatment_success_metrics(
+                NEW.patient_id,
+                DATE_TRUNC('day', NEW.created_at),
+                DATE_TRUNC('day', NEW.created_at) + INTERVAL '1 day'
+            ),
             DATE_TRUNC('day', NEW.created_at),
-            DATE_TRUNC('day', NEW.created_at) + INTERVAL '1 day'
-        ),
-        DATE_TRUNC('day', NEW.created_at),
-        DATE_TRUNC('day', NEW.created_at) + INTERVAL '1 day',
-        NEW.patient_id;
+            DATE_TRUNC('day', NEW.created_at) + INTERVAL '1 day',
+            NEW.patient_id;
+    END IF;
 
     -- Insert appointment metrics
-    INSERT INTO analytics_metrics (
-        metric_type,
-        metric_value,
-        period_start,
-        period_end,
-        patient_id
-    )
-    SELECT
-        'appointments',
-        calculate_appointment_metrics(
-            NEW.patient_id,
+    IF EXISTS (SELECT 1 FROM appointments WHERE patient_id = NEW.patient_id) THEN
+        INSERT INTO analytics_metrics (
+            metric_type,
+            metric_value,
+            period_start,
+            period_end,
+            patient_id
+        )
+        SELECT
+            'appointment_metrics',
+            calculate_appointment_metrics(
+                NEW.patient_id,
+                DATE_TRUNC('day', NEW.created_at),
+                DATE_TRUNC('day', NEW.created_at) + INTERVAL '1 day'
+            ),
             DATE_TRUNC('day', NEW.created_at),
-            DATE_TRUNC('day', NEW.created_at) + INTERVAL '1 day'
-        ),
-        DATE_TRUNC('day', NEW.created_at),
-        DATE_TRUNC('day', NEW.created_at) + INTERVAL '1 day',
-        NEW.patient_id;
+            DATE_TRUNC('day', NEW.created_at) + INTERVAL '1 day',
+            NEW.patient_id;
+    END IF;
 
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS update_analytics_metrics_trigger ON analytics_events;
 CREATE TRIGGER update_analytics_metrics_trigger
     AFTER INSERT ON analytics_events
     FOR EACH ROW

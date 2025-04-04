@@ -1,21 +1,7 @@
--- Create payment_methods table
-CREATE TABLE payment_methods (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  provider_id UUID REFERENCES providers(id) ON DELETE CASCADE,
-  type TEXT NOT NULL CHECK (type IN ('credit_card', 'debit_card', 'bank_account')),
-  last_four TEXT NOT NULL,
-  expiry_month INTEGER,
-  expiry_year INTEGER,
-  is_default BOOLEAN DEFAULT false,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
 -- Create payments table
 CREATE TABLE payments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
+  patient_id UUID REFERENCES patient_profiles(id) ON DELETE CASCADE,
   provider_id UUID REFERENCES providers(id) ON DELETE CASCADE,
   amount DECIMAL NOT NULL,
   currency TEXT NOT NULL DEFAULT 'USD',
@@ -44,7 +30,7 @@ CREATE TABLE payment_transactions (
 -- Create subscriptions table
 CREATE TABLE subscriptions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
+  patient_id UUID REFERENCES patient_profiles(id) ON DELETE CASCADE,
   provider_id UUID REFERENCES providers(id) ON DELETE CASCADE,
   package_id UUID REFERENCES packages(id) ON DELETE CASCADE,
   status TEXT NOT NULL CHECK (status IN ('active', 'cancelled', 'expired', 'pending')),
@@ -71,8 +57,6 @@ CREATE TABLE subscription_payments (
 );
 
 -- Create indexes
-CREATE INDEX idx_payment_methods_user_id ON payment_methods(user_id);
-CREATE INDEX idx_payment_methods_provider_id ON payment_methods(provider_id);
 CREATE INDEX idx_payments_patient_id ON payments(patient_id);
 CREATE INDEX idx_payments_provider_id ON payments(provider_id);
 CREATE INDEX idx_payments_status ON payments(status);
@@ -93,11 +77,6 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create triggers
-CREATE TRIGGER update_payment_methods_updated_at
-  BEFORE UPDATE ON payment_methods
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
-
 CREATE TRIGGER update_payments_updated_at
   BEFORE UPDATE ON payments
   FOR EACH ROW
@@ -114,35 +93,18 @@ CREATE TRIGGER update_subscription_payments_updated_at
   EXECUTE FUNCTION update_updated_at_column();
 
 -- Add RLS policies
-ALTER TABLE payment_methods ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payment_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subscription_payments ENABLE ROW LEVEL SECURITY;
 
--- Payment methods policies
-CREATE POLICY "Users can view their own payment methods"
-  ON payment_methods FOR SELECT
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert their own payment methods"
-  ON payment_methods FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update their own payment methods"
-  ON payment_methods FOR UPDATE
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete their own payment methods"
-  ON payment_methods FOR DELETE
-  USING (auth.uid() = user_id);
-
 -- Payments policies
+DROP POLICY IF EXISTS "Users can view their own payments" ON payments;
 CREATE POLICY "Users can view their own payments"
   ON payments FOR SELECT
   USING (
     auth.uid() IN (
-      SELECT user_id FROM patients WHERE id = patient_id
+      SELECT user_id FROM patient_profiles WHERE id = patient_id
       UNION
       SELECT user_id FROM providers WHERE id = provider_id
     )
@@ -155,13 +117,14 @@ CREATE POLICY "Providers can create payments"
   );
 
 -- Payment transactions policies
+DROP POLICY IF EXISTS "Users can view their own payment transactions" ON payment_transactions;
 CREATE POLICY "Users can view their own payment transactions"
   ON payment_transactions FOR SELECT
   USING (
     auth.uid() IN (
-      SELECT p.user_id 
+      SELECT pp.user_id 
       FROM payments py
-      JOIN patients p ON py.patient_id = p.id
+      JOIN patient_profiles pp ON py.patient_id = pp.id
       WHERE py.id = payment_id
       UNION
       SELECT p.user_id 
@@ -172,11 +135,12 @@ CREATE POLICY "Users can view their own payment transactions"
   );
 
 -- Subscriptions policies
+DROP POLICY IF EXISTS "Users can view their own subscriptions" ON subscriptions;
 CREATE POLICY "Users can view their own subscriptions"
   ON subscriptions FOR SELECT
   USING (
     auth.uid() IN (
-      SELECT user_id FROM patients WHERE id = patient_id
+      SELECT user_id FROM patient_profiles WHERE id = patient_id
       UNION
       SELECT user_id FROM providers WHERE id = provider_id
     )
@@ -189,13 +153,14 @@ CREATE POLICY "Providers can create subscriptions"
   );
 
 -- Subscription payments policies
+DROP POLICY IF EXISTS "Users can view their own subscription payments" ON subscription_payments;
 CREATE POLICY "Users can view their own subscription payments"
   ON subscription_payments FOR SELECT
   USING (
     auth.uid() IN (
-      SELECT p.user_id 
+      SELECT pp.user_id 
       FROM subscriptions s
-      JOIN patients p ON s.patient_id = p.id
+      JOIN patient_profiles pp ON s.patient_id = pp.id
       WHERE s.id = subscription_id
       UNION
       SELECT p.user_id 

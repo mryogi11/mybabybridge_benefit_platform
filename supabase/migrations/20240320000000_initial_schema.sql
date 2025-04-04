@@ -1,5 +1,6 @@
 -- Create enum types
-CREATE TYPE user_role AS ENUM ('admin', 'staff', 'patient');
+DROP TYPE IF EXISTS user_role CASCADE;
+CREATE TYPE user_role AS ENUM ('admin', 'staff', 'provider', 'patient');
 CREATE TYPE package_tier AS ENUM ('basic', 'premium', 'custom');
 CREATE TYPE purchase_type AS ENUM ('subscription', 'one-time');
 CREATE TYPE package_status AS ENUM ('purchased', 'active', 'expired', 'completed');

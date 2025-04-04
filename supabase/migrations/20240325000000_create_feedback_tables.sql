@@ -10,7 +10,7 @@ CREATE TABLE feedback_categories (
 -- Create provider_reviews table
 CREATE TABLE provider_reviews (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
+  patient_id UUID REFERENCES patient_profiles(id) ON DELETE CASCADE,
   provider_id UUID REFERENCES providers(id) ON DELETE CASCADE,
   rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
   review_text TEXT,
@@ -23,7 +23,7 @@ CREATE TABLE provider_reviews (
 -- Create treatment_feedback table
 CREATE TABLE treatment_feedback (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
+  patient_id UUID REFERENCES patient_profiles(id) ON DELETE CASCADE,
   treatment_plan_id UUID REFERENCES treatment_plans(id) ON DELETE CASCADE,
   rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
   feedback_text TEXT,
@@ -54,31 +54,20 @@ CREATE INDEX idx_treatment_feedback_category_id ON treatment_feedback(category_i
 CREATE INDEX idx_feedback_responses_feedback_id ON feedback_responses(feedback_id);
 CREATE INDEX idx_feedback_responses_responder_id ON feedback_responses(responder_id);
 
--- Create updated_at trigger function if not exists
-DO $$ 
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'update_updated_at_column') THEN
-    CREATE OR REPLACE FUNCTION update_updated_at_column()
-    RETURNS TRIGGER AS $$
-    BEGIN
-      NEW.updated_at = NOW();
-      RETURN NEW;
-    END;
-    $$ LANGUAGE plpgsql;
-  END IF;
-END $$;
-
--- Create triggers
+-- Create triggers (Assume function exists)
+DROP TRIGGER IF EXISTS update_provider_reviews_updated_at ON provider_reviews;
 CREATE TRIGGER update_provider_reviews_updated_at
   BEFORE UPDATE ON provider_reviews
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_treatment_feedback_updated_at ON treatment_feedback;
 CREATE TRIGGER update_treatment_feedback_updated_at
   BEFORE UPDATE ON treatment_feedback
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_feedback_responses_updated_at ON feedback_responses;
 CREATE TRIGGER update_feedback_responses_updated_at
   BEFORE UPDATE ON feedback_responses
   FOR EACH ROW
@@ -94,22 +83,25 @@ CREATE POLICY "Patients can view provider reviews"
   ON provider_reviews FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Patients can create provider reviews" ON provider_reviews;
 CREATE POLICY "Patients can create provider reviews"
   ON provider_reviews FOR INSERT
   WITH CHECK (
-    auth.uid() IN (SELECT user_id FROM patients WHERE id = patient_id)
+    auth.uid() IN (SELECT user_id FROM patient_profiles WHERE id = patient_id)
   );
 
+DROP POLICY IF EXISTS "Patients can update their provider reviews" ON provider_reviews;
 CREATE POLICY "Patients can update their provider reviews"
   ON provider_reviews FOR UPDATE
   USING (
-    auth.uid() IN (SELECT user_id FROM patients WHERE id = patient_id)
+    auth.uid() IN (SELECT user_id FROM patient_profiles WHERE id = patient_id)
   );
 
+DROP POLICY IF EXISTS "Patients can delete their provider reviews" ON provider_reviews;
 CREATE POLICY "Patients can delete their provider reviews"
   ON provider_reviews FOR DELETE
   USING (
-    auth.uid() IN (SELECT user_id FROM patients WHERE id = patient_id)
+    auth.uid() IN (SELECT user_id FROM patient_profiles WHERE id = patient_id)
   );
 
 -- Treatment feedback policies
@@ -117,22 +109,25 @@ CREATE POLICY "Patients can view treatment feedback"
   ON treatment_feedback FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Patients can create treatment feedback" ON treatment_feedback;
 CREATE POLICY "Patients can create treatment feedback"
   ON treatment_feedback FOR INSERT
   WITH CHECK (
-    auth.uid() IN (SELECT user_id FROM patients WHERE id = patient_id)
+    auth.uid() IN (SELECT user_id FROM patient_profiles WHERE id = patient_id)
   );
 
+DROP POLICY IF EXISTS "Patients can update their treatment feedback" ON treatment_feedback;
 CREATE POLICY "Patients can update their treatment feedback"
   ON treatment_feedback FOR UPDATE
   USING (
-    auth.uid() IN (SELECT user_id FROM patients WHERE id = patient_id)
+    auth.uid() IN (SELECT user_id FROM patient_profiles WHERE id = patient_id)
   );
 
+DROP POLICY IF EXISTS "Patients can delete their treatment feedback" ON treatment_feedback;
 CREATE POLICY "Patients can delete their treatment feedback"
   ON treatment_feedback FOR DELETE
   USING (
-    auth.uid() IN (SELECT user_id FROM patients WHERE id = patient_id)
+    auth.uid() IN (SELECT user_id FROM patient_profiles WHERE id = patient_id)
   );
 
 -- Feedback responses policies

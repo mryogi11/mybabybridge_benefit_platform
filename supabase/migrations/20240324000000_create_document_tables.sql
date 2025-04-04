@@ -10,7 +10,7 @@ CREATE TABLE document_categories (
 -- Create documents table
 CREATE TABLE documents (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
+  patient_id UUID REFERENCES patient_profiles(id) ON DELETE CASCADE,
   provider_id UUID REFERENCES providers(id) ON DELETE CASCADE,
   category_id UUID REFERENCES document_categories(id) ON DELETE SET NULL,
   title TEXT NOT NULL,
@@ -43,62 +43,54 @@ CREATE INDEX idx_documents_category_id ON documents(category_id);
 CREATE INDEX idx_document_shares_document_id ON document_shares(document_id);
 CREATE INDEX idx_document_shares_shared_with ON document_shares(shared_with);
 
--- Create updated_at trigger function if not exists
-DO $$ 
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'update_updated_at_column') THEN
-    CREATE OR REPLACE FUNCTION update_updated_at_column()
-    RETURNS TRIGGER AS $$
-    BEGIN
-      NEW.updated_at = NOW();
-      RETURN NEW;
-    END;
-    $$ LANGUAGE plpgsql;
-  END IF;
-END $$;
-
--- Create triggers
+-- Create triggers (Ensure function handle_updated_at or similar exists)
+DROP TRIGGER IF EXISTS update_documents_updated_at ON documents;
 CREATE TRIGGER update_documents_updated_at
   BEFORE UPDATE ON documents
   FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+  EXECUTE FUNCTION update_updated_at_column(); -- Use the function assumed to exist
 
+DROP TRIGGER IF EXISTS update_document_shares_updated_at ON document_shares;
 CREATE TRIGGER update_document_shares_updated_at
   BEFORE UPDATE ON document_shares
   FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+  EXECUTE FUNCTION update_updated_at_column(); -- Use the function assumed to exist
 
 -- Add RLS policies
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE document_shares ENABLE ROW LEVEL SECURITY;
 
 -- Documents policies
+DROP POLICY IF EXISTS "Patients can view their own documents" ON documents;
 CREATE POLICY "Patients can view their own documents"
   ON documents FOR SELECT
   USING (
     auth.uid() IN (
-      SELECT user_id FROM patients WHERE id = patient_id
+      SELECT user_id FROM patient_profiles WHERE id = patient_id
       UNION
       SELECT user_id FROM providers WHERE id = provider_id
     )
   );
 
+DROP POLICY IF EXISTS "Patients can insert their own documents" ON documents;
 CREATE POLICY "Patients can insert their own documents"
   ON documents FOR INSERT
   WITH CHECK (
-    auth.uid() IN (SELECT user_id FROM patients WHERE id = patient_id)
+    auth.uid() IN (SELECT user_id FROM patient_profiles WHERE id = patient_id)
   );
 
+DROP POLICY IF EXISTS "Patients can update their own documents" ON documents;
 CREATE POLICY "Patients can update their own documents"
   ON documents FOR UPDATE
   USING (
-    auth.uid() IN (SELECT user_id FROM patients WHERE id = patient_id)
+    auth.uid() IN (SELECT user_id FROM patient_profiles WHERE id = patient_id)
   );
 
+DROP POLICY IF EXISTS "Patients can delete their own documents" ON documents;
 CREATE POLICY "Patients can delete their own documents"
   ON documents FOR DELETE
   USING (
-    auth.uid() IN (SELECT user_id FROM patients WHERE id = patient_id)
+    auth.uid() IN (SELECT user_id FROM patient_profiles WHERE id = patient_id)
   );
 
 -- Document shares policies
