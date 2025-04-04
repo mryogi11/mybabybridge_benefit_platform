@@ -20,6 +20,8 @@ const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -42,7 +44,12 @@ export default function RegisterForm() {
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
-      await signUp(data.email, data.password);
+      const email = data.email.trim();
+      const password = data.password.trim();
+      const firstName = data.firstName.trim();
+      const lastName = data.lastName.trim();
+
+      await signUp(email, password, firstName, lastName);
       router.push('/login?registered=true');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -108,6 +115,26 @@ export default function RegisterForm() {
             error={!!errors.confirmPassword}
             helperText={errors.confirmPassword?.message}
             {...register('confirmPassword')}
+            sx={{ mb: 3 }}
+          />
+
+          <TextField
+            fullWidth
+            label="First Name"
+            margin="normal"
+            error={!!errors.firstName}
+            helperText={errors.firstName?.message}
+            {...register('firstName')}
+            sx={{ mb: 2 }}
+          />
+
+          <TextField
+            fullWidth
+            label="Last Name"
+            margin="normal"
+            error={!!errors.lastName}
+            helperText={errors.lastName?.message}
+            {...register('lastName')}
             sx={{ mb: 3 }}
           />
 

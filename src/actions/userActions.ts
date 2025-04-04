@@ -73,37 +73,41 @@ export async function createUserAction(userData: NewUserData): Promise<{ success
             if (isExistingUserError) {
                 console.warn("[Server Action] Auth user already exists for email:", userData.email, ". Retrieving existing ID.");
                 // Attempt to find the user in auth.users via admin API to get the ID
-                const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({
-                    filter: `email = "${userData.email}"`
-                });
+                // Fetch users (potentially paginated - consider adding pagination if user base is large)
+                const { data: { users: allUsers }, error: listError } = await supabaseAdmin.auth.admin.listUsers(); 
 
-                if (listError || !users || users.length === 0) {
-                     console.error("[Server Action] Auth user exists, but failed to retrieve ID via admin API:", listError);
-                     throw new Error(`Auth user exists, but couldn't retrieve ID via admin API. ${listError?.message || ''}`);
+                if (listError) {
+                    console.error("[Server Action] Supabase admin listUsers Error:", listError);
+                    throw new Error(listError.message || "Failed to list users.");
                 }
 
-                // Check if user also exists in public.users
-                const existingPublicUser = await supabaseAdmin
-                    .from('users')
-                    .select('id')
-                    .eq('id', users[0].id)
-                    .maybeSingle(); // Use maybeSingle to handle potential null
+                // Filter the results manually to find the user in auth.users
+                const existingAuthUser = allUsers.find(u => u.email === userData.email);
 
-                if (existingPublicUser.error) {
-                    console.error("[Server Action] Error checking public.users for existing user:", existingPublicUser.error);
-                    throw new Error(`Failed to check public.users table. ${existingPublicUser.error.message}`);
+                if (!existingAuthUser) {
+                    console.error(`[Server Action] Existing user with email ${userData.email} not found in auth.users.`);
+                    throw new Error(`User with email ${userData.email} not found in authentication users.`);
                 }
                 
-                newUserId = users[0].id; // Assign existing ID from auth listing
+                newUserId = existingAuthUser.id;
                 console.log("[Server Action] Found existing auth user ID:", newUserId);
 
-                // If user doesn't exist in public.users yet (from a failed previous attempt), 
-                // proceed as if it's a new user insertion for subsequent steps.
-                // The upsert logic will handle creating the public.users row.
-                if (!existingPublicUser.data) {
-                     console.warn("[Server Action] Existing auth user found, but no corresponding row in public.users. Proceeding with upsert.");
+                // Now, check if this user ID exists in public.users
+                const { data: existingPublicUserData, error: publicUserError } = await supabaseAdmin
+                    .from('users')
+                    .select('id')
+                    .eq('id', newUserId)
+                    .maybeSingle();
+                
+                if (publicUserError) {
+                     console.error("[Server Action] Error checking public.users for existing user:", publicUserError);
+                     throw new Error(`Failed to check public.users table. ${publicUserError.message}`);
                 }
 
+                // If user doesn't exist in public.users yet, proceed with upsert (warn is helpful)
+                if (!existingPublicUserData) {
+                     console.warn("[Server Action] Existing auth user found, but no corresponding row in public.users. Proceeding with upsert.");
+                }
             } else {
                 console.error("[Server Action] Supabase Auth Error:", authError);
                 if (authError.message === 'User not allowed') {
