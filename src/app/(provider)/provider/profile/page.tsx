@@ -12,6 +12,7 @@ import {
   LinearProgress,
   Snackbar,
   Alert,
+  Container,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -148,12 +149,18 @@ export default function ProviderProfilePage() {
   }
 
   return (
-    <Box>
-      <Typography variant="h4" gutterBottom>
-        Provider Profile
+    <Container maxWidth="lg">
+      <Typography variant="h4" sx={{ mb: 3 }}>
+        My Profile
       </Typography>
 
       <Paper sx={{ p: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          Profile Information
+        </Typography>
+        <Typography sx={{ color: 'text.secondary' }}>
+          Placeholder for viewing and editing provider profile details (Specialization, Bio, Experience, etc.).
+        </Typography>
         <form onSubmit={handleSubmit}>
           <Grid container spacing={3}>
             <Grid item xs={12} sm={6}>
@@ -317,6 +324,6 @@ export default function ProviderProfilePage() {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Box>
+    </Container>
   );
 } 

@@ -1,93 +1,90 @@
 'use client';
 
-import { createTheme, ThemeOptions } from '@mui/material/styles';
+import { createTheme, ThemeOptions, responsiveFontSizes, PaletteOptions, Shadows } from '@mui/material/styles';
+import ComponentsOverrides from '../theme/overrides';
 
-export const themeOptions: ThemeOptions = {
-  palette: {
-    primary: {
-      main: '#2D5049',
-      light: '#3E6F66',
-      dark: '#1D3B34',
-      contrastText: '#fff',
-    },
-    secondary: {
-      main: '#E5756B',
-      light: '#F08D85',
-      dark: '#CC5C53',
-      contrastText: '#fff',
-    },
-    background: {
-      default: '#F9FAFB',
-      paper: '#FFFFFF',
-    },
-    text: {
-      primary: '#2D5049',
-      secondary: '#6B7280',
-    },
-    error: {
-      main: '#EF4444',
-    },
-    warning: {
-      main: '#F59E0B',
-    },
-    info: {
-      main: '#3B82F6',
-    },
-    success: {
-      main: '#10B981',
-    },
+// Define base palette inline (adjust colors as needed for Minimal theme)
+const palette: PaletteOptions = {
+  primary: {
+    main: '#007bff', // Example primary color
+    contrastText: '#fff',
   },
-  typography: {
-    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    h1: {
-      fontWeight: 700,
-      fontSize: '2.5rem',
-    },
-    h2: {
-      fontWeight: 600,
-      fontSize: '2rem',
-    },
-    h3: {
-      fontWeight: 600,
-      fontSize: '1.5rem',
-    },
-    h4: {
-      fontWeight: 600,
-      fontSize: '1.25rem',
-    },
-    h5: {
-      fontWeight: 600,
-      fontSize: '1rem',
-    },
-    h6: {
-      fontWeight: 600,
-      fontSize: '0.875rem',
-    },
+  secondary: {
+    main: '#6c757d', // Example secondary color
+    contrastText: '#fff',
   },
-  shape: {
-    borderRadius: 8,
+  background: {
+    default: '#F9FAFB',
+    paper: '#FFFFFF',
   },
-  components: {
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          textTransform: 'none',
-          fontWeight: 600,
-        },
-      },
-    },
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.1), 0px 1px 2px rgba(0, 0, 0, 0.06)',
-          borderRadius: 12,
-        },
-      },
-    },
+  text: {
+    primary: '#212529',
+    secondary: '#6c757d',
   },
+  // Add other palette settings like error, warning, info, success if needed
+  error: { main: '#dc3545' },
+  warning: { main: '#ffc107' },
+  info: { main: '#17a2b8' },
+  success: { main: '#28a745' },
 };
 
-// Use this function only on the client side
+// Define base typography inline
+const typography = {
+  fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  // Add specific variant styles if needed, otherwise MUI defaults apply
+  h1: { fontSize: '2.5rem', fontWeight: 700 },
+  h2: { fontSize: '2rem', fontWeight: 600 },
+  h3: { fontSize: '1.75rem', fontWeight: 600 },
+  h4: { fontSize: '1.5rem', fontWeight: 600 },
+  h5: { fontSize: '1.25rem', fontWeight: 600 },
+  h6: { fontSize: '1rem', fontWeight: 600 },
+};
+
+// Define base shadows inline (MUI defaults essentially)
+const shadows: Shadows = Array(25).fill('none') as Shadows;
+// Add specific elevations if needed, e.g.:
+shadows[1] = '0px 1px 3px rgba(0, 0, 0, 0.1)';
+shadows[3] = '0px 3px 6px rgba(0, 0, 0, 0.1)'; // Used in Menu override
+shadows[8] = '0px 8px 16px rgba(0, 0, 0, 0.1)';
+shadows[20] = '0px 20px 40px rgba(0, 0, 0, 0.15)'; // Example for z20
+
+// Define customShadows inline if used by overrides (or remove if not)
+const customShadows = {
+    z20: shadows[20], // Example referencing base shadows
+    // Add other custom shadows if needed
+};
+
+// Define base theme options using inline definitions
+export const baseThemeOptions: ThemeOptions = {
+  palette: palette,
+  typography: typography,
+  shape: { borderRadius: 8 }, 
+  shadows: shadows, 
+  // customShadows is not a standard ThemeOption, added later via merge
+};
+
+// Function to create the full theme including overrides
 export function getTheme() {
-  return createTheme(themeOptions);
+  let theme = createTheme(baseThemeOptions);
+  const componentOverrides = ComponentsOverrides(theme);
+
+  // Merge base theme, overrides, and add customShadows
+  theme = createTheme(theme, {
+      components: componentOverrides,
+      // Add custom shadows here if needed via module augmentation
+      customShadows: customShadows, 
+  });
+
+  theme = responsiveFontSizes(theme);
+  return theme;
+} 
+
+// Module augmentation for custom shadows 
+declare module '@mui/material/styles' {
+  interface Theme {
+    customShadows: typeof customShadows;
+  }
+  interface ThemeOptions {
+    customShadows?: typeof customShadows;
+  }
 } 

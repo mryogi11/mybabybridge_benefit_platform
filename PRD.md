@@ -5,14 +5,18 @@
 **Objective:** Develop a web application for fertility patients to manage their treatment journey, including registration, package selection, and dashboard tracking. The platform will also provide administrative tools for user management and package creation.
 
 ## Technical Stack
-- **Frontend:** Next.js with Modern Material UI
-- **Backend:** Node.js
-- **Database:** Supabase Cloud (for production and testing)
-- **Authentication:** Supabase Auth with Role-Based Access Control (RBAC)
-- **Payment Gateway:** Stripe
-- **Social Media Login:** Google, Facebook
-- **Deployment:** Vercel
-- **Editor:** Cursor Editor
+
+*   **Frontend Framework:** Next.js (^15.2.4)
+*   **UI Library:** Material UI (MUI) (^5.17.1) with MUI X (^7.28.3)
+*   **Styling:** Emotion (^11.14.0)
+*   **State Management:** React Context API (AuthContext, potentially others)
+*   **Form Handling:** React Hook Form (^7.50.1) with Zod (^3.22.4) for validation
+*   **Data Fetching:** Supabase Client Library, React Server Components / Server Actions, Fetch API
+*   **Backend/Database:** Supabase (PostgreSQL)
+*   **Authentication:** Supabase Auth (@supabase/auth-helpers-nextjs ^0.9.0)
+*   **Language:** TypeScript
+*   **Package Manager:** npm (or Yarn - confirm from lock file if needed)
+*   **Deployment:** Vercel (planned)
 
 ## Features and Functionalities
 
@@ -243,6 +247,14 @@ The analytics module provides comprehensive insights into the platform's perform
 - Automated reporting
 - Custom alert system
 - Advanced visualization options
+
+#### UI/UX Goals
+
+*   Clean, modern, and intuitive interface.
+*   Minimalist design aesthetic, focusing on clarity and ease of use.
+*   Responsive design for desktop and potentially tablet use.
+*   Consistent styling across all user roles (Admin, Provider, Patient).
+*   **Visual Reference:** The overall look and feel of UI components should aim to align with the style presented in the Minimal UI Kit free demo: [https://free.minimals.cc/](https://free.minimals.cc/).
 
 ## Project Structure Schema
 

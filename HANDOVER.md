@@ -54,7 +54,7 @@ The application uses Supabase for authentication with the following key componen
 4. **Secure Messaging**: Communication between patients and providers
 5. **Educational Resources**: Curated content for fertility education
 6. **Analytics**: Treatment success metrics and insights
-7. **Payments**: Integration with payment processing (in development)
+7. **Payments**: Integration with payment processing (Status: In Development / Partially Implemented)
 
 ## Development Work Completed
 
@@ -131,20 +131,23 @@ The application uses Supabase for authentication with the following key componen
 
 1. Run development server: `npm run dev`
 2. Build the project: `npm run build`
-3. Start production server: `npm run start`
+3. Start production server: `npm start`
 4. The project uses ESLint for code quality: `npm run lint`
 
 ## Supabase Schema Overview
 
-The database includes the following main tables:
+The database includes the following main tables (verify against migrations):
 
-- `users`: User profiles with role designations
-- `treatment_plans`: Fertility treatment plans with provider relationships
-- `treatment_milestones`: Progress tracking for treatment plans
-- `appointments`: Patient-provider appointments with status tracking
-- `notifications`: System notifications for users
-- `messages`: Communication between patients and providers
-- `education_resources`: Educational content for patients
+- `users`: Base user data from Supabase Auth (usually referenced via auth.uid(), not queried directly often).
+- `profiles`: Stores additional user information like `first_name`, `last_name`, `role` etc. Linked via `id` (foreign key to `auth.users.id`).
+- `packages`: Details about fertility treatment packages available for purchase.
+- `treatment_plans`: Fertility treatment plans linked to users (patients) and potentially providers.
+- `treatment_milestones`: Progress tracking for treatment plans.
+- `appointments`: Patient-provider appointments with status tracking.
+- `notifications`: System notifications for users.
+- `messages`: Communication between patients and providers.
+- `education_resources`: Educational content for patients.
+- `provider_availability` (Potentially needed): Table to store provider work hours/time off.
 
 ## Next Steps and Future Work
 
@@ -198,3 +201,58 @@ The platform has undergone significant UI/UX improvements focused on brand consi
 6. **Mobile Responsiveness**: Improved adaptability across different device sizes
 
 These changes have significantly enhanced the platform's professional appearance and user experience, establishing a strong foundation for future feature development. 
+
+## Project Status
+
+*   **Overall:** Development in progress. Core authentication and basic layouts for Admin and Provider are functional. Admin user listing and creation (including detailed provider creation via Server Action) is implemented. Provider login and dashboard access issues have been resolved.
+*   **Auth:** Supabase Auth is used. Basic sign-up/sign-in/sign-out works. Role handling is implemented via custom claims/users table.
+*   **Database:** Supabase Postgres. Key tables include `users`, `providers`, `patients`, `appointments`, `messages`. Schema might need further refinement, especially relationships and constraints.
+*   **Admin Module:** User list page with search/filter implemented. User creation dialog allows adding all roles, including providers with specific details. Edit/Delete functionality is pending.
+*   **Provider Module:** Basic layout and sidebar navigation implemented. Dashboard is accessible after login. Specific pages (Profile, Patients, Appointments, etc.) are linked but need content and functionality.
+*   **Patient Module:** Layout exists but functionality is pending.
+*   **UI/UX:** Using Material UI (MUI) with a custom Minimal theme, aiming for consistency. 
+    *   **Visual Target:** Component styling aims to emulate the Minimal UI Kit free demo ([https://free.minimals.cc/](https://free.minimals.cc/)). Theme overrides are used to centralize styles.
+*   **Payments:** Stripe integration is planned but not started.
+
+## Key Code Locations
+
+*   **Authentication:** `src/contexts/AuthContext.tsx`, `src/app/(auth)/login/page.tsx`, Supabase Auth UI/helpers.
+*   **Layouts:** `src/components/layouts/`, `src/app/(admin)/layout.tsx`, `src/app/(provider)/layout.tsx`.
+*   **Admin User Management:** `src/app/(admin)/admin/users/page.tsx`, `src/actions/userActions.ts` (for creation).
+*   **Provider Components:** `src/app/(provider)/...` (Dashboard, Sidebar Content).
+*   **Database Types:** `src/lib/supabase/database.types.ts` (Path needs confirmation).
+*   **Supabase Client:** `src/lib/supabase/client.ts` (Client-side), Server Actions use `@supabase/auth-helpers-nextjs` or direct client creation.
+
+## Next Steps / Priorities
+
+1.  **Implement Provider Module Pages:** Build out the functionality for Profile, Patients, Appointments, Messages, Settings.
+2.  **Implement Patient Module Pages:** Build out core patient functionality.
+3.  **Admin User Edit/Delete:** Add remaining CRUD operations for users.
+4.  **Refine RLS/Security:** Ensure database security is robust.
+5.  See `TODO.md` for detailed task breakdown.
+
+## Potential Issues / Blockers
+
+*   Confirming the correct path for generated Supabase database types (`database.types.ts`).
+*   Ensuring all Supabase client initializations (client-side, server components, server actions) use appropriate keys and handle sessions correctly.
+*   Further RLS policy refinement might be complex depending on requirements.
+
+## Handover Checklist
+
+*   [ ] Environment variables (`.env.local`) configured correctly.
+*   [ ] Necessary database migrations/seed data applied.
+*   [ ] Clear understanding of the current feature set and limitations.
+*   [ ] Familiarity with the key code locations listed above.
+*   [ ] Review `TODO.md` for pending tasks and priorities. 
+
+## Technical Stack Overview
+
+*   **Framework:** Next.js (^15.2.4)
+*   **Language:** TypeScript
+*   **UI:** Material UI (MUI Core ^5.17.1, MUI X ^7.28.3)
+*   **Styling:** Emotion (^11.14.0)
+*   **Backend/DB:** Supabase (Postgres, Auth)
+*   **Auth Helper:** @supabase/auth-helpers-nextjs (^0.9.0)
+*   **Forms:** React Hook Form (^7.50.1) + Zod (^3.22.4)
+*   **State:** React Context API
+*   **Deployment Target:** Vercel 

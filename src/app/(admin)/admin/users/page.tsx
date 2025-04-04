@@ -24,14 +24,15 @@ import {
 } from '@mui/material';
 import {
     Add as AddIcon,
-    MoreVert as MoreVertIcon,
+  MoreVert as MoreVertIcon,
     Edit as EditIcon,
-    Delete as DeleteIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { supabase } from '@/lib/supabase/client';
 import { User, UserRole } from '@/types';
 import { DataGrid, GridColDef, GridRenderCellParams, GridToolbarContainer, GridToolbarQuickFilter, GridToolbarProps } from '@mui/x-data-grid';
 import { format } from 'date-fns';
+import { createUserAction } from '@/actions/userActions';
 
 // Define the type for the complete new user data payload
 interface NewUserData {
@@ -40,6 +41,10 @@ interface NewUserData {
     email: string;
     password?: string; // Password is required logic-wise, but keep optional for type flexibility if needed initially
     role: UserRole;
+    // Add optional provider fields
+    specialization?: string;
+    bio?: string;
+    experience_years?: number;
 }
 
 // --- AddUserDialog Component ---
@@ -57,6 +62,11 @@ function AddUserDialog({ open, onClose, onAddUser, error }: AddUserDialogProps) 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [roles, setRoles] = useState<UserRole[]>(['patient']);
+    // Add state for provider fields
+    const [specialization, setSpecialization] = useState('');
+    const [bio, setBio] = useState('');
+    const [experienceYears, setExperienceYears] = useState<number | ''>('');
+
     const [dialogError, setDialogError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
@@ -68,12 +78,16 @@ function AddUserDialog({ open, onClose, onAddUser, error }: AddUserDialogProps) 
             setEmail('');
             setPassword('');
             setRoles(['patient']);
-            setDialogError(error);
+            // Reset provider fields
+            setSpecialization('');
+            setBio('');
+            setExperienceYears('');
+            setDialogError(error); // Set external error if passed
             setLoading(false);
         } else {
-             setDialogError(null);
+             setDialogError(null); // Clear internal dialog error on close
         }
-    }, [open, error]);
+    }, [open, error]); // Depend on external error prop as well
 
     const handleRoleChange = (event: any) => {
         const { value } = event.target;
@@ -84,33 +98,55 @@ function AddUserDialog({ open, onClose, onAddUser, error }: AddUserDialogProps) 
         // Adjust validation
         if (!firstName.trim()) { setDialogError('First Name is required.'); return; }
         if (!lastName.trim()) { setDialogError('Last Name is required.'); return; }
-        if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) { setDialogError('Valid Email is required.'); return; }
+        if (!email.trim() || !/\S+@\S+\.\S+/.test(email.trim())) { setDialogError('Valid Email is required.'); return; }
         if (!password || password.length < 6) { setDialogError('Password must be at least 6 characters.'); return; }
         if (roles.length === 0) { setDialogError('A role must be selected.'); return; }
 
-        setDialogError(null); 
+        const currentRole = roles[0];
+        // Provider specific validation
+        if (currentRole === 'provider') {
+            if (!specialization.trim()) { setDialogError('Specialization is required for providers.'); return; }
+            if (experienceYears === '' || experienceYears < 0) { setDialogError('Valid Experience Years is required for providers.'); return; }
+        }
+
+        setDialogError(null);
         setLoading(true);
         try {
-            // Call onAddUser with the complete payload including password
-            await onAddUser({ 
-                first_name: firstName.trim(), 
-                last_name: lastName.trim(), 
-                email: email.trim(), 
+            const userDataPayload: NewUserData = {
+                first_name: firstName.trim(),
+                last_name: lastName.trim(),
+                email: email.trim(),
                 password, // Include password
-                role: roles[0] // Send the first selected role
-            });
+                role: currentRole, // Send the selected role
+            };
+
+            // Add provider details if role is provider
+            if (currentRole === 'provider') {
+                userDataPayload.specialization = specialization.trim();
+                userDataPayload.bio = bio.trim(); // Bio is optional
+                userDataPayload.experience_years = Number(experienceYears);
+            }
+
+            // Call onAddUser with the complete payload
+            await onAddUser(userDataPayload);
+            // If onAddUser doesn't throw, assume success and close dialog
+            // onClose(); // Let parent decide if dialog should close on success
         } catch (err) {
-           // Parent handles error display via prop
+           // Error is now handled by the parent via the error prop
+           // No need to setDialogError here as the parent controls it via `addUserError` state
         } finally {
             setLoading(false);
         }
     };
 
-    return (
-        <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+  return (
+        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth> {/* Increased maxWidth for more fields */}
             <DialogTitle>Add New User</DialogTitle>
             <DialogContent>
-                {dialogError && <Alert severity="error" sx={{ mb: 2 }}>{dialogError}</Alert>}
+                {/* Display external error passed via props */}
+                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+                {/* Display internal validation error */}
+                {dialogError && !error && <Alert severity="warning" sx={{ mb: 2 }}>{dialogError}</Alert>}
                 <TextField
                     autoFocus
                     margin="dense"
@@ -157,7 +193,7 @@ function AddUserDialog({ open, onClose, onAddUser, error }: AddUserDialogProps) 
                     disabled={loading}
                 />
                 <FormControl fullWidth margin="dense" disabled={loading}>
-                    <InputLabel id="role-label">Role</InputLabel> 
+                    <InputLabel id="role-label">Role</InputLabel>
                     <Select
                         labelId="role-label"
                         id="role"
@@ -168,8 +204,60 @@ function AddUserDialog({ open, onClose, onAddUser, error }: AddUserDialogProps) 
                         <MenuItem value="admin">Admin</MenuItem>
                         <MenuItem value="provider">Provider</MenuItem>
                         <MenuItem value="patient">Patient</MenuItem>
+                        {/* Add 'staff' if needed */}
+                        {/* <MenuItem value="staff">Staff</MenuItem> */}
                     </Select>
                 </FormControl>
+
+                {/* Conditional Provider Fields */}
+                {roles[0] === 'provider' && (
+                    <>
+                        <TextField
+                            margin="dense"
+                            id="specialization"
+                            label="Specialization"
+                            type="text"
+                            fullWidth
+                            variant="outlined"
+                            value={specialization}
+                            onChange={(e) => setSpecialization(e.target.value)}
+                            disabled={loading}
+                            required // Mark as visually required
+                        />
+                        <TextField
+                            margin="dense"
+                            id="bio"
+                            label="Bio (Optional)"
+                            type="text"
+                            fullWidth
+                            multiline
+                            rows={3}
+                            variant="outlined"
+                            value={bio}
+                            onChange={(e) => setBio(e.target.value)}
+                            disabled={loading}
+                        />
+                        <TextField
+                            margin="dense"
+                            id="experienceYears"
+                            label="Years of Experience"
+                            type="number"
+                            fullWidth
+                            variant="outlined"
+                            value={experienceYears}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                // Allow empty string or positive numbers
+                                if (val === '' || parseInt(val) >= 0) {
+                                    setExperienceYears(val === '' ? '' : parseInt(val));
+                                }
+                            }}
+                            InputProps={{ inputProps: { min: 0 } }} // Basic HTML5 validation
+                            disabled={loading}
+                            required // Mark as visually required
+                        />
+                    </>
+                )}
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose} disabled={loading}>Cancel</Button>
@@ -239,7 +327,7 @@ export default function UsersManagementPage() {
 
       // Fetch from the users table
       const { data, error: fetchError } = await supabase
-        .from('users') 
+        .from('users')
         .select('*')
         // Use snake_case for ordering
         .order('created_at', { ascending: false });
@@ -263,25 +351,22 @@ export default function UsersManagementPage() {
   }, [fetchUsers]);
 
   // Update handleAddUser function signature to accept NewUserData
-  const handleAddUser = async (userData: NewUserData) => { 
-    setAddUserError(null); 
-    try {
-      // Pass the complete userData (including password) directly to the API
-      const response = await fetch('/api/admin/create-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData),
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to create user');
-      }
-      setAddUserDialogOpen(false);
-      fetchUsers();
-    } catch (error: any) {
-      console.error("Add user error:", error);
-      setAddUserError(error.message || 'An unknown error occurred during user creation.');
-      throw error;
+  const handleAddUser = async (userData: NewUserData) => {
+    setAddUserError(null); // Clear previous errors
+    console.log("Calling createUserAction with:", userData);
+
+    // Call the Server Action
+    const result = await createUserAction(userData);
+
+    if (result.success) {
+      console.log("Server Action successful. Closing dialog and refreshing users.");
+      setAddUserDialogOpen(false); // Close the dialog on success
+      await fetchUsers(); // Refresh the user list
+    } else {
+      // Server action failed, display the error from the action
+      console.error("Server Action failed:", result.error);
+      setAddUserError(result.error || "An unexpected error occurred on the server.");
+      // Keep the dialog open so the user sees the error
     }
   };
 
@@ -404,28 +489,28 @@ export default function UsersManagementPage() {
                      color: 'text.secondary',
                  },
               }}
-            />
-          </Paper>
+        />
+      </Paper>
       )}
-      
+
       {/* Action Menu */}
-        <Menu
-            anchorEl={anchorEl}
+      <Menu
+        anchorEl={anchorEl}
             open={menuOpen}
-            onClose={handleMenuClose}
+        onClose={handleMenuClose}
             // TODO: Add PaperProps for styling consistency if needed
         >
             {/* TODO: Implement Edit/Delete functionality */}
             <MenuItem onClick={handleMenuClose}>
                 <ListItemIcon><EditIcon fontSize="small"/></ListItemIcon>
                 Edit
-            </MenuItem>
+        </MenuItem>
             <MenuItem onClick={handleMenuClose} sx={{ color: 'error.main' }}>
                  <ListItemIcon sx={{ color: 'error.main' }}><DeleteIcon fontSize="small"/></ListItemIcon>
                  Delete
-             </MenuItem>
+        </MenuItem>
             {/* TODO: Implement Role Change if needed */}
-        </Menu>
+      </Menu>
 
       {/* Add User Dialog */}
       <AddUserDialog

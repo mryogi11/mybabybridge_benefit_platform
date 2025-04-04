@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   AppBar,
   Box,
@@ -19,27 +19,26 @@ import {
   ListItemIcon,
   Badge,
   alpha,
-  CircularProgress,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import { AccountCircle, Logout, Settings } from '@mui/icons-material';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter, usePathname } from 'next/navigation';
-import SideDrawerContent from './SideDrawerContent'; // Import the drawer content
+import { useRouter } from 'next/navigation';
+import ProviderSideDrawerContent from './ProviderSideDrawerContent'; // Import the PROVIDER drawer content
 
 const DRAWER_WIDTH = 280;
 
-export default function DashboardMainLayout({ children }: { children: React.ReactNode }) {
+export default function ProviderMainLayout({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
   const isMdUp = useMediaQuery(theme.breakpoints.up('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
 
-  // User Menu State & Handlers (Moved from Navigation.tsx)
+  // User Menu State & Handlers
   const [anchorElUser, setAnchorElUser] = useState<null | HTMLElement>(null);
   const [anchorElNotifications, setAnchorElNotifications] = useState<null | HTMLElement>(null);
-  const { user, profile, signOut } = useAuth(); // Added profile
+  const { user, profile, signOut } = useAuth();
   const router = useRouter();
 
   const handleOpenUserMenu = (event: React.MouseEvent<HTMLElement>) => setAnchorElUser(event.currentTarget);
@@ -74,7 +73,7 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
 
   const handleNavigate = (path: string) => {
       router.push(path);
-      handleCloseUserMenu(); // Close menu after navigation
+      handleCloseUserMenu();
   }
 
   return (
@@ -86,10 +85,10 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
         sx={{
           width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
           ml: { md: `${DRAWER_WIDTH}px` },
-          backgroundColor: alpha(theme.palette.background.default, 0.8), // Adjusted for minimal feel
+          backgroundColor: alpha(theme.palette.background.default, 0.8),
           backdropFilter: 'blur(6px)',
           borderBottom: `1px dashed ${theme.palette.divider}`,
-          color: theme.palette.text.primary, // Ensure icons/text are visible
+          color: theme.palette.text.primary,
         }}
       >
         <Toolbar sx={{ justifyContent: 'space-between' }}>
@@ -98,53 +97,51 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
             aria-label="open drawer"
             edge="start"
             onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { md: 'none' } }} // Only show on mobile
+            sx={{ mr: 2, display: { md: 'none' } }}
           >
             <MenuIcon />
           </IconButton>
 
-          {/* Spacer to push icons to the right */}
-          <Box sx={{ flexGrow: 1 }} />
+          <Box sx={{ flexGrow: 1 }} /> {/* Spacer */}
 
-          {/* Right-side Icons (Notifications, User) */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             {/* Notifications */}
             <Tooltip title="Notifications">
                <IconButton color="inherit" onClick={handleOpenNotificationsMenu}>
-                   <Badge badgeContent={4} color="error"> {/* Example badge */}
+                   <Badge badgeContent={1} color="error"> {/* Example */}
                        <NotificationsIcon />
                    </Badge>
                </IconButton>
             </Tooltip>
             <Menu
-                id="menu-notifications"
+                id="menu-notifications-provider"
                 anchorEl={anchorElNotifications}
                 open={Boolean(anchorElNotifications)}
                 onClose={handleCloseNotificationsMenu}
-                // Add styling similar to user menu if needed
             >
-                {/* Replace with actual notifications */}
-                <MenuItem onClick={handleCloseNotificationsMenu}>Notification 1</MenuItem>
-                <MenuItem onClick={handleCloseNotificationsMenu}>Notification 2</MenuItem>
+                <MenuItem onClick={handleCloseNotificationsMenu}>Provider Notification 1</MenuItem>
             </Menu>
-
 
             {/* User Avatar & Menu */}
             <Tooltip title="Open settings">
               <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-                <Avatar alt={profile?.first_name || user?.email} src="/static/images/avatar/2.jpg" />
+                 {/* TODO: Replace with dynamic avatar source if available */}
+                <Avatar alt={profile?.first_name || user?.email} src="/static/images/avatar/provider.jpg" />
               </IconButton>
             </Tooltip>
+            {/* Use theme override for Menu styling, remove local PaperProps */}
             <Menu
-              sx={{ mt: '45px' }}
-              id="menu-appbar-user"
+              sx={{ mt: '45px' }} // Keep positional sx prop
+              id="menu-appbar-provider"
               anchorEl={anchorElUser}
               anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
               keepMounted
               transformOrigin={{ vertical: 'top', horizontal: 'right' }}
               open={Boolean(anchorElUser)}
               onClose={handleCloseUserMenu}
+               // Removed PaperProps relying on theme override
             >
+              {/* MenuItems should inherit styles from theme */}
               <Box sx={{ my: 1.5, px: 2.5 }}>
                 <Typography variant="subtitle2" noWrap>
                   {profile?.first_name} {profile?.last_name}
@@ -154,17 +151,19 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
                 </Typography>
               </Box>
               <Divider sx={{ borderStyle: 'dashed' }} />
-              <MenuItem onClick={() => handleNavigate('/dashboard/profile')}>
+              {/* Link to provider-specific paths */}
+              <MenuItem onClick={() => handleNavigate('/provider/profile')}>
                 <ListItemIcon><AccountCircle fontSize="small" /></ListItemIcon>
                 Profile
               </MenuItem>
-              <MenuItem onClick={() => handleNavigate('/dashboard/settings')}>
+              <MenuItem onClick={() => handleNavigate('/provider/settings')}>
                  <ListItemIcon><Settings fontSize="small" /></ListItemIcon>
                  Settings
               </MenuItem>
               <Divider sx={{ borderStyle: 'dashed' }} />
+               {/* Keep local sx for error color as it's specific */}
               <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
-                <ListItemIcon sx={{ color: 'error.main' }}><Logout fontSize="small" /></ListItemIcon>
+                 <ListItemIcon sx={{ color: 'error.main' }}><Logout fontSize="small" /></ListItemIcon>
                 Logout
               </MenuItem>
             </Menu>
@@ -176,7 +175,6 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
       <Box
         component="nav"
         sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}
-        aria-label="mailbox folders"
       >
         {/* Mobile Drawer */}
         <Drawer
@@ -184,9 +182,7 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
           open={mobileOpen}
           onTransitionEnd={handleDrawerTransitionEnd}
           onClose={handleDrawerClose}
-          ModalProps={{
-            keepMounted: true, // Better open performance on mobile.
-          }}
+          ModalProps={{ keepMounted: true }}
           sx={{
             display: { xs: 'block', md: 'none' },
             '& .MuiDrawer-paper': {
@@ -196,7 +192,7 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
              },
           }}
         >
-          <SideDrawerContent />
+          <ProviderSideDrawerContent /> {/* Use Provider Content */}
         </Drawer>
 
         {/* Desktop Drawer */}
@@ -212,7 +208,7 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
           }}
           open
         >
-          <SideDrawerContent />
+          <ProviderSideDrawerContent /> {/* Use Provider Content */}
         </Drawer>
       </Box>
 
@@ -224,7 +220,7 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
           p: 3,
           width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
           minHeight: '100vh',
-          backgroundColor: theme.palette.grey[100], // Or another light background
+          backgroundColor: theme.palette.grey[100],
         }}
       >
         <Toolbar /> {/* Offset content below AppBar */}

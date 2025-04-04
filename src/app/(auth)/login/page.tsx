@@ -31,29 +31,47 @@ export default function LoginPage() {
   const [redirectCountdown, setRedirectCountdown] = useState(3);
   const [userRole, setUserRole] = useState<User['role'] | null>(null);
   const router = useRouter();
-  const { signIn, isLoading } = useAuth();
+  const { signIn, isLoading: isAuthLoading, user, profile, isProfileLoading } = useAuth();
   const theme = useTheme();
   
   const checkSession = async () => {
     try {
-      const { data } = await supabase.auth.getSession();
-      
-      if (data.session) {
+      console.log("Checking for existing session...");
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        console.error('Error fetching session:', error.message);
+        return;
+      }
+
+      if (data && data.session && data.session.user) {
+        const userId = data.session.user.id;
+        console.log('Existing session found for user:', userId);
+
         const { data: profileData, error: profileError } = await supabase
           .from('users')
           .select('role')
-          .eq('id', data.session.user.id)
+          .eq('id', userId)
           .single();
 
         if (profileError) {
-           console.warn('Session exists but failed to fetch profile on initial load:', profileError.message);
-        } else if (profileData) {
+          console.warn('Session exists but failed to fetch profile on initial load:', profileError.message);
+        } else if (profileData && profileData.role) {
+          console.log('Profile fetched, user role:', profileData.role);
           setUserRole(profileData.role);
           setLoginSuccess(true);
+        } else {
+            console.warn('Session exists and profile fetched, but no role found for user:', userId);
         }
+      } else {
+        console.log('No active session found.');
       }
     } catch (err) {
-      console.error('Error checking session:', err);
+        if (err instanceof Error) {
+            console.error('Error in checkSession function:', err.message);
+        } else {
+            console.error('An unknown error occurred in checkSession:', err);
+        }
     }
   };
   
@@ -64,51 +82,18 @@ export default function LoginPage() {
     setUserRole(null);
 
     try {
-      await supabase.auth.signOut();
-      localStorage.removeItem('sb-access-token');
-      localStorage.removeItem('sb-refresh-token');
-      document.cookie = 'loggedIn=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-
       const result = await signIn(email, password);
 
-      if (result?.session?.user?.id) {
-        const { data: profileData, error: profileError } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', result.session.user.id)
-          .single();
-
-        if (profileError) {
-          console.error('Error fetching user profile:', profileError);
-          setError('Login successful, but failed to retrieve user role. Please contact support.');
-          setLoading(false);
-          return;
-        }
-
-        if (profileData?.role) {
-          setUserRole(profileData.role);
-          setLoginSuccess(true);
-
-          setLoggedInCookie();
-
-          if (result.session?.access_token) {
-              localStorage.setItem('sb-access-token', result.session.access_token);
-          }
-          if (result.session?.refresh_token) {
-              localStorage.setItem('sb-refresh-token', result.session.refresh_token);
-          }
-
-        } else {
-          setError('Login successful, but no role found for this user. Please contact support.');
-          setLoading(false);
-        }
-
-      } else {
-        setError('Login failed. Please check your credentials or try again.');
-        setLoading(false);
+      if (!result || !result.session) {
+         setError('Login failed. Please check your credentials.');
+         setLoading(false);
+         return;
       }
+
+      console.log("Sign-in call potentially successful, waiting for AuthContext update...");
+
     } catch (err: any) {
-      console.error('Login error:', err);
+      console.error('Login handleSubmit error:', err);
       setError(err?.message || 'An unexpected error occurred during login.');
       setLoading(false);
     }
@@ -124,7 +109,7 @@ export default function LoginPage() {
       case 'staff':
         return '/admin';
       case 'provider':
-        return '/provider/provider';
+        return '/provider/dashboard';
       case 'patient':
       default:
         return '/dashboard';
@@ -135,6 +120,7 @@ export default function LoginPage() {
     let timer: NodeJS.Timeout | null = null;
 
     if (loginSuccess && redirectCountdown > 0) {
+      console.log(`Redirect countdown: ${redirectCountdown}`);
       timer = setTimeout(() => {
         setRedirectCountdown(prev => prev - 1);
       }, 1000);
@@ -142,6 +128,8 @@ export default function LoginPage() {
 
     if (loginSuccess && userRole && redirectCountdown === 0) {
       const path = getRedirectPath(userRole);
+      console.log(`Redirecting now to: ${path}`);
+      setLoggedInCookie();
       window.location.href = path;
     }
 
@@ -149,6 +137,33 @@ export default function LoginPage() {
       if (timer) clearTimeout(timer);
     };
   }, [loginSuccess, redirectCountdown, userRole]);
+
+  useEffect(() => {
+    if (loading && !isAuthLoading && !isProfileLoading) {
+       console.log("AuthContext updated after login attempt. User:", user?.id, "Profile Role:", profile?.role);
+      if (user && profile?.role) {
+        console.log("Setting local login success state...");
+        setUserRole(profile.role as User['role']);
+        setLoginSuccess(true);
+        setLoading(false);
+      } else if (user && !profile) {
+         console.warn("User context updated, but profile role not yet available.");
+      } else if (!user) {
+          console.error("Login attempt finished, but no user found in AuthContext.");
+          setError("Login completed but user session is invalid. Please try again.");
+          setLoading(false);
+      }
+    }
+  }, [user, profile, loading, isAuthLoading, isProfileLoading]);
+
+  useEffect(() => {
+    const setupAuth = async () => {
+    };
+    
+    setupAuth();
+    
+    checkSession();
+  }, []);
 
   const goToDesignatedDashboard = () => {
     if (userRole) {
@@ -159,15 +174,6 @@ export default function LoginPage() {
        setError("Cannot redirect yet, user role not determined.");
     }
   };
-
-  useEffect(() => {
-    const setupAuth = async () => {
-    };
-    
-    setupAuth();
-    
-    checkSession();
-  }, []);
 
   return (
     <Container component="main" maxWidth={false} disableGutters>
@@ -276,10 +282,10 @@ export default function LoginPage() {
                   fullWidth
                   variant="contained"
                   color="primary"
-                  disabled={loading || loginSuccess}
+                  disabled={loading || isAuthLoading || isProfileLoading || loginSuccess}
                   sx={{ mt: 2, mb: 1.5, py: 1 }}
                 >
-                  {loading ? <CircularProgress size={24} /> : "Sign In"}
+                  {(loading || isAuthLoading || isProfileLoading) ? <CircularProgress size={24} /> : "Sign In"}
                 </Button>
                 <Box sx={{ mt: 1, textAlign: 'center' }}>
                   <Typography variant="body2">

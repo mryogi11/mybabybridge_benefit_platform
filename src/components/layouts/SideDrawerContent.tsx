@@ -69,14 +69,12 @@ interface NavItemProps {
 
 function NavItem({ item, depth = 0, onNavigate, isNavigating, currentNavPath }: NavItemProps) {
   const pathname = usePathname();
-  const theme = useTheme();
-  const [open, setOpen] = useState(false); // State for sub-menu collapse
-
   const isActive = item.path && pathname === item.path;
-  // Check if any child path matches the current pathname
   const isChildActive = item.children?.some((child: MenuItemType) => child.path && pathname === child.path);
-  // Explicitly cast the check to boolean for the disabled prop
   const isCurrentNavTarget = Boolean(item.path && isNavigating && currentNavPath === item.path);
+
+  // Sub-menu state
+  const [open, setOpen] = useState(isChildActive); // Keep open if child is active
 
   const handleToggle = () => {
     setOpen(!open);
@@ -90,28 +88,20 @@ function NavItem({ item, depth = 0, onNavigate, isNavigating, currentNavPath }: 
     }
   };
 
-  const itemSx = {
-    py: 1,
-    px: 2.5 + depth * 1.5, // Indentation for sub-menus
-    minHeight: 44,
-    borderRadius: 1,
-    mb: 0.5,
-    // Adjust active colors/background slightly for parent of active child
-    color: isActive || isChildActive ? theme.palette.primary.main : theme.palette.text.secondary,
-    backgroundColor: isActive ? alpha(theme.palette.primary.main, 0.08) 
-                     : isChildActive ? alpha(theme.palette.primary.main, 0.04) // Lighter for parent
-                     : 'transparent',
-    fontWeight: isActive || isChildActive ? 600 : 400,
-    '&:hover': {
-      backgroundColor: alpha(theme.palette.primary.main, 0.12),
-      color: theme.palette.primary.main,
-    },
-  };
-
+  // Use Mui-selected class for active state, rely on theme override
   return (
     <>
-      <ListItemButton sx={itemSx} onClick={handleClick} disabled={isCurrentNavTarget}>
-        <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}>
+      <ListItemButton 
+        selected={isActive || isChildActive} // Let theme handle selected styles
+        onClick={handleClick} 
+        disabled={isCurrentNavTarget}
+        sx={{ 
+          // Keep only dynamic padding based on depth
+          pl: 2.5 + depth * 1.5, 
+        }}
+      >
+        {/* Rely on ListItemIcon override for base styling */}
+        <ListItemIcon> 
           {isCurrentNavTarget ? (
             <CircularProgress size={20} color="inherit" />
           ) : item.badge ? (
@@ -122,23 +112,22 @@ function NavItem({ item, depth = 0, onNavigate, isNavigating, currentNavPath }: 
             item.icon
           )}
         </ListItemIcon>
+        {/* Rely on theme override for text style */}
         <ListItemText
           primary={item.title}
-          primaryTypographyProps={{ variant: 'body2', fontWeight: 'inherit' }}
+          primaryTypographyProps={{ variant: 'body2', fontWeight: 'inherit' }} 
         />
-        {/* Show expand icon only if there are children */}
         {item.children && item.children.length > 0 && (open ? <ExpandLess /> : <ExpandMore />)}
       </ListItemButton>
 
-      {/* Render children only if they exist */}
       {item.children && item.children.length > 0 && (
         <Collapse in={open} timeout="auto" unmountOnExit>
           <List component="div" disablePadding>
-            {item.children.map((child: MenuItemType) => ( // Use MenuItemType here
+            {item.children.map((child: MenuItemType) => (
               <NavItem
                 key={child.title}
                 item={child}
-                depth={depth + 1}
+                depth={depth + 1} // Pass depth down
                 onNavigate={onNavigate}
                 isNavigating={isNavigating}
                 currentNavPath={currentNavPath}
