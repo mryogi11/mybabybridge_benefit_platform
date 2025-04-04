@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Button,
@@ -28,13 +28,12 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
-  const [redirectCountdown, setRedirectCountdown] = useState(3);
   const [userRole, setUserRole] = useState<User['role'] | null>(null);
   const router = useRouter();
   const { signIn, isLoading: isAuthLoading, user, profile, isProfileLoading } = useAuth();
   const theme = useTheme();
   
-  const checkSession = async () => {
+  const checkSession = useCallback(async () => {
     try {
       console.log("Checking for existing session...");
       const { data, error } = await supabase.auth.getSession();
@@ -73,7 +72,7 @@ export default function LoginPage() {
             console.error('An unknown error occurred in checkSession:', err);
         }
     }
-  };
+  }, []);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,26 +116,13 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
-
-    if (loginSuccess && redirectCountdown > 0) {
-      console.log(`Redirect countdown: ${redirectCountdown}`);
-      timer = setTimeout(() => {
-        setRedirectCountdown(prev => prev - 1);
-      }, 1000);
-    }
-
-    if (loginSuccess && userRole && redirectCountdown === 0) {
+    if (loginSuccess && userRole) {
       const path = getRedirectPath(userRole);
-      console.log(`Redirecting now to: ${path}`);
+      console.log(`Login successful. Redirecting immediately to: ${path}`);
       setLoggedInCookie();
-      window.location.href = path;
+      router.push(path);
     }
-
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [loginSuccess, redirectCountdown, userRole]);
+  }, [loginSuccess, userRole, router]);
 
   useEffect(() => {
     if (loading && !isAuthLoading && !isProfileLoading) {
@@ -163,17 +149,7 @@ export default function LoginPage() {
     setupAuth();
     
     checkSession();
-  }, []);
-
-  const goToDesignatedDashboard = () => {
-    if (userRole) {
-      const path = getRedirectPath(userRole);
-      setLoggedInCookie();
-      window.location.href = path;
-    } else {
-       setError("Cannot redirect yet, user role not determined.");
-    }
-  };
+  }, [checkSession]);
 
   return (
     <Container component="main" maxWidth={false} disableGutters>
@@ -225,77 +201,60 @@ export default function LoginPage() {
                   <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
                     Login successful!
                   </Typography>
-                  {userRole ? (
-                    <>
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        Redirecting in {redirectCountdown} seconds...
-                      </Typography>
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        fullWidth
-                        size="large"
-                        sx={{ mt: 1, py: 1, fontSize: '1rem' }}
-                        onClick={goToDesignatedDashboard}
-                      >
-                        Go Now
-                      </Button>
-                    </>
-                  ) : (
-                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                      <CircularProgress size={20} sx={{ mr: 1 }}/>
-                      <Typography variant="body2">Fetching user details...</Typography>
-                    </Box>
-                  )}
+                  <Typography variant="body2">
+                     Redirecting now...
+                  </Typography>
                 </Alert>
               )}
 
-              <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, opacity: loginSuccess ? 0.5 : 1, pointerEvents: loginSuccess ? 'none' : 'auto' }}>
-                <TextField
-                  margin="normal"
-                  required
-                  fullWidth
-                  id="email"
-                  label="Email Address"
-                  name="email"
-                  autoComplete="email"
-                  autoFocus
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  sx={{ mb: 1.5 }}
-                />
-                <TextField
-                  margin="normal"
-                  required
-                  fullWidth
-                  name="password"
-                  label="Password"
-                  type="password"
-                  id="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  sx={{ mt: 0 }}
-                />
-                <Button
-                  type="submit"
-                  fullWidth
-                  variant="contained"
-                  color="primary"
-                  disabled={loading || isAuthLoading || isProfileLoading || loginSuccess}
-                  sx={{ mt: 2, mb: 1.5, py: 1 }}
-                >
-                  {(loading || isAuthLoading || isProfileLoading) ? <CircularProgress size={24} /> : "Sign In"}
-                </Button>
-                <Box sx={{ mt: 1, textAlign: 'center' }}>
-                  <Typography variant="body2">
-                    Don't have an account?{' '}
-                    <MuiLink component={Link} href="/register" variant="body2" underline="hover">
-                      Sign up
-                    </MuiLink>
-                  </Typography>
+              {!loginSuccess && (
+                <Box component="form" onSubmit={handleSubmit} noValidate>
+                  <TextField
+                    margin="normal"
+                    required
+                    fullWidth
+                    id="email"
+                    label="Email Address"
+                    name="email"
+                    autoComplete="email"
+                    autoFocus
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    sx={{ mb: 1.5 }}
+                  />
+                  <TextField
+                    margin="normal"
+                    required
+                    fullWidth
+                    name="password"
+                    label="Password"
+                    type="password"
+                    id="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    sx={{ mt: 0 }}
+                  />
+                  <Button
+                    type="submit"
+                    fullWidth
+                    variant="contained"
+                    color="primary"
+                    disabled={loading || isAuthLoading || isProfileLoading || loginSuccess}
+                    sx={{ mt: 2, mb: 1.5, py: 1 }}
+                  >
+                    {(loading || isAuthLoading || isProfileLoading) ? <CircularProgress size={24} /> : "Sign In"}
+                  </Button>
+                  <Box sx={{ mt: 1, textAlign: 'center' }}>
+                    <Typography variant="body2">
+                      Don't have an account?{' '}
+                      <MuiLink component={Link} href="/register" variant="body2" underline="hover">
+                        Sign up
+                      </MuiLink>
+                    </Typography>
+                  </Box>
                 </Box>
-              </Box>
+              )}
             </Paper>
           </Box>
         </Grid>

@@ -24,7 +24,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <head>
         <link rel="icon" href="/images/favicon.ico" />
-        <link rel="apple-touch-icon" href="/images/apple-touch-icon.png" />
         <title>MyBabyBridge - Fertility Care Platform</title>
       </head>
       <body className={inter.className}>

@@ -39,11 +39,9 @@ interface ProviderMenuItemType {
 // Define provider navigation items
 const providerMenuItems: ProviderMenuItemType[] = [
   { title: 'Dashboard', path: '/provider/dashboard', icon: <DashboardIcon /> },
-  { title: 'Profile', path: '/provider/profile', icon: <ProfileIcon /> },
   { title: 'Patients', path: '/provider/patients', icon: <PatientsIcon /> },
-  { title: 'Appointments', path: '/provider/appointments', icon: <AppointmentsIcon /> }, // Add badge example if needed
-  { title: 'Messages', path: '/provider/messages', icon: <MessagesIcon /> }, // Add badge example if needed
-  { title: 'Settings', path: '/provider/settings', icon: <SettingsIcon /> },
+  { title: 'Appointments', path: '/provider/appointments', icon: <AppointmentsIcon /> },
+  { title: 'Messages', path: '/provider/messages', icon: <MessagesIcon /> },
 ];
 
 // Reusable NavItem component replicating admin styling

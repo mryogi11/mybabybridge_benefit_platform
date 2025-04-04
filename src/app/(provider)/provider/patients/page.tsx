@@ -3,26 +3,26 @@
 import React from 'react';
 import { Box, Typography, Container, Paper } from '@mui/material';
 
-export default function ProviderAppointmentsPage() {
+export default function ProviderPatientsPage() {
 
-  // TODO: Fetch provider appointments
-  // TODO: Implement calendar view or list view
-  // TODO: Functionality for scheduling, editing, canceling
+  // TODO: Fetch assigned patients list
+  // TODO: Implement patient list display (DataGrid?)
+  // TODO: Link to individual patient view?
 
   return (
     <Container maxWidth="lg">
       <Typography variant="h4" sx={{ mb: 3 }}>
-        Appointments
+        My Patients
       </Typography>
 
       <Paper sx={{ p: 3 }}>
         <Typography variant="h6" gutterBottom>
-          Appointment Schedule
+          Patient List
         </Typography>
         <Typography sx={{ color: 'text.secondary' }}>
-          Placeholder for displaying the provider's appointment schedule (e.g., using a calendar component).
+          Placeholder for displaying the list of patients assigned to this provider.
         </Typography>
-        {/* Add calendar or list display here */}
+        {/* Add patient list display here */}
       </Paper>
     </Container>
   );
