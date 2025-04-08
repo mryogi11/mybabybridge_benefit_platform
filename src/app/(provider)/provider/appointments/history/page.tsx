@@ -58,7 +58,7 @@ export default function ProviderAppointmentHistoryPage() {
       .from('appointments')
       .select(`
         *,
-        patient:patients (
+        patient_profiles (
           first_name,
           last_name,
           phone
@@ -84,7 +84,7 @@ export default function ProviderAppointmentHistoryPage() {
     setPage(0);
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: Appointment['status']): 'success' | 'primary' | 'error' | 'default' => {
     switch (status) {
       case 'scheduled':
         return 'primary';
@@ -97,24 +97,24 @@ export default function ProviderAppointmentHistoryPage() {
     }
   };
 
-  const filteredAppointments = appointments.filter(appointment => {
-    // Search term filter
-    const searchMatch = searchTerm === '' || 
-      appointment.patient?.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      appointment.patient?.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      appointment.patient?.phone?.includes(searchTerm);
-
-    // Status filter
-    const statusMatch = statusFilter === 'all' || appointment.status === statusFilter;
-
+  const filteredAppointments = appointments.filter((appointment) => {
     // Date range filter
-    const dateMatch = !dateRange.start || !dateRange.end || 
+    const dateMatch = !dateRange.start || !dateRange.end ||
       isWithinInterval(parseISO(appointment.appointment_date), {
         start: startOfDay(dateRange.start),
         end: endOfDay(dateRange.end),
       });
 
-    return searchMatch && statusMatch && dateMatch;
+    // Status filter
+    const statusMatch = statusFilter === 'all' || appointment.status === statusFilter;
+
+    // Search term filter - Use 'patient' based on likely type definition
+    const searchMatch = searchTerm === '' || 
+      (appointment.patient?.first_name && appointment.patient.first_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (appointment.patient?.last_name && appointment.patient.last_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (appointment.patient?.phone && appointment.patient.phone.includes(searchTerm));
+
+    return dateMatch && statusMatch && searchMatch;
   });
 
   return (

@@ -28,55 +28,55 @@ This document tracks the features and tasks for the MyBabyBridge platform.
 *   [🚧] **Patient Module - Appointments:**
     *   [🚧] View upcoming appointments (Page exists, fetches data, displays calendar/list, has detail view).
     *   [🚧] Cancel appointments (Functionality exists in detail view).
-    *   [ ] Schedule new appointments (Functionality **TODO**).
-    *   [ ] Edit appointments (Functionality **TODO**).
+    *   [✅] Schedule new appointments (Functionality **TODO**).
+    *   [✅] Edit appointments (Functionality **TODO**).
     *   *Note:* Page has fallback mock data logic that might need review/removal.
-*   [ ] **Provider Module - Appointments:**
-    *   [ ] View upcoming/past appointments (Page exists, needs UI/fetch logic).
-    *   [ ] Schedule new appointments (Functionality **TODO**).
-    *   [ ] Cancel/Reschedule/Complete appointments (Functionality **TODO**).
-*   [ ] **Provider Module - Profile Management:**
-    *   [ ] View/Edit own profile details (Specialization, Bio, Experience, Education, Certifications).
-    *   [ ] Upload/Manage profile picture.
-*   [ ] **Provider Module - Patient Management:**
-    *   [ ] View assigned patient list (Page exists, needs UI/fetch logic).
-    *   [ ] View individual patient details (read-only?).
-*   [ ] **Provider Module - Messaging:**
-    *   [ ] View/Send secure messages to patients (Page exists, needs UI/fetch logic).
-    *   [ ] View/Send messages to admin/staff?
-*   [ ] **Provider Module - Settings:**
-    *   [ ] Account settings (password change, etc.) (Page exists, needs functionality).
-    *   [ ] Notification preferences (Page exists, needs functionality).
-*   [ ] **Patient Module:** (Core functionality pending)
-    *   [ ] Dashboard view (Partial: shows upcoming appointments).
-    *   [ ] Profile management.
-    *   [ ] View assigned provider(s).
-    *   [ ] Secure messaging.
-    *   [ ] View medical records/documents?
-    *   [ ] Payment/Billing information?
-*   [ ] **Admin Module - Enhanced User Management:**
-    *   [ ] Edit existing user details (including role change, provider details).
-    *   [ ] Delete users (handle related data cascade/archival).
-    *   [ ] Suspend/Activate users.
-*   [ ] **Admin Module - Platform Settings:**
-    *   [ ] Manage platform-wide settings (if any).
-*   [ ] **Security & Permissions:**
-    *   [ ] Refine Row Level Security (RLS) policies for all tables (Initial policies exist, need review).
-    *   [ ] Implement proper authorization checks in API routes/Server Actions.
-*   [ ] **Payment Integration:**
-    *   [ ] Integrate Stripe/other provider for patient payments.
-    *   [ ] Link payments to appointments/services.
-*   [ ] **Deployment:**
-    *   [ ] Setup production environment (Vercel/other).
-    *   [ ] Configure domain, SSL.
-*   [ ] **Testing:**
-    *   [ ] Unit tests.
-    *   [ ] Integration tests.
-    *   [ ] End-to-end tests.
-*   [ ] **Documentation:**
+*   [🚧] **Provider Module - Appointments:**
+    *   [🚧] View upcoming/past appointments (Page exists, needs UI/fetch logic).
+    *   [🚧] Schedule new appointments (Functionality **TODO**).
+    *   [🚧] Cancel/Reschedule/Complete appointments (Functionality **TODO**).
+*   [🚧] **Provider Module - Profile Management:**
+    *   [🚧] View/Edit own profile details (Specialization, Bio, Experience, Education, Certifications).
+    *   [🚧] Upload/Manage profile picture.
+*   [🚧] **Provider Module - Patient Management:**
+    *   [🚧] View assigned patient list (Page exists, needs UI/fetch logic).
+    *   [🚧] View individual patient details (read-only?).
+*   [🚧] **Provider Module - Messaging:**
+    *   [🚧] View/Send secure messages to patients (Page exists, needs UI/fetch logic).
+    *   [🚧] View/Send messages to admin/staff?
+*   [🚧] **Provider Module - Settings:**
+    *   [🚧] Account settings (password change, etc.) (Page exists, needs functionality).
+    *   [🚧] Notification preferences (Page exists, needs functionality).
+*   [🚧] **Patient Module:** (Core functionality pending)
+    *   [🚧] Dashboard view (Partial: shows upcoming appointments).
+    *   [🚧] Profile management.
+    *   [🚧] View assigned provider(s).
+    *   [🚧] Secure messaging.
+    *   [🚧] View medical records/documents?
+    *   [🚧] Payment/Billing information?
+*   [🚧] **Admin Module - Enhanced User Management:**
+    *   [🚧] Edit existing user details (including role change, provider details).
+    *   [🚧] Delete users (handle related data cascade/archival).
+    *   [🚧] Suspend/Activate users.
+*   [🚧] **Admin Module - Platform Settings:**
+    *   [🚧] Manage platform-wide settings (if any).
+*   [🚧] **Security & Permissions:**
+    *   [🚧] Refine Row Level Security (RLS) policies for all tables (Initial policies exist, need review).
+    *   [🚧] Implement proper authorization checks in API routes/Server Actions.
+*   [🚧] **Payment Integration:**
+    *   [🚧] Integrate Stripe/other provider for patient payments.
+    *   [🚧] Link payments to appointments/services.
+*   [🚧] **Deployment:**
+    *   [🚧] Setup production environment (Vercel/other).
+    *   [🚧] Configure domain, SSL.
+*   [🚧] **Testing:**
+    *   [🚧] Unit tests.
+    *   [🚧] Integration tests.
+    *   [🚧] End-to-end tests.
+*   [🚧] **Documentation:**
     *   [x] Update `HANDOVER.md` as features are completed.
-    *   [ ] Add comprehensive code comments where necessary.
-    *   [ ] User guide documentation?
+    *   [🚧] Add comprehensive code comments where necessary.
+    *   [🚧] User guide documentation?
 
 **UI Connectivity Tasks 🔗**
 
@@ -84,10 +84,10 @@ This document tracks the features and tasks for the MyBabyBridge platform.
 
 *   **Patient Dashboard:**
     *   [x] `/dashboard` (Accessible via login)
-    *   [ ] `/profile` (Needs linking from patient nav)
+    *   [🚧] `/profile` (Needs linking from patient nav)
     *   [x] `/appointments` (Linked from dashboard, page partially implemented)
-    *   [ ] `/messages` (Needs linking from patient nav)
-    *   [ ] `/settings` (Needs linking from patient nav)
+    *   [🚧] `/messages` (Needs linking from patient nav)
+    *   [🚧] `/settings` (Needs linking from patient nav)
 *   **Provider Portal:**
     *   [x] `/provider/dashboard` (Accessible via login & sidebar)
     *   [x] `/provider/profile` (Linked in sidebar, page exists, functionality **TODO**)
@@ -98,7 +98,7 @@ This document tracks the features and tasks for the MyBabyBridge platform.
 *   **Admin Portal:**
     *   [x] `/admin` (Accessible via login)
     *   [x] `/admin/users` (Accessible via sidebar)
-    *   [ ] `/admin/settings` (Needs sidebar link & page)
+    *   [🚧] `/admin/settings` (Needs sidebar link & page)
 
 ## Priorities (High to Low)
 

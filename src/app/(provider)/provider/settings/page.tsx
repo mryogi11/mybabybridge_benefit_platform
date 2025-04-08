@@ -1,11 +1,18 @@
 'use client';
 
 import React from 'react';
-import { Box, Typography, Container, Paper, Grid, Divider, TextField, Button, Switch, FormControlLabel } from '@mui/material';
+import { Box, Typography, Container, Paper, Grid, Divider, TextField, Button, Switch, FormControlLabel, List, ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
 import { useAuth } from '@/contexts/AuthContext';
+import PersonIcon from '@mui/icons-material/Person';
+import PaymentsIcon from '@mui/icons-material/Payments';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import SecurityIcon from '@mui/icons-material/Security';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import { useRouter } from 'next/navigation';
 
 export default function ProviderSettingsPage() {
   const { user } = useAuth(); // Get user info if needed
+  const router = useRouter();
 
   // TODO: Add state and handlers for form elements
 
@@ -77,6 +84,25 @@ export default function ProviderSettingsPage() {
         </Grid>
         
         {/* Add more settings sections as needed */}
+
+        {/* Other settings links */}
+        <ListItem disablePadding>
+          <ListItemButton onClick={() => router.push('/provider/payments')}>
+            <ListItemIcon>
+              <PaymentsIcon />
+            </ListItemIcon>
+            <ListItemText primary="Payment Settings" />
+          </ListItemButton>
+        </ListItem>
+
+        <ListItem disablePadding>
+          <ListItemButton onClick={() => router.push('/provider/notifications')}>
+            <ListItemIcon>
+              <NotificationsIcon />
+            </ListItemIcon>
+            <ListItemText primary="Notifications" />
+          </ListItemButton>
+        </ListItem>
 
       </Grid>
     </Container>

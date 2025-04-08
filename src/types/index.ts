@@ -121,18 +121,32 @@ export interface ProviderAvailability {
   updated_at: string;
 }
 
-export interface Appointment {
+export type Appointment = {
   id: string;
   patient_id: string;
   provider_id: string;
   appointment_date: string;
-  status: 'scheduled' | 'completed' | 'cancelled';
+  duration: number;
   type: string;
-  notes?: string;
+  status: 'scheduled' | 'completed' | 'cancelled' | 'pending';
+  notes?: string | null;
   created_at: string;
-  patient?: Patient;
-  provider?: Provider;
-}
+  updated_at: string;
+  provider?: {
+    id: string;
+    user_id: string;
+    first_name: string | null;
+    last_name: string | null;
+    specialization: string | null;
+  };
+  patient?: {
+    id: string;
+    user_id: string;
+    first_name: string | null;
+    last_name: string | null;
+    phone?: string | null;
+  };
+};
 
 export interface AppointmentSlot {
   id: string;
@@ -280,4 +294,14 @@ export interface MedicalHistory {
   notes: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ProviderTimeBlock {
+  id: string;
+  provider_id: string;
+  start_datetime: string; // ISO string format
+  end_datetime: string; // ISO string format
+  reason?: string | null;
+  is_unavailable: boolean;
+  created_at: string;
 } 

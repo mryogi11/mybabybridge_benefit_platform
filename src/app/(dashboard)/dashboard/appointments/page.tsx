@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Container,
@@ -19,18 +19,28 @@ import {
   Chip,
   CircularProgress,
   Alert,
+  Grid,
+  Snackbar,
+  Badge,
 } from '@mui/material';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3';
+import { PickersDay, PickersDayProps } from '@mui/x-date-pickers/PickersDay';
 import { format, parseISO, isSameDay } from 'date-fns';
 import { supabase } from '@/lib/supabase/client';
 import { EventNote } from '@mui/icons-material';
+import BookAppointmentModal from '@/components/appointments/BookAppointmentModal';
+import { useAuth } from '@/contexts/AuthContext';
+import { getAvailableSlots, bookAppointment } from '../../../../actions/appointmentActions';
+import { Alert as MuiAlert } from '@mui/material';
 
-interface Provider {
-  first_name: string;
-  last_name: string;
-  specialization: string;
+interface ProviderInfo {
+  id: string;
+  user_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  specialization: string | null;
 }
 
 interface Appointment {
@@ -39,174 +49,155 @@ interface Appointment {
   provider_id: string;
   appointment_date: string;
   status: string;
-  type: string;
   notes: string;
   created_at: string;
-  provider?: Provider;
+  providers: ProviderInfo | null;
 }
 
 export default function AppointmentsPage() {
+  const { user, session } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [availableProviders, setAvailableProviders] = useState<ProviderInfo[]>([]);
+  const [fetchingProviders, setFetchingProviders] = useState(true);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
-    const fetchAppointments = async () => {
+    const fetchProviders = async () => {
+      setFetchingProviders(true);
       try {
-        // Get the current user
-        const { data: userData, error: userError } = await supabase.auth.getUser();
+        const { data, error: providerError } = await supabase
+          .from('providers')
+          .select('id, user_id, first_name, last_name, specialization');
         
-        if (userError) {
-          console.error('Error fetching user:', userError);
-          setError('Error fetching user data. Please try again later.');
-          setLoading(false);
-          return;
-        }
+        if (providerError) throw providerError;
         
-        if (!userData.user) {
-          console.error('No user data available');
-          setError('User data not available. Try refreshing the page.');
-          setLoading(false);
-          return;
-        }
-
-        // Attempt to fetch profile
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', userData.user.id)
-          .single();
-
-        // If the profiles table doesn't exist or there's another error, use the user's ID directly
-        let patientId;
-        if (profileError) {
-          console.warn('Profile fetch error:', profileError.message);
-          if (profileError.message.includes('relation "public.profiles" does not exist')) {
-            console.log('Using mock patient ID for development');
-            // Use mock data for development
-            patientId = '1'; // Mock patient ID
-            setError(null); // Clear any previous errors
-          } else {
-            setError(`Error fetching profile: ${profileError.message}`);
-            setLoading(false);
-            return;
-          }
-        } else {
-          patientId = profile.id;
-        }
-
-        // Mock appointment data for development
-        if (profileError && profileError.message.includes('relation "public.profiles" does not exist')) {
-          const mockAppointments: Appointment[] = [
-            {
-              id: '1',
-              patient_id: '1',
-              provider_id: '101',
-              appointment_date: new Date().toISOString(),
-              status: 'scheduled',
-              type: 'Initial Consultation',
-              notes: 'Please arrive 15 minutes early to fill out paperwork.',
-              created_at: new Date().toISOString(),
-              provider: {
-                first_name: 'Jane',
-                last_name: 'Smith',
-                specialization: 'Pediatric Therapy'
-              }
-            },
-            {
-              id: '2',
-              patient_id: '1',
-              provider_id: '102',
-              appointment_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 1 week later
-              status: 'scheduled',
-              type: 'Follow-up',
-              notes: '',
-              created_at: new Date().toISOString(),
-              provider: {
-                first_name: 'Robert',
-                last_name: 'Johnson',
-                specialization: 'Speech Therapy'
-              }
-            }
-          ];
-          setAppointments(mockAppointments);
-          setLoading(false);
-          return;
-        }
-
-        // Only attempt to fetch from database if the table exists
-        const { data, error: appointmentsError } = await supabase
-          .from('appointments')
-          .select(`
-            *,
-            provider:profiles!provider_id (
-              first_name,
-              last_name,
-              specialization
-            )
-          `)
-          .eq('patient_id', patientId)
-          .eq('status', 'scheduled')
-          .order('appointment_date');
-
-        if (appointmentsError) {
-          // If appointments table doesn't exist, use mock data
-          if (appointmentsError.message.includes('relation "public.appointments" does not exist')) {
-            console.log('Using mock appointment data for development');
-            const mockAppointments: Appointment[] = [
-              {
-                id: '1',
-                patient_id: '1',
-                provider_id: '101',
-                appointment_date: new Date().toISOString(),
-                status: 'scheduled',
-                type: 'Initial Consultation',
-                notes: 'Please arrive 15 minutes early to fill out paperwork.',
-                created_at: new Date().toISOString(),
-                provider: {
-                  first_name: 'Jane',
-                  last_name: 'Smith',
-                  specialization: 'Pediatric Therapy'
-                }
-              },
-              {
-                id: '2',
-                patient_id: '1',
-                provider_id: '102',
-                appointment_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 1 week later
-                status: 'scheduled',
-                type: 'Follow-up',
-                notes: '',
-                created_at: new Date().toISOString(),
-                provider: {
-                  first_name: 'Robert',
-                  last_name: 'Johnson',
-                  specialization: 'Speech Therapy'
-                }
-              }
-            ];
-            setAppointments(mockAppointments);
-            setError(null);
-          } else {
-            setError(`Error fetching appointments: ${appointmentsError.message}`);
-          }
-        } else {
-          setAppointments(data || []);
-          setError(null);
-        }
-      } catch (err) {
-        console.error('Error in fetchAppointments:', err);
-        setError(err instanceof Error ? err.message : 'An error occurred');
+        setAvailableProviders(data || []);
+      } catch (err: any) {
+        console.error("Error fetching providers:", err);
+        setError('Could not load provider list. Please try again later.');
       } finally {
-        setLoading(false);
+        setFetchingProviders(false);
       }
     };
-
-    fetchAppointments();
+    fetchProviders();
   }, []);
+
+  const fetchAppointments = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (!user) {
+        console.log("Fetch appointments waiting for user...");
+        setLoading(false);
+        return;
+      }
+      console.log("Fetching appointments for user ID:", user.id); // Auth User ID
+
+      // 1. Get the Patient Profile ID using the Auth User ID
+      const { data: patientData, error: profileError } = await supabase
+        .from('patient_profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError || !patientData) {
+        console.error("Error fetching patient profile ID for appointments page:", profileError);
+        setError("Could not fetch patient profile information.");
+        setAppointments([]);
+        setLoading(false);
+        return;
+      }
+      
+      const patientProfileId = patientData.id;
+      console.log("Found patient profile ID for appointments page:", patientProfileId);
+
+      // 2. Fetch appointments using the Patient Profile ID
+      const { data, error: appointmentsError } = await supabase
+        .from('appointments')
+        .select(`
+          id,
+          provider_id,
+          appointment_date,
+          status,
+          notes,
+          created_at,
+          providers (
+            id, 
+            user_id,
+            first_name,
+            last_name,
+            specialization
+          )
+        `)
+        .eq('patient_id', patientProfileId) // Use the correct profile ID
+        .neq('status', 'cancelled')
+        .order('appointment_date');
+
+      if (appointmentsError) {
+        console.error("Error fetching appointments:", appointmentsError);
+        setError(`Error fetching appointments: ${appointmentsError.message}`);
+        setAppointments([]);
+      } else {
+        console.log("Fetched appointments data:", data);
+
+        // Correctly map the fetched data, handling the possibility of providers being an array
+        const typedAppointments: Appointment[] = (data || []).map(appt => {
+          const providerRelation = appt.providers as unknown as (ProviderInfo | null)[] | ProviderInfo | null;
+          const providerData = Array.isArray(providerRelation) ? providerRelation[0] : providerRelation;
+          
+          return {
+            id: appt.id,
+            patient_id: patientProfileId, // Use the correct profile ID
+            provider_id: appt.provider_id,
+            appointment_date: appt.appointment_date,
+            status: appt.status,
+            notes: appt.notes,
+            created_at: appt.created_at,
+            // Map the provider data carefully
+            providers: providerData ? { 
+              id: providerData.id,
+              user_id: providerData.user_id,
+              first_name: providerData.first_name,
+              last_name: providerData.last_name,
+              specialization: providerData.specialization
+            } : null // Handle case where provider join might be null
+          };
+        });
+
+        setAppointments(typedAppointments);
+        setError(null);
+      }
+    } catch (err) {
+      console.error('Error in fetchAppointments:', err);
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred during appointment fetch');
+      setAppointments([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [user, supabase]); // Add supabase to dependency array
+
+  useEffect(() => {
+    console.log("Appointments Page: useEffect for fetch triggered. User:", user);
+    if(user) {
+      console.log("Appointments Page: Calling fetchAppointments...");
+      fetchAppointments();
+    } else {
+      console.log("Appointments Page: User not available yet, clearing appointments.");
+      setAppointments([]);
+      setLoading(false);
+    }
+  }, [user, fetchAppointments]);
+
+  // Log the state whenever it changes
+  useEffect(() => {
+    console.log("Appointments Page: appointments state updated:", appointments);
+  }, [appointments]);
 
   const handleCancelAppointment = async (appointmentId: string) => {
     try {
@@ -226,9 +217,83 @@ export default function AppointmentsPage() {
     }
   };
 
+  const handleBookAppointment = async (bookingDetails: { 
+    providerId: string; 
+    dateTime: Date; 
+    notes: string; 
+    patientId: string;
+    accessToken: string;
+  }): Promise<{ success: boolean; error?: string }> => {
+    if (!bookingDetails.patientId || !bookingDetails.accessToken) {
+        console.error("Booking handler missing patientId or accessToken");
+        return { success: false, error: "Authentication details missing." };
+    }
+
+    console.log("Page requesting booking via server action (using passed details):", bookingDetails);
+
+    try {
+      const result = await bookAppointment({
+        providerId: bookingDetails.providerId,
+        dateTime: bookingDetails.dateTime,
+        notes: bookingDetails.notes,
+        patientUserId: bookingDetails.patientId,
+        accessToken: bookingDetails.accessToken,
+      });
+
+      if (result.success) {
+        setIsBookingModalOpen(false);
+        setSnackbar({ open: true, message: 'Appointment booked successfully!', severity: 'success' });
+        fetchAppointments();
+        return { success: true };
+      } else {
+        console.error("Booking failed (from server action):", result.error);
+        setSnackbar({ open: true, message: `Booking failed: ${result.error}`, severity: 'error' });
+        return { success: false, error: result.error };
+      }
+    } catch (err: any) {
+      console.error("Unexpected error calling bookAppointment action:", err);
+      setSnackbar({ open: true, message: `Booking failed: ${err.message || 'An unexpected server error occurred.'}`, severity: 'error' });
+      return { success: false, error: err.message || 'An unexpected server error occurred.' };
+    }
+  };
+
   const filteredAppointments = appointments.filter(appointment =>
     selectedDate && isSameDay(parseISO(appointment.appointment_date), selectedDate)
   );
+
+  // Add this function to mark dates with appointments
+  const hasAppointmentOnDate = (date: Date) => {
+    return appointments.some(appointment => 
+      isSameDay(parseISO(appointment.appointment_date), date)
+    );
+  };
+
+  // Custom Day component for the calendar
+  function DayWithIndicator(props: PickersDayProps<Date>) {
+    const { day, outsideCurrentMonth, ...other } = props;
+    // Check if there's an appointment on this specific day
+    const hasAppointment = appointments.some(appointment => 
+      isSameDay(parseISO(appointment.appointment_date), day)
+    );
+
+    return (
+      // Apply conditional styling directly to PickersDay
+      <PickersDay 
+        {...other} 
+        outsideCurrentMonth={outsideCurrentMonth} 
+        day={day} 
+        // Apply sx prop with theme callback for dynamic styling
+        sx={(theme) => ({
+          // Base styles for the day can go here if needed
+          // Conditional styles for the blue circle
+          ...(hasAppointment && !outsideCurrentMonth && { 
+            border: `2px solid ${theme.palette.primary.main}`, // Blue border using theme color
+            borderRadius: '50%', // Makes the border circular
+          }),
+        })}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -257,102 +322,145 @@ export default function AppointmentsPage() {
   }
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ py: 4 }}>
-        <Typography variant="h4" gutterBottom>
-          My Appointments
-        </Typography>
+    <LocalizationProvider dateAdapter={AdapterDateFns}>
+      <Container maxWidth="lg">
+        <Box sx={{ py: 4 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
+            <Typography variant="h4">My Appointments</Typography>
+            <Button 
+              variant="contained" 
+              startIcon={<EventNote />} 
+              onClick={() => setIsBookingModalOpen(true)}
+              disabled={fetchingProviders || availableProviders.length === 0 || !user?.id}
+            >
+              Book New Appointment
+            </Button>
+          </Stack>
 
-        <Box sx={{ display: 'flex', gap: 4, flexDirection: { xs: 'column', md: 'row' } }}>
-          <Paper sx={{ flex: 1, p: 2 }}>
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <DateCalendar
-                value={selectedDate}
-                onChange={(newValue) => setSelectedDate(newValue)}
-              />
-            </LocalizationProvider>
-          </Paper>
+          {error && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {error}
+            </Alert>
+          )}
 
-          <Paper sx={{ flex: 2, p: 2 }}>
-            <List>
-              {filteredAppointments.length === 0 ? (
-                <Box sx={{ py: 4, textAlign: 'center' }}>
-                  <EventNote sx={{ fontSize: 40, color: 'text.secondary', mb: 1 }} />
-                  <Typography variant="subtitle1" gutterBottom>
-                    No appointments scheduled for this day
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={4}>
+              <Paper sx={{ p: 2 }}>
+                <DateCalendar
+                  value={selectedDate}
+                  onChange={(newDate) => setSelectedDate(newDate)}
+                  slots={{
+                    day: DayWithIndicator,
+                  }}
+                />
+              </Paper>
+            </Grid>
+
+            <Grid item xs={12} md={7} lg={8}>
+              <Paper elevation={2} sx={{ p: 2, minHeight: '400px' }}>
+                <Typography variant="h6" gutterBottom>
+                  {selectedDate ? `Appointments for ${format(selectedDate, 'MMMM d, yyyy')}` : 'Select a date to view appointments'}
+                </Typography>
+                {loading ? (
+                  <Box display="flex" justifyContent="center" alignItems="center" height="100%">
+                    <CircularProgress />
+                  </Box>
+                ) : filteredAppointments.length > 0 ? (
+                  <List>
+                    {filteredAppointments.map((appointment) => (
+                      <ListItem 
+                        key={appointment.id} 
+                        button 
+                        onClick={() => {
+                            setSelectedAppointment(appointment);
+                            setDialogOpen(true);
+                        }}
+                        divider
+                      >
+                        <ListItemText
+                          primary={
+                            <Typography component="span" variant="body1">
+                              {appointment.providers?.first_name && appointment.providers?.last_name 
+                                ? `Dr. ${appointment.providers.first_name} ${appointment.providers.last_name}`
+                                : 'Provider details unavailable'}
+                            </Typography>
+                          }
+                          secondary={
+                            <Stack direction="row" spacing={1} alignItems="center" component="span">
+                               <Typography component="span" variant="body2" color="text.secondary">
+                                {format(parseISO(appointment.appointment_date), 'p')} - {appointment.providers?.specialization || 'Specialty N/A'}
+                              </Typography>
+                              <Chip 
+                                label={appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+                                size="small" 
+                                color={appointment.status === 'scheduled' ? 'primary' : appointment.status === 'completed' ? 'success' : 'default'}
+                                sx={{ height: 'auto', '& .MuiChip-label': { py: 0.2, px: 0.8 } }}
+                              />
+                            </Stack>
+                          }
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                ) : (
+                  <Typography sx={{ mt: 3, textAlign: 'center', color: 'text.secondary' }}>
+                    No appointments scheduled for this date.
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Try selecting a different date or book a new appointment
-                  </Typography>
-                </Box>
-              ) : (
-                filteredAppointments.map((appointment) => (
-                  <ListItem
-                    key={appointment.id}
-                    divider
-                    button
-                    onClick={() => {
-                      setSelectedAppointment(appointment);
-                      setDialogOpen(true);
-                    }}
-                  >
-                    <ListItemText
-                      primary={`Dr. ${appointment.provider?.first_name} ${appointment.provider?.last_name}`}
-                      secondary={format(parseISO(appointment.appointment_date), 'MMMM d, yyyy h:mm a')}
-                    />
-                    <ListItemSecondaryAction>
-                      <Stack direction="row" spacing={1}>
-                        <Chip label={appointment.type} color="primary" size="small" />
-                      </Stack>
-                    </ListItemSecondaryAction>
-                  </ListItem>
-                ))
-              )}
-            </List>
-          </Paper>
+                )}
+              </Paper>
+            </Grid>
+          </Grid>
         </Box>
 
-        <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
-          {selectedAppointment && (
-            <>
-              <DialogTitle>Appointment Details</DialogTitle>
-              <DialogContent>
-                <Box sx={{ py: 2 }}>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Provider: Dr. {selectedAppointment.provider?.first_name} {selectedAppointment.provider?.last_name}
-                  </Typography>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Specialization: {selectedAppointment.provider?.specialization}
-                  </Typography>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Type: {selectedAppointment.type}
-                  </Typography>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Date: {format(parseISO(selectedAppointment.appointment_date), 'MMMM d, yyyy h:mm a')}
-                  </Typography>
-                  {selectedAppointment.notes && (
-                    <Typography variant="subtitle1" gutterBottom>
-                      Notes: {selectedAppointment.notes}
-                    </Typography>
-                  )}
-                </Box>
-              </DialogContent>
-              <DialogActions>
-                <Stack direction="row" spacing={2}>
-                  <Button
-                    variant="contained"
-                    color="error"
-                    onClick={() => handleCancelAppointment(selectedAppointment.id)}
-                  >
-                    Cancel Appointment
-                  </Button>
-                  <Button onClick={() => setDialogOpen(false)}>Close</Button>
-                </Stack>
-              </DialogActions>
-            </>
-          )}
-        </Dialog>
-      </Box>
-    </Container>
+        {selectedAppointment && (
+          <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="xs" fullWidth>
+            <DialogTitle>Appointment Details</DialogTitle>
+            <DialogContent dividers>
+              {selectedAppointment.providers && (
+                 <Typography gutterBottom><b>Provider:</b> Dr. {selectedAppointment.providers.first_name} {selectedAppointment.providers.last_name} ({selectedAppointment.providers.specialization})</Typography>
+              )}
+              <Typography gutterBottom><b>Date & Time:</b> {format(parseISO(selectedAppointment.appointment_date), 'PPP p')}</Typography>
+              <Typography gutterBottom><b>Status:</b> <Chip label={selectedAppointment.status} size="small" color={selectedAppointment.status === 'scheduled' ? 'primary' : 'default'} /></Typography>
+              {selectedAppointment.notes && <Typography gutterBottom><b>Notes:</b> {selectedAppointment.notes}</Typography>}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setDialogOpen(false)}>Close</Button>
+              {selectedAppointment.status === 'scheduled' && (
+                <Button onClick={() => handleCancelAppointment(selectedAppointment.id)} color="error">
+                  Cancel Appointment
+                </Button>
+              )}
+            </DialogActions>
+          </Dialog>
+        )}
+
+        <BookAppointmentModal
+          open={isBookingModalOpen}
+          onClose={() => setIsBookingModalOpen(false)}
+          availableProviders={availableProviders}
+          onBookAppointment={handleBookAppointment}
+          getAvailableSlots={getAvailableSlots}
+          accessToken={session?.access_token}
+          patientId={user?.id || ''}
+        />
+
+        <Snackbar 
+          open={snackbar?.open || false} 
+          autoHideDuration={6000} 
+          onClose={() => setSnackbar(null)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <MuiAlert 
+              elevation={6} 
+              variant="filled" 
+              onClose={() => setSnackbar(null)} 
+              severity={snackbar?.severity || 'info'}
+              sx={{ width: '100%' }} 
+          >
+              {snackbar?.message}
+          </MuiAlert>
+        </Snackbar>
+      </Container>
+    </LocalizationProvider>
   );
 } 

@@ -15,10 +15,23 @@ import {
   TextField,
   MenuItem,
   CircularProgress,
+  Alert,
+  List,
+  ListItem,
+  ListItemText,
+  Chip,
+  Stack,
+  Divider,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Pagination
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3';
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 

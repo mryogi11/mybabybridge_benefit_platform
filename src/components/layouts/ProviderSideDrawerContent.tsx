@@ -13,6 +13,7 @@ import {
   Badge,
   useTheme,
   alpha,
+  Divider,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -24,9 +25,12 @@ import {
   ExpandLess,
   ExpandMore,
 } from '@mui/icons-material';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 // Define the type for a provider menu item (can be simpler if no sub-menus planned)
 interface ProviderMenuItemType {
@@ -95,6 +99,20 @@ export default function ProviderSideDrawerContent() {
   const router = useRouter();
   const [isNavigating, setIsNavigating] = useState(false);
   const [currentNavPath, setCurrentNavPath] = useState<string | null>(null);
+  const supabase = createClientComponentClient(); // Initialize supabase client
+
+  // Placeholder Logout Handler
+  const handleLogout = async () => {
+    console.log("Logout clicked - implementing...");
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error('Error signing out:', error);
+      // Handle error appropriately (e.g., show notification)
+    } else {
+      // Redirect to login or home page after successful logout
+      router.push('/login'); 
+    }
+  };
 
   // Prefetch links on mount
   useEffect(() => {
@@ -135,6 +153,34 @@ export default function ProviderSideDrawerContent() {
             currentNavPath={currentNavPath}
            />
         ))}
+      </List>
+
+      <Divider />
+
+      <List component="nav">
+        {/* Settings Link */}
+        <ListItemButton component={Link} href="/provider/settings">
+          <ListItemIcon>
+            <SettingsIcon />
+          </ListItemIcon>
+          <ListItemText primary="Settings" />
+        </ListItemButton>
+
+        {/* Availability Link */}
+        <ListItemButton component={Link} href="/provider/availability">
+          <ListItemIcon>
+            <EventAvailableIcon />
+          </ListItemIcon>
+          <ListItemText primary="Manage Availability" />
+        </ListItemButton>
+
+        {/* Logout Button */}
+        <ListItemButton onClick={handleLogout}>
+          <ListItemIcon>
+            <ExitToAppIcon />
+          </ListItemIcon>
+          <ListItemText primary="Logout" />
+        </ListItemButton>
       </List>
 
       {/* Optional: Footer Section (matching admin drawer if needed) */}
