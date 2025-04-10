@@ -33,21 +33,21 @@ import { useParams } from 'next/navigation';
 
 interface EducationResource {
   id: string;
-  category_id: string;
+  category_id?: string | null;
   title: string;
-  description: string;
+  description?: string | null;
   content: string;
-  media_url: string | null;
-  media_type: 'image' | 'video' | 'document' | null;
-  reading_time: number;
-  difficulty_level: 'beginner' | 'intermediate' | 'advanced';
+  media_url?: string | null;
+  media_type?: 'image' | 'video' | 'document' | null;
+  reading_time?: number | null;
+  difficulty_level?: 'beginner' | 'intermediate' | 'advanced' | null;
 }
 
 interface PatientProgress {
-  status: 'not_started' | 'in_progress' | 'completed';
-  progress_percentage: number;
-  last_accessed_at: string | null;
-  completed_at: string | null;
+  status?: 'not_started' | 'in_progress' | 'completed' | null;
+  progress_percentage?: number | null;
+  last_accessed_at?: string | null;
+  completed_at?: string | null;
 }
 
 export default function EducationResourcePage() {
@@ -58,26 +58,32 @@ export default function EducationResourcePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resource, setResource] = useState<EducationResource | null>(null);
-  const [progress, setProgress] = useState<PatientProgress>({
-    status: 'not_started',
-    progress_percentage: 0,
-    last_accessed_at: null,
-    completed_at: null,
-  });
+  const [progress, setProgress] = useState<PatientProgress>({});
   const [patientId, setPatientId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchData();
+    const resourceId = params.id;
+    if (typeof resourceId === 'string') {
+      fetchData(resourceId);
+    }
   }, [params.id]);
 
-  const fetchData = async () => {
+  const fetchData = async (resourceId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    setLoading(true);
+    setError(null);
+
+    if (!resourceId || typeof resourceId !== 'string') {
+      setError('Invalid resource ID.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Fetch patient ID
       const { data: patientData, error: patientError } = await supabase
-        .from('patients')
+        .from('patient_profiles')
         .select('id')
         .eq('user_id', user.id)
         .single();
@@ -85,22 +91,40 @@ export default function EducationResourcePage() {
       if (patientError) throw patientError;
       setPatientId(patientData.id);
 
-      // Fetch resource
       const { data: resourceData, error: resourceError } = await supabase
         .from('education_resources')
         .select('*')
-        .eq('id', params.id)
+        .eq('id', resourceId)
         .single();
 
       if (resourceError) throw resourceError;
-      setResource(resourceData);
+      
+      const typedResource: EducationResource = {
+        id: resourceData.id,
+        category_id: resourceData.category_id,
+        title: resourceData.title,
+        description: resourceData.description,
+        content: resourceData.content,
+        media_url: resourceData.media_url,
+        media_type: (
+          resourceData.media_type === 'image' ||
+          resourceData.media_type === 'video' ||
+          resourceData.media_type === 'document'
+        ) ? resourceData.media_type : null,
+        reading_time: resourceData.reading_time,
+        difficulty_level: (
+          resourceData.difficulty_level === 'beginner' ||
+          resourceData.difficulty_level === 'intermediate' ||
+          resourceData.difficulty_level === 'advanced'
+        ) ? resourceData.difficulty_level : null,
+      };
+      setResource(typedResource);
 
-      // Fetch progress
       const { data: progressData, error: progressError } = await supabase
         .from('patient_education_progress')
         .select('*')
         .eq('patient_id', patientData.id)
-        .eq('resource_id', params.id)
+        .eq('resource_id', resourceId)
         .single();
 
       if (progressError && progressError.code !== 'PGRST116') {
@@ -108,7 +132,13 @@ export default function EducationResourcePage() {
       }
 
       if (progressData) {
-        setProgress(progressData);
+        const typedProgress: PatientProgress = {
+          status: progressData.status as PatientProgress['status'],
+          progress_percentage: progressData.progress_percentage,
+          last_accessed_at: progressData.last_accessed_at,
+          completed_at: progressData.completed_at,
+        };
+        setProgress(typedProgress);
       }
 
       setLoading(false);
@@ -146,7 +176,7 @@ export default function EducationResourcePage() {
     }
   };
 
-  const getDifficultyColor = (level: string) => {
+  const getDifficultyColor = (level: string | null | undefined) => {
     switch (level) {
       case 'beginner':
         return 'success';
@@ -209,7 +239,7 @@ export default function EducationResourcePage() {
                       />
                       <Chip
                         icon={<SchoolIcon />}
-                        label={resource.difficulty_level}
+                        label={resource.difficulty_level || 'N/A'}
                         size="small"
                         color={getDifficultyColor(resource.difficulty_level)}
                       />
@@ -274,12 +304,12 @@ export default function EducationResourcePage() {
                           Progress
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {progress.progress_percentage}%
+                          {progress.progress_percentage ?? 0}%
                         </Typography>
                       </Stack>
                       <LinearProgress
                         variant="determinate"
-                        value={progress.progress_percentage}
+                        value={progress.progress_percentage ?? 0}
                         color={progress.status === 'completed' ? 'success' : 'primary'}
                         sx={{ height: 8, borderRadius: 4 }}
                       />
@@ -287,7 +317,7 @@ export default function EducationResourcePage() {
 
                     <Stack spacing={2}>
                       <Typography variant="body2" color="text.secondary">
-                        Status: {progress.status.replace('_', ' ')}
+                        Status: {progress.status?.replace('_', ' ')}
                       </Typography>
                       {progress.last_accessed_at && (
                         <Typography variant="body2" color="text.secondary">

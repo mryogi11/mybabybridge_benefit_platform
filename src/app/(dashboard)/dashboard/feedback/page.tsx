@@ -35,9 +35,10 @@ interface FeedbackCategory {
 
 interface Provider {
   id: string;
-  name: string;
-  specialty: string;
-  avatar_url?: string;
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  specialization?: string | null;
 }
 
 interface TreatmentPlan {
@@ -108,10 +109,10 @@ export default function FeedbackPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchData();
+    fetchInitialData();
   }, []);
 
-  const fetchData = async () => {
+  const fetchInitialData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -119,10 +120,19 @@ export default function FeedbackPage() {
       // Fetch providers
       const { data: providersData, error: providersError } = await supabase
         .from('providers')
-        .select('*');
+        .select('id, user_id, first_name, last_name, specialization');
 
       if (providersError) throw providersError;
-      setProviders(providersData);
+
+      // Explicitly map providersData
+      const typedProviders: Provider[] = (providersData || []).map(p => ({
+        id: p.id,
+        user_id: p.user_id,
+        first_name: p.first_name,
+        last_name: p.last_name,
+        specialization: p.specialization,
+      }));
+      setProviders(typedProviders);
 
       // Fetch treatment plans
       const { data: plansData, error: plansError } = await supabase
@@ -308,7 +318,7 @@ export default function FeedbackPage() {
                         <Stack spacing={2}>
                           <Stack direction="row" justifyContent="space-between" alignItems="center">
                             <Typography variant="subtitle1">
-                              {review.is_anonymous ? 'Anonymous Review' : review.provider?.name}
+                              {review.is_anonymous ? 'Anonymous Review' : review.provider?.first_name}
                             </Typography>
                             <Rating value={review.rating} readOnly />
                           </Stack>
@@ -440,7 +450,7 @@ export default function FeedbackPage() {
             >
               {providers.map((provider) => (
                 <MenuItem key={provider.id} value={provider.id}>
-                  {provider.name} - {provider.specialty}
+                  {`${provider.first_name} ${provider.last_name}`}
                 </MenuItem>
               ))}
             </TextField>
@@ -509,7 +519,7 @@ export default function FeedbackPage() {
             >
               {treatmentPlans.map((plan) => (
                 <MenuItem key={plan.id} value={plan.id}>
-                  {plan.title} - {plan.provider?.name}
+                  {plan.title} - {plan.provider?.first_name}
                 </MenuItem>
               ))}
             </TextField>
