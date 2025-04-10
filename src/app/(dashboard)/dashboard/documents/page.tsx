@@ -27,24 +27,12 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DownloadIcon from '@mui/icons-material/Download';
 import { supabase } from '@/lib/supabase/client';
 import { format } from 'date-fns';
+import { Document } from '@/types';
 
 interface DocumentCategory {
   id: string;
   name: string;
-  description: string;
-}
-
-interface Document {
-  id: string;
-  title: string;
-  description: string;
-  file_path: string;
-  file_type: string;
-  file_size: number;
-  category_id: string;
-  is_private: boolean;
-  created_at: string;
-  category?: DocumentCategory;
+  description?: string | null;
 }
 
 export default function DocumentsPage() {
@@ -77,26 +65,61 @@ export default function DocumentsPage() {
     const { data, error } = await supabase
       .from('documents')
       .select(`
-        *,
-        category:document_categories(*)
+        id,
+        patient_id,
+        category_id,
+        title,
+        description,
+        file_path,
+        file_type,
+        file_size,
+        is_private,
+        metadata,
+        created_at,
+        updated_at,
+        uploaded_by,
+        category:document_categories (id, name, description)
       `)
       .eq('patient_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error fetching documents:', error);
-      setError('Failed to load documents');
+      setError(error.message);
+      setLoading(false);
       return;
     }
 
-    setDocuments(data);
+    // Explicitly map data to the Document type
+    const typedDocuments: Document[] = (data || []).map(doc => ({
+      id: doc.id,
+      patient_id: doc.patient_id ?? '',
+      category_id: doc.category_id,
+      title: doc.title,
+      description: doc.description,
+      file_path: doc.file_path,
+      file_type: doc.file_type,
+      file_size: doc.file_size,
+      is_private: doc.is_private,
+      metadata: doc.metadata as Record<string, any> | null,
+      created_at: doc.created_at,
+      updated_at: doc.updated_at,
+      uploaded_by: doc.uploaded_by,
+      category: doc.category ? {
+        id: doc.category.id,
+        name: doc.category.name,
+        description: doc.category.description,
+      } : null,
+    }));
+
+    setDocuments(typedDocuments); // Use the explicitly typed array
     setLoading(false);
   };
 
   const fetchCategories = async () => {
     const { data, error } = await supabase
       .from('document_categories')
-      .select('*')
+      .select('id, name, description')
       .order('name');
 
     if (error) {
@@ -104,7 +127,14 @@ export default function DocumentsPage() {
       return;
     }
 
-    setCategories(data);
+    // Explicitly map category data
+    const typedCategories: DocumentCategory[] = (data || []).map(cat => ({
+      id: cat.id,
+      name: cat.name,
+      description: cat.description,
+    }));
+
+    setCategories(typedCategories); // Use typed data
   };
 
   const handleFileUpload = async () => {
@@ -129,7 +159,7 @@ export default function DocumentsPage() {
       if (uploadError) throw uploadError;
 
       // Create document record
-      const { data, error: insertError } = await supabase
+      const { data: insertedData, error: insertError } = await supabase
         .from('documents')
         .insert({
           patient_id: user.id,
@@ -147,7 +177,13 @@ export default function DocumentsPage() {
 
       if (insertError) throw insertError;
 
-      setDocuments([data, ...documents]);
+      // Cast the inserted data to Document before updating state
+      const newDoc = insertedData as Document;
+
+      // Map the existing documents just in case their type isn't perfect
+      const existingDocs = documents.map(doc => ({...doc})); 
+
+      setDocuments([newDoc, ...existingDocs]);
       setUploadDialog(false);
       setNewDocument({
         title: '',
@@ -293,7 +329,7 @@ export default function DocumentsPage() {
                       )}
                     </Stack>
                     <Typography variant="caption" color="text.secondary">
-                      Uploaded {format(new Date(document.created_at), 'MMM d, yyyy')}
+                      Uploaded {document.created_at && typeof document.created_at === 'string' ? format(new Date(document.created_at), 'MMM d, yyyy') : 'date unknown'}
                     </Typography>
                   </Box>
                   <Stack direction="row" spacing={1}>

@@ -37,28 +37,28 @@ import { useRouter } from 'next/navigation';
 interface EducationCategory {
   id: string;
   name: string;
-  description: string;
-  icon_url: string;
+  description?: string | null;
+  icon_url?: string | null;
 }
 
 interface EducationResource {
   id: string;
-  category_id: string;
+  category_id?: string | null;
   title: string;
-  description: string;
-  content: string;
-  media_url: string | null;
-  media_type: 'image' | 'video' | 'document' | null;
-  reading_time: number;
-  difficulty_level: 'beginner' | 'intermediate' | 'advanced';
+  description?: string | null;
+  content?: string | null;
+  media_url?: string | null;
+  media_type?: 'image' | 'video' | 'document' | null;
+  reading_time?: number | null;
+  difficulty_level?: 'beginner' | 'intermediate' | 'advanced' | null;
 }
 
 interface PatientProgress {
-  resource_id: string;
-  status: 'not_started' | 'in_progress' | 'completed';
-  progress_percentage: number;
-  last_accessed_at: string | null;
-  completed_at: string | null;
+  resource_id?: string | null;
+  status?: 'not_started' | 'in_progress' | 'completed' | null;
+  progress_percentage?: number | null;
+  last_accessed_at?: string | null;
+  completed_at?: string | null;
 }
 
 export default function EducationPage() {
@@ -85,7 +85,7 @@ export default function EducationPage() {
     try {
       // Fetch patient ID
       const { data: patientData, error: patientError } = await supabase
-        .from('patients')
+        .from('patient_profiles')
         .select('id')
         .eq('user_id', user.id)
         .single();
@@ -100,7 +100,15 @@ export default function EducationPage() {
         .order('name');
 
       if (categoriesError) throw categoriesError;
-      setCategories(categoriesData);
+
+      // Explicitly map categoriesData
+      const typedCategories: EducationCategory[] = (categoriesData || []).map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        description: cat.description,
+        icon_url: cat.icon_url,
+      }));
+      setCategories(typedCategories);
 
       // Fetch resources
       const { data: resourcesData, error: resourcesError } = await supabase
@@ -109,7 +117,20 @@ export default function EducationPage() {
         .order('title');
 
       if (resourcesError) throw resourcesError;
-      setResources(resourcesData);
+
+      // Explicitly map resourcesData
+      const typedResources: EducationResource[] = (resourcesData || []).map(res => ({
+        id: res.id,
+        category_id: res.category_id,
+        title: res.title,
+        description: res.description,
+        content: res.content,
+        media_url: res.media_url,
+        media_type: res.media_type as EducationResource['media_type'],
+        reading_time: res.reading_time,
+        difficulty_level: res.difficulty_level as EducationResource['difficulty_level'],
+      }));
+      setResources(typedResources);
 
       // Fetch progress
       const { data: progressData, error: progressError } = await supabase
@@ -121,7 +142,15 @@ export default function EducationPage() {
       
       const progressMap: Record<string, PatientProgress> = {};
       progressData.forEach((p) => {
-        progressMap[p.resource_id] = p;
+        if (p.resource_id) {
+          progressMap[p.resource_id] = {
+            resource_id: p.resource_id,
+            status: p.status as PatientProgress['status'],
+            progress_percentage: p.progress_percentage,
+            last_accessed_at: p.last_accessed_at,
+            completed_at: p.completed_at,
+          };
+        }
       });
       setProgress(progressMap);
 
@@ -133,7 +162,7 @@ export default function EducationPage() {
     }
   };
 
-  const getResourceProgress = (resourceId: string) => {
+  const getResourceProgress = (resourceId: string): PatientProgress => {
     return progress[resourceId] || {
       status: 'not_started',
       progress_percentage: 0,
@@ -142,7 +171,7 @@ export default function EducationPage() {
     };
   };
 
-  const getDifficultyColor = (level: string) => {
+  const getDifficultyColor = (level: string | null | undefined): 'success' | 'warning' | 'error' | 'default' => {
     switch (level) {
       case 'beginner':
         return 'success';
@@ -300,7 +329,7 @@ export default function EducationPage() {
                             />
                             <Chip
                               icon={<SchoolIcon />}
-                              label={resource.difficulty_level}
+                              label={resource.difficulty_level || 'N/A'}
                               size="small"
                               color={getDifficultyColor(resource.difficulty_level)}
                             />
@@ -322,14 +351,14 @@ export default function EducationPage() {
                           </Stack>
                           <LinearProgress
                             variant="determinate"
-                            value={progress.progress_percentage}
+                            value={progress.progress_percentage ?? 0}
                             color={progress.status === 'completed' ? 'success' : 'primary'}
                           />
                         </Box>
 
                         <Stack direction="row" spacing={1} alignItems="center">
                           <Typography variant="body2" color="text.secondary">
-                            Status: {progress.status.replace('_', ' ')}
+                            Status: {progress.status?.replace('_', ' ')}
                           </Typography>
                           {progress.last_accessed_at && (
                             <Typography variant="body2" color="text.secondary">

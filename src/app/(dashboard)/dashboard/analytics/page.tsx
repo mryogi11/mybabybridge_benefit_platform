@@ -72,7 +72,7 @@ export default function AnalyticsPage() {
     try {
       // Fetch patient ID
       const { data: patientData, error: patientError } = await supabase
-        .from('patients')
+        .from('patient_profiles')
         .select('id')
         .eq('user_id', user.id)
         .single();
@@ -94,7 +94,14 @@ export default function AnalyticsPage() {
         .order('period_start', { ascending: true });
 
       if (metricsError) throw metricsError;
-      setMetrics(metricsData);
+
+      // Explicitly cast metric_value to the expected type
+      const typedMetricsData = metricsData.map(metric => ({
+        ...metric,
+        metric_value: metric.metric_value as AnalyticsMetric['metric_value'],
+      }));
+
+      setMetrics(typedMetricsData);
 
       setLoading(false);
     } catch (error) {

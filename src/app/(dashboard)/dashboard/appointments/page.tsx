@@ -49,9 +49,9 @@ interface Appointment {
   provider_id: string;
   appointment_date: string;
   status: string;
-  notes: string;
+  notes?: string | null;
   created_at: string;
-  providers: ProviderInfo | null;
+  provider?: ProviderInfo | null;
 }
 
 export default function AppointmentsPage() {
@@ -122,13 +122,14 @@ export default function AppointmentsPage() {
         .from('appointments')
         .select(`
           id,
+          patient_id,
           provider_id,
           appointment_date,
           status,
           notes,
           created_at,
-          providers (
-            id, 
+          provider:providers (
+            id,
             user_id,
             first_name,
             last_name,
@@ -147,25 +148,27 @@ export default function AppointmentsPage() {
 
         // Correctly map the fetched data, handling the possibility of providers being an array
         const typedAppointments: Appointment[] = (data || []).map(appt => {
-          const providerRelation = appt.providers as unknown as (ProviderInfo | null)[] | ProviderInfo | null;
+          // Ensure we are accessing the aliased 'provider' field from the fetched data
+          const providerRelation = appt.provider as unknown as ProviderInfo | null;
+          // The check for array is likely no longer needed with the alias, but keeping for safety
           const providerData = Array.isArray(providerRelation) ? providerRelation[0] : providerRelation;
           
           return {
             id: appt.id,
-            patient_id: patientProfileId, // Use the correct profile ID
+            patient_id: patientProfileId,
             provider_id: appt.provider_id,
             appointment_date: appt.appointment_date,
             status: appt.status,
-            notes: appt.notes,
+            notes: appt.notes, // Directly assign notes (already string | null)
             created_at: appt.created_at,
-            // Map the provider data carefully
-            providers: providerData ? { 
+            // Assign to the 'provider' field (singular) in the typed object
+            provider: providerData ? { 
               id: providerData.id,
               user_id: providerData.user_id,
               first_name: providerData.first_name,
               last_name: providerData.last_name,
               specialization: providerData.specialization
-            } : null // Handle case where provider join might be null
+            } : null
           };
         });
 
@@ -387,15 +390,15 @@ export default function AppointmentsPage() {
                                 variant="body1"
                                 sx={{ textDecoration: isCancelled ? 'line-through' : 'none' }}
                               >
-                                {appointment.providers?.first_name && appointment.providers?.last_name 
-                                  ? `Dr. ${appointment.providers.first_name} ${appointment.providers.last_name}`
+                                {appointment.provider?.first_name && appointment.provider?.last_name 
+                                  ? `Dr. ${appointment.provider.first_name} ${appointment.provider.last_name}`
                                   : 'Provider details unavailable'}
                               </Typography>
                             }
                             secondary={
                               <Stack component="span" direction="row" spacing={1} alignItems="center">
                                  <Typography component="span" variant="body2" color="text.secondary">
-                                  {format(parseISO(appointment.appointment_date), 'p')} - {appointment.providers?.specialization || 'Specialty N/A'}
+                                  {format(parseISO(appointment.appointment_date), 'p')} - {appointment.provider?.specialization || 'Specialty N/A'}
                                 </Typography>
                                 <Chip 
                                   label={appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
@@ -425,8 +428,8 @@ export default function AppointmentsPage() {
           <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="xs" fullWidth>
             <DialogTitle>Appointment Details</DialogTitle>
             <DialogContent dividers>
-              {selectedAppointment.providers && (
-                 <Typography gutterBottom><b>Provider:</b> Dr. {selectedAppointment.providers.first_name} {selectedAppointment.providers.last_name} ({selectedAppointment.providers.specialization})</Typography>
+              {selectedAppointment.provider && (
+                 <Typography gutterBottom><b>Provider:</b> Dr. {selectedAppointment.provider.first_name} {selectedAppointment.provider.last_name} ({selectedAppointment.provider.specialization})</Typography>
               )}
               <Typography gutterBottom><b>Date & Time:</b> {format(parseISO(selectedAppointment.appointment_date), 'PPP p')}</Typography>
               <Typography gutterBottom><b>Status:</b> <Chip label={selectedAppointment.status} size="small" color={selectedAppointment.status === 'scheduled' ? 'primary' : 'default'} /></Typography>

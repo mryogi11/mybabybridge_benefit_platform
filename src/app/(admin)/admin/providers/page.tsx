@@ -50,13 +50,22 @@ export default function ProvidersPage() {
 
   const fetchProviders = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: rawData, error } = await supabase
         .from('providers')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*');
 
       if (error) throw error;
-      setProviders(data || []);
+
+      const transformedData = (rawData || []).map(provider => ({
+        ...provider,
+        specialization: provider.specialization ?? undefined,
+        bio: provider.bio ?? undefined,
+        experience_years: provider.experience_years ?? undefined,
+        education: provider.education ?? undefined,
+        certifications: provider.certifications ?? undefined,
+      }));
+
+      setProviders(transformedData);
     } catch (error) {
       console.error('Error fetching providers:', error);
       setError('Failed to load providers');
@@ -111,9 +120,24 @@ export default function ProvidersPage() {
 
         if (error) throw error;
       } else {
+        // Construct the object for insertion, ensuring required fields are present
+        // TODO: Replace placeholder user_id with actual logic to get/create user ID
+        const providerDataToInsert = {
+          first_name: formData.first_name || '', // Ensure string type from Partial<T>
+          last_name: formData.last_name || '', // Ensure string type from Partial<T>
+          user_id: 'PLACEHOLDER_USER_ID', // Placeholder - Needs proper handling!
+          specialization: formData.specialization || null, // Handle potential undefined from Partial<T> -> null
+          bio: formData.bio || null, // Handle potential undefined from Partial<T> -> null
+          experience_years: formData.experience_years === undefined ? null : formData.experience_years, // Handle potential undefined number -> null
+          education: formData.education || null, // Handle potential undefined from Partial<T> -> null
+          certifications: formData.certifications || null, // Handle potential undefined from Partial<T> -> null
+          availability: formData.availability || {}, // Ensure object type
+          // created_at and updated_at are typically handled by the database
+        };
+
         const { error } = await supabase
           .from('providers')
-          .insert([formData]);
+          .insert([providerDataToInsert]); // Use the explicitly constructed object
 
         if (error) throw error;
       }

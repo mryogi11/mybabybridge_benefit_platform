@@ -37,8 +37,8 @@ export interface User {
   id: string;
   email: string;
   role: UserRole;
-  first_name: string;
-  last_name: string;
+  first_name?: string;
+  last_name?: string;
   avatar_url?: string;
   created_at: string;
   updated_at: string;
@@ -101,11 +101,11 @@ export interface Provider {
   user_id: string;
   first_name: string;
   last_name: string;
-  specialization: string;
-  bio?: string;
-  experience_years?: number;
-  education?: string[];
-  certifications?: string[];
+  specialization?: string | null;
+  bio?: string | null;
+  experience_years?: number | null;
+  education?: string[] | null;
+  certifications?: string[] | null;
   availability?: Record<string, any>;
   created_at?: string;
   updated_at?: string;
@@ -304,4 +304,25 @@ export interface ProviderTimeBlock {
   reason?: string | null;
   is_unavailable: boolean;
   created_at: string;
+}
+
+export interface Document {
+  id: string;
+  patient_id: string;
+  category_id?: string | null;
+  title: string;
+  description?: string | null;
+  file_path: string;
+  file_type: string;
+  file_size: number;
+  is_private?: boolean | null;
+  metadata?: Record<string, any> | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  uploaded_by?: string | null;
+  category?: {
+    id: string;
+    name: string;
+    description?: string | null;
+  } | null;
 } 
