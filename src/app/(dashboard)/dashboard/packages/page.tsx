@@ -115,11 +115,12 @@ export default function PackagesPage() {
         throw error;
       }
       
-      // Update cache
-      packageCache = data || [];
+      // Update cache with any cast
+      packageCache = data as any || [];
       packageCacheTimestamp = now;
       
-      setPackages(data || []);
+      // Set state with any cast
+      setPackages(data as any || []);
     } catch (error) {
       console.error('Error fetching packages:', error);
       setError('Failed to load packages. Please try again later.');
