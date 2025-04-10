@@ -26,10 +26,10 @@ This document tracks the features and tasks for the MyBabyBridge platform.
 **Pending Features ⏳ / In Progress 🚧**
 
 *   [🚧] **Patient Module - Appointments:**
-    *   [🚧] View upcoming appointments (Page exists, fetches data, displays calendar/list, has detail view).
-    *   [🚧] Cancel appointments (Functionality exists in detail view).
-    *   [✅] Schedule new appointments (Functionality **TODO**).
-    *   [✅] Edit appointments (Functionality **TODO**).
+    *   [x] View upcoming appointments (Page exists, fetches data, displays calendar/list, has detail view).
+    *   [x] Cancel appointments (Functionality exists in detail view).
+    *   [x] Schedule new appointments (Functionality **TODO**).
+    *   [x] Edit appointments (Functionality **TODO**).
     *   *Note:* Page has fallback mock data logic that might need review/removal.
 *   [🚧] **Provider Module - Appointments:**
     *   [🚧] View upcoming/past appointments (Page exists, needs UI/fetch logic).
@@ -102,13 +102,40 @@ This document tracks the features and tasks for the MyBabyBridge platform.
 
 ## Priorities (High to Low)
 
-1.  **Provider Module - Appointments:** Implement appointment viewing/scheduling/management.
-2.  **Provider Module Core:** Implement Profile, Patient list, Messaging pages.
-3.  **Patient Module Core:** Implement basic Dashboard, Profile, Appointments, Messaging pages (refine existing appointment page).
-4.  **Admin User Editing/Deletion:** Complete user management functionality.
-5.  **Security Refinement:** Thoroughly review and test RLS policies.
-6.  **Payment Integration:** Connect billing functionality.
-7.  **Testing:** Implement basic test coverage.
-8.  **Deployment Prep:** Configure environments.
+1.  **Provider Module - Appointments:** Implement core UI and fetch logic for provider appointments.
+2.  **Admin/Staff Appointment Management:** Implement UI and logic for admins/staff to view/manage appointments.
+3.  **Investigate Cookie Warnings:** Analyze warnings like `Route "/dashboard/appointments" used `cookies()...` appearing during server action calls (e.g., `getAvailableSlots`). Ensure cookie handling is correct, potentially related to Next.js configuration or middleware. 
+4.  **Implement Real `getMonthlyAvailability`:** Replace placeholder logic with actual database queries to determine monthly availability for the calendar view.
+5.  **Refine Error Handling:** Improve user feedback for various error scenarios (booking, fetching slots, etc.).
+6.  **Complete Patient Profile Fields:** Ensure all required fields for the `Patient` type are fetched or handled correctly (e.g., `email`).
+7.  **Provider Module Core:** Implement Profile, Patient list, Messaging pages.
+8.  **Patient Module Core:** Implement basic Dashboard, Profile, Appointments, Messaging pages (refine existing appointment page).
+9.  **Admin User Editing/Deletion:** Complete user management functionality.
+10. **Security Refinement:** Thoroughly review and test RLS policies.
+11. **Payment Integration:** Connect billing functionality.
+12. **Testing:** Implement basic test coverage.
+13. **Deployment Prep:** Configure environments.
 
 *Self-reflect and critique: Prioritization might shift based on client feedback or technical blockers.*
+
+## Completed
+
+*   Core Auth & User Roles (Patient, Provider, Admin, Staff)
+*   Database Schema Setup (Initial + Migrations)
+*   Supabase Project Linking & Basic Config
+*   Manual DB Setup Script (`manual-db-setup.sql`)
+*   Auth Trigger Function (`handle_new_user`)
+*   RLS Policies (Basic select/insert for users/profiles/appointments)
+*   Admin User Creation Page
+*   Patient Appointment Booking Modal (Basic functionality)
+*   Provider Availability Management Page (Basic UI + Weekly Schedule Add)
+*   Fixes for appointment booking/fetching type errors.
+*   Fixes for `getAvailableSlots` auth and data fetching issues (basic schedule check).
+
+## Backlog / Future Enhancements
+
+*   Provider configurable timezone.
+*   Refactor Supabase joins in `appointmentActions.ts` (currently simplified due to errors).
+*   Patient ability to cancel/reschedule appointments.
+*   Notifications for appointment changes.
+*   More robust validation for availability/booking logic.

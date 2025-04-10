@@ -135,8 +135,7 @@ export default function AppointmentsPage() {
             specialization
           )
         `)
-        .eq('patient_id', patientProfileId) // Use the correct profile ID
-        .neq('status', 'cancelled')
+        .eq('patient_id', patientProfileId)
         .order('appointment_date');
 
       if (appointmentsError) {
@@ -232,13 +231,14 @@ export default function AppointmentsPage() {
     console.log("Page requesting booking via server action (using passed details):", bookingDetails);
 
     try {
-      const result = await bookAppointment({
-        providerId: bookingDetails.providerId,
-        dateTime: bookingDetails.dateTime,
-        notes: bookingDetails.notes,
-        patientUserId: bookingDetails.patientId,
-        accessToken: bookingDetails.accessToken,
-      });
+      const result = await bookAppointment(
+          bookingDetails.patientId,    // 1. patientId (string)
+          bookingDetails.providerId,   // 2. providerId (string)
+          bookingDetails.dateTime.toISOString(), // 3. dateTime (pass as ISO string)
+          60, // 4. duration (Assuming 60 minutes, adjust if needed)
+          'consultation', // 5. appointmentType (Assuming default, adjust if needed)
+          bookingDetails.notes       // 6. notes (string | null)
+      );
 
       if (result.success) {
         setIsBookingModalOpen(false);
@@ -323,7 +323,7 @@ export default function AppointmentsPage() {
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Container maxWidth="lg">
+      <Container maxWidth="lg" sx={{ py: 4 }}>
         <Box sx={{ py: 4 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
             <Typography variant="h4">My Appointments</Typography>
@@ -356,8 +356,8 @@ export default function AppointmentsPage() {
               </Paper>
             </Grid>
 
-            <Grid item xs={12} md={7} lg={8}>
-              <Paper elevation={2} sx={{ p: 2, minHeight: '400px' }}>
+            <Grid item xs={12} md={8}>
+              <Paper elevation={2} sx={{ p: 2 }}>
                 <Typography variant="h6" gutterBottom>
                   {selectedDate ? `Appointments for ${format(selectedDate, 'MMMM d, yyyy')}` : 'Select a date to view appointments'}
                 </Typography>
@@ -366,41 +366,50 @@ export default function AppointmentsPage() {
                     <CircularProgress />
                   </Box>
                 ) : filteredAppointments.length > 0 ? (
-                  <List>
-                    {filteredAppointments.map((appointment) => (
-                      <ListItem 
-                        key={appointment.id} 
-                        button 
-                        onClick={() => {
-                            setSelectedAppointment(appointment);
-                            setDialogOpen(true);
-                        }}
-                        divider
-                      >
-                        <ListItemText
-                          primary={
-                            <Typography component="span" variant="body1">
-                              {appointment.providers?.first_name && appointment.providers?.last_name 
-                                ? `Dr. ${appointment.providers.first_name} ${appointment.providers.last_name}`
-                                : 'Provider details unavailable'}
-                            </Typography>
-                          }
-                          secondary={
-                            <Stack direction="row" spacing={1} alignItems="center" component="span">
-                               <Typography component="span" variant="body2" color="text.secondary">
-                                {format(parseISO(appointment.appointment_date), 'p')} - {appointment.providers?.specialization || 'Specialty N/A'}
+                  <List disablePadding>
+                    {filteredAppointments.map((appointment) => {
+                      const isCancelled = appointment.status === 'cancelled';
+                      return (
+                        <ListItem 
+                          key={appointment.id} 
+                          button 
+                          onClick={() => {
+                              setSelectedAppointment(appointment);
+                              setDialogOpen(true);
+                          }}
+                          divider
+                          sx={{ opacity: isCancelled ? 0.6 : 1 }}
+                        >
+                          <ListItemText
+                            primary={
+                              <Typography 
+                                component="span" 
+                                variant="body1"
+                                sx={{ textDecoration: isCancelled ? 'line-through' : 'none' }}
+                              >
+                                {appointment.providers?.first_name && appointment.providers?.last_name 
+                                  ? `Dr. ${appointment.providers.first_name} ${appointment.providers.last_name}`
+                                  : 'Provider details unavailable'}
                               </Typography>
-                              <Chip 
-                                label={appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
-                                size="small" 
-                                color={appointment.status === 'scheduled' ? 'primary' : appointment.status === 'completed' ? 'success' : 'default'}
-                                sx={{ height: 'auto', '& .MuiChip-label': { py: 0.2, px: 0.8 } }}
-                              />
-                            </Stack>
-                          }
-                        />
-                      </ListItem>
-                    ))}
+                            }
+                            secondary={
+                              <Stack component="span" direction="row" spacing={1} alignItems="center">
+                                 <Typography component="span" variant="body2" color="text.secondary">
+                                  {format(parseISO(appointment.appointment_date), 'p')} - {appointment.providers?.specialization || 'Specialty N/A'}
+                                </Typography>
+                                <Chip 
+                                  label={appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+                                  size="small" 
+                                  color={isCancelled ? 'error' : (appointment.status === 'completed' ? 'success' : 'primary')}
+                                  sx={{ height: 'auto', '& .MuiChip-label': { py: 0.2, px: 0.8 } }}
+                                />
+                              </Stack>
+                            }
+                            secondaryTypographyProps={{ component: 'div' }} 
+                          />
+                        </ListItem>
+                      );
+                    })}
                   </List>
                 ) : (
                   <Typography sx={{ mt: 3, textAlign: 'center', color: 'text.secondary' }}>
