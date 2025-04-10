@@ -34,7 +34,6 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ user: User | null; session: Session | null } | undefined>;
   signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<{ user: User | null; session: Session | null } | undefined>;
   signOut: () => Promise<void>;
-  refreshSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -46,7 +45,6 @@ const AuthContext = createContext<AuthContextType>({
   signIn: async () => undefined,
   signUp: async () => undefined,
   signOut: async () => {},
-  refreshSession: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -88,140 +86,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Initialize auth and check for existing session
-  const initializeAuth = async () => {
-    debugLog('Initializing auth and checking for session...');
-    try {
-      // First, check if we have any token in localStorage
-      if (typeof window !== 'undefined') {
-        try {
-          const storedTokenData = localStorage.getItem('supabase.auth.token');
-          if (storedTokenData) {
-            debugLog('Found stored auth token, attempting to parse and use it');
-            
-            // Try to parse the token data
-            const tokenData = JSON.parse(storedTokenData);
-            if (tokenData && tokenData.access_token) {
-              debugLog('Valid token data found, setting session');
-              
-              // Try to use the refresh token if available
-              if (tokenData.refresh_token) {
-                debugLog('Attempting to refresh session with stored refresh token');
-                await supabase.auth.refreshSession({
-                  refresh_token: tokenData.refresh_token
-                });
-              }
-            } else {
-              debugLog('Invalid token format found in localStorage, removing');
-              localStorage.removeItem('supabase.auth.token');
-            }
-          }
-        } catch (error) {
-          debugLog('Error processing stored token:', error);
-          localStorage.removeItem('supabase.auth.token');
-        }
-      }
-      
-      // Now get the session
-      const { data, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        debugLog('Error getting session:', error);
-        setSession(null);
-        setUser(null);
-        setProfile(null);
-      } else if (data?.session) {
-        debugLog(`Session found during initialization for user: ${data.session.user.email}`);
-        if (data.session.expires_at) {
-          debugLog(`Session expires at: ${new Date(data.session.expires_at * 1000).toISOString()}`);
-        }
-        
-        // Store the session token in localStorage for backup
-        if (typeof window !== 'undefined' && data.session.access_token) {
-          debugLog('Storing access token in localStorage');
-          try {
-            // Store in a way that's compatible with Supabase's expected format
-            const authObject = {
-              access_token: data.session.access_token,
-              refresh_token: data.session.refresh_token,
-              expires_at: data.session.expires_at,
-              expires_in: data.session.expires_in,
-              token_type: 'bearer'
-            };
-            localStorage.setItem('supabase.auth.token', JSON.stringify(authObject));
-          } catch (error) {
-            debugLog('Error storing token:', error);
-          }
-        }
-        
-        setSession(data.session);
-        setUser(data.session.user);
-        await fetchAndSetProfile(data.session.user.id);
-      } else {
-        debugLog('No session found during initialization');
-        setSession(null);
-        setUser(null);
-        setProfile(null);
-      }
-    } catch (error) {
-      debugLog('Error initializing auth:', error);
-      setSession(null);
-      setUser(null);
-      setProfile(null);
-    } finally {
-      debugLog('Initialization complete. Setting isLoading to false.');
-      setIsLoading(false);
-    }
-  };
-
-  // Function to manually refresh the session
-  const refreshSession = async () => {
-    try {
-      debugLog('Manually refreshing session...');
-      const { data, error } = await supabase.auth.refreshSession();
-      
-      if (error) {
-        debugLog('Error refreshing session:', error);
-        setSession(null);
-        setUser(null);
-        setProfile(null);
-        return;
-      }
-      
-      if (data?.session) {
-        debugLog(`Session refreshed for user: ${data.session.user.email}`);
-        setSession(data.session);
-        setUser(data.session.user);
-        await fetchAndSetProfile(data.session.user.id);
-      } else {
-        debugLog('No session found after refresh');
-        setSession(null);
-        setUser(null);
-        setProfile(null);
-      }
-    } catch (error) {
-      debugLog('Error during session refresh:', error);
-      setSession(null);
-      setUser(null);
-      setProfile(null);
-    }
-  };
-
+  // --- Simplified Initialization and Auth Listener Setup --- 
   useEffect(() => {
-    debugLog('Auth Provider useEffect running. Initializing auth AND setting up listener...');
-    initializeAuth();
+    debugLog('Setting up auth listener...');
+
+    // Fetch the initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      debugLog('Initial getSession call completed.', { hasSession: !!session });
+      setSession(session);
+      setUser(session?.user ?? null);
+      // Initial profile fetch is handled by the separate useEffect below
+      setIsLoading(false); // Mark initial loading as complete
+      debugLog('Auth state initialized.');
+    }).catch((error) => {
+        debugLog('Error fetching initial session:', error);
+        setIsLoading(false); // Still complete loading on error
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
+      (event, currentSession) => {
         debugLog(`>>> Auth state change event START: ${event}`);
         debugLog('Auth Event - New session details:', currentSession?.user ? `User: ${currentSession.user.email}` : 'No session or no user');
 
-        // Listener only updates session and user state directly
+        // Update session and user state directly from the listener
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
-        
-        // Profile fetching is handled by the dedicated useEffect below
-        // REMOVED fetchAndSetProfile calls from individual event handlers
+
+        // If user signs out, explicitly clear profile
+        if (event === 'SIGNED_OUT') {
+            debugLog('SIGNED_OUT event detected, clearing profile.');
+            setProfile(null);
+        }
+        // Profile fetching for SIGNED_IN/USER_UPDATED is handled by the useEffect below
 
         debugLog(`<<< Auth state change event END: ${event} (Session/User state updated)`);
       }
@@ -233,6 +129,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription?.unsubscribe();
     };
   }, []); // Runs once on mount
+
+  // --- End Simplified Initialization ---
 
   // Effect specifically for fetching/clearing the profile based on user state
   useEffect(() => {
@@ -279,24 +177,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           expiresIn: data.session.expires_in,
           providerToken: data.session.provider_token ? 'Present' : 'Missing'
         });
-        
-        // Store tokens in localStorage for backup access
-        if (typeof window !== 'undefined') {
-          debugLog('Storing tokens in localStorage');
-          try {
-            // Store in a way that's compatible with Supabase's expected format
-            const authObject = {
-              access_token: data.session.access_token,
-              refresh_token: data.session.refresh_token,
-              expires_at: data.session.expires_at,
-              expires_in: data.session.expires_in,
-              token_type: 'bearer'
-            };
-            localStorage.setItem('supabase.auth.token', JSON.stringify(authObject));
-          } catch (error) {
-            debugLog('Error storing token:', error);
-          }
-        }
       } else {
         debugLog('No session created after sign in');
       }
@@ -379,7 +259,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signIn, 
       signUp, 
       signOut,
-      refreshSession
     }}>
       {children}
     </AuthContext.Provider>

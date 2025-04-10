@@ -24,7 +24,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 // Import the new server action
-import { getMonthlyAvailability } from '@/actions/appointmentActions'; // Adjust path if needed
+// import { getMonthlyAvailability } from '@/actions/appointmentActions'; // Adjust path if needed
 
 // --- Types (Consider moving to shared types file) ---
 interface ProviderInfo {
@@ -42,7 +42,7 @@ interface BookAppointmentModalProps {
   patientId: string; // Change back to required string
   availableProviders: ProviderInfo[];
   accessToken: string | null | undefined; 
-  getAvailableSlots: (providerId: string, dateStr: string, accessToken: string) => Promise<string[]>; 
+  getAvailableSlots: (providerId: string, dateStr: string) => Promise<string[]>; 
   onBookAppointment: (bookingDetails: { 
       providerId: string; 
       dateTime: Date; 
@@ -87,11 +87,6 @@ export default function BookAppointmentModal({
   const [booking, setBooking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // --- New State for Monthly Availability ---
-  const [currentMonth, setCurrentMonth] = useState<Date>(new Date()); // Track viewed month
-  const [availableDatesInMonth, setAvailableDatesInMonth] = useState<Set<string>>(new Set()); // Use Set for quick lookups
-  const [loadingMonthAvailability, setLoadingMonthAvailability] = useState<boolean>(false);
-
   // Reset state when modal opens/closes or providers change
   useEffect(() => {
     if (open) {
@@ -103,20 +98,12 @@ export default function BookAppointmentModal({
         setError(null);
         setLoadingSlots(false);
         setBooking(false);
-        // Reset month view and availability
-        const today = new Date();
-        setCurrentMonth(today); 
-        setAvailableDatesInMonth(new Set());
-        setLoadingMonthAvailability(false);
     } 
   }, [open]);
 
   // Fetch slots when provider and date are selected
-  // *** This useEffect seems redundant now given the one below that depends on availableDatesInMonth ***
-  // *** Let's comment it out to avoid confusion and potential double-fetching/errors ***
-  /* 
   useEffect(() => {
-    if (selectedProviderId && selectedDate && isValid(selectedDate) && typeof accessToken === 'string') { 
+    if (selectedProviderId && selectedDate && isValid(selectedDate)) { 
       const fetchSlots = async () => {
         setLoadingSlots(true);
         setError(null);
@@ -124,14 +111,14 @@ export default function BookAppointmentModal({
         setSelectedSlot('');
         try {
           const dateStr = format(selectedDate, 'yyyy-MM-dd'); // Format correctly here too
-          console.log(`Modal fetching slots (Initial Effect) for ${selectedProviderId} / ${dateStr}`);
-          const slots = await getAvailableSlots(selectedProviderId, dateStr, accessToken);
+          console.log(`Modal fetching slots (Restored Effect) for ${selectedProviderId} / ${dateStr}`);
+          const slots = await getAvailableSlots(selectedProviderId, dateStr); 
           setTimeSlots(slots);
           if (slots.length === 0) {
              setError('No available slots found for the selected provider and date.');
           }
         } catch (err: any) {
-          console.error("Error fetching slots in modal (Initial Effect):", err);
+          console.error("Error fetching slots in modal (Restored Effect):", err);
           setError(err.message || 'Failed to fetch available slots.');
         } finally {
           setLoadingSlots(false);
@@ -141,113 +128,12 @@ export default function BookAppointmentModal({
     } else {
         setTimeSlots([]);
         setSelectedSlot('');
-        if (error === 'No available slots found for the selected provider and date.') {
+        // Clear specific error if selection becomes invalid
+        if (error && error.includes('slots')) { 
             setError(null);
         }
     }
-  }, [selectedProviderId, selectedDate, getAvailableSlots, accessToken]);
-  */
-
-  // --- Fetch MONTHLY availability (Updated) --- 
-  useEffect(() => {
-      if (!selectedProviderId) {
-          setAvailableDatesInMonth(new Set()); // Clear if no provider
-          return;
-      }
-      
-      const fetchMonthData = async () => {
-          setLoadingMonthAvailability(true);
-          setError(null); // Clear previous errors
-          setAvailableDatesInMonth(new Set()); // Clear old data
-          console.log(`Fetching monthly availability for ${selectedProviderId} / ${currentMonth.toISOString()}`);
-          
-          // --- Check if accessToken prop exists --- 
-          if (!accessToken) {
-              console.error("Access token not provided to BookAppointmentModal.");
-              setError("Authentication error. Cannot load availability.");
-              setLoadingMonthAvailability(false);
-              return;
-          }
-          
-          try {
-              // Pass access token prop to the server action
-              const availableDatesResult = await getMonthlyAvailability(selectedProviderId, currentMonth, accessToken);
-              
-              // --- Log and Validate Result --- 
-              console.log("[Client] Received from getMonthlyAvailability:", availableDatesResult);
-              if (Array.isArray(availableDatesResult)) {
-                  setAvailableDatesInMonth(new Set(availableDatesResult)); // Store as Set
-              } else {
-                  console.error("[Client] getMonthlyAvailability did not return an array:", availableDatesResult);
-                  setError("Error processing monthly availability data.");
-                  setAvailableDatesInMonth(new Set()); // Set empty on unexpected result
-              }
-              // --- End Validation --- 
-              
-          } catch (err: any) {
-              console.error("[Client] Error calling getMonthlyAvailability:", err); // Log client-side catch
-              setError("Could not load monthly availability. Please try again.");
-              setAvailableDatesInMonth(new Set()); // Clear on error
-          } finally {
-              setLoadingMonthAvailability(false);
-          }
-      };
-
-      fetchMonthData();
-
-  }, [selectedProviderId, currentMonth, accessToken]); // Use accessToken in dependencies
-
-  // --- Fetch DAILY slots (when date is clicked) --- 
-  useEffect(() => {
-    // Ensure we have a valid date AND token before proceeding
-    if (selectedProviderId && selectedDate && isValid(selectedDate) && typeof accessToken === 'string') {
-      const fetchSlots = async () => {
-        const dateStr = format(selectedDate, 'yyyy-MM-dd');
-        
-        // Only fetch if the selected date is potentially available
-        if (!availableDatesInMonth.has(dateStr) && availableDatesInMonth.size > 0) {
-             console.log("Skipping slot fetch for potentially unavailable date:", dateStr);
-             setTimeSlots([]);
-             setSelectedSlot('');
-             return;
-        }
-
-        setLoadingSlots(true);
-        setError(null); 
-        setTimeSlots([]);
-        setSelectedSlot('');
-        try {
-          console.log(`Modal fetching DAILY slots for ${selectedProviderId} / ${dateStr}`); 
-          // accessToken is now guaranteed to be a string here
-          const slots = await getAvailableSlots(selectedProviderId, dateStr, accessToken);
-          setTimeSlots(slots);
-           if (slots.length === 0) {
-               // More specific error if the day was expected to have slots
-               if (availableDatesInMonth.has(dateStr)) {
-                    setError('No available time slots found for this date, it might be fully booked.');
-               } else {
-                    // Should ideally not happen due to check above, but as fallback:
-                     setError('No slots available for this date.');
-               }
-           }
-        } catch (err: any) {
-          console.error("Error fetching daily slots in modal:", err);
-          setError(err.message || 'Failed to fetch available slots.');
-        } finally {
-          setLoadingSlots(false);
-        }
-      };
-      fetchSlots();
-    } else {
-        setTimeSlots([]);
-        setSelectedSlot('');
-        // Clear specific errors if selection becomes invalid
-         if (error && error.includes('slots')) {
-           setError(null);
-         }
-    }
-    // Add accessToken to dependency array - selectedDate still triggers the effect
-  }, [selectedProviderId, selectedDate, getAvailableSlots, availableDatesInMonth, accessToken]);
+  }, [selectedProviderId, selectedDate, getAvailableSlots]); 
 
   // Handlers
   const handleProviderChange = (event: SelectChangeEvent<string>) => {
@@ -256,22 +142,11 @@ export default function BookAppointmentModal({
     setTimeSlots([]);
     setSelectedSlot('');
     setError(null);
-    setCurrentMonth(new Date()); // Reset month view on provider change
-    setAvailableDatesInMonth(new Set());
   };
 
   const handleDateChange = (newValue: Date | null) => {
     setSelectedDate(newValue);
     // Slot fetching is handled by the useEffect dependent on selectedDate
-  };
-
-  const handleMonthChange = (newMonth: Date) => {
-      setCurrentMonth(newMonth);
-      setSelectedDate(null); // Clear selected date when month changes
-      setTimeSlots([]);
-      setSelectedSlot('');
-      setError(null);
-      setAvailableDatesInMonth(new Set()); // Clear old month data while new loads
   };
 
   const handleSlotChange = (event: SelectChangeEvent<string>) => {
@@ -319,20 +194,8 @@ export default function BookAppointmentModal({
       if (result && result.success) {
         console.log("Booking successful via modal, closing.");
         onClose(); // Close the modal on success (parent handles snackbar)
-        // Refresh monthly availability as booking might have taken last slot for a day
-        if(selectedProviderId) { 
-          getMonthlyAvailability(selectedProviderId, currentMonth, accessToken)
-              .then(dates => setAvailableDatesInMonth(new Set(dates)))
-              .catch(e => console.error("Failed to refresh month availability after successful booking"));
-        }
       } else {
         setError(result?.error || 'Booking failed. Please try again.');
-        // Optionally refresh month availability even on failure
-        if(selectedProviderId) { 
-           getMonthlyAvailability(selectedProviderId, currentMonth, accessToken)
-              .then(dates => setAvailableDatesInMonth(new Set(dates)))
-              .catch(e => console.error("Failed to refresh month availability after failed booking"));
-        }
       }
 
     } catch (err: any) {
@@ -342,75 +205,6 @@ export default function BookAppointmentModal({
       setBooking(false);
     }
   };
-
-  // --- Custom Day Renderer (Revised Logic v3) ---
-  function DayWithHighlight(props: PickersDayProps<Date> & { 
-    highlightedDays?: Set<string>; // Use Set for efficiency
-    day: Date; // Ensure day is always passed correctly
-  }) {
-    const theme = useTheme(); // Get theme object
-    const { day, highlightedDays, outsideCurrentMonth, selected, disabled: propDisabled, ...other } = props;
-
-    const dateString = format(day, 'yyyy-MM-dd');
-    const isHighlighted = highlightedDays?.has(dateString);
-    const isSelected = selected;
-    const isPast = isBefore(day, dateFnsStartOfDay(new Date()));
-    const isToday = isSameDay(day, new Date()); // Keep for potential future use, but not directly in sx logic below
-
-    // Determine if the date should be disabled:
-    // Disabled if explicitly passed, or past, or NOT highlighted.
-    const isDisabled = propDisabled || isPast || !isHighlighted;
-
-    return (
-      <PickersDay 
-        {...other} 
-        day={day} 
-        selected={selected} 
-        outsideCurrentMonth={outsideCurrentMonth}
-        disabled={isDisabled} // Use calculated disabled state
-        sx={{
-          // --- Style Application Order ---
-
-          // 1. Base hover for any clickable (not disabled, not selected) date
-          ...(!isDisabled && !isSelected && {
-            '&:hover': { 
-              backgroundColor: alpha(theme.palette.action.hover, 0.04), 
-            },
-          }),
-
-          // 2. Style for PAST or DISABLED NON-AVAILABLE dates
-          ...(isDisabled && !isSelected && { // Apply if disabled (for any reason) and not selected
-            color: theme.palette.text.disabled,
-            pointerEvents: 'none',
-            border: 'none',
-            backgroundColor: 'transparent',
-            '&:hover': { backgroundColor: 'transparent' },
-          }),
-
-          // 3. Style for AVAILABLE dates (highlighted, not past, not selected)
-          // This applies the blue border if highlighted. Includes today if highlighted.
-          ...(isHighlighted && !isPast && !isSelected && {
-            border: `2px solid ${theme.palette.primary.main}`, // Blue border
-            color: theme.palette.text.primary, // Normal text color
-            backgroundColor: 'transparent', // Ensure no background unless hovered/selected
-            '&:hover': { 
-              backgroundColor: alpha(theme.palette.primary.main, 0.1),
-            },
-          }),
-          
-          // 4. Style for SELECTED dates (highest precedence, if not past)
-          ...(isSelected && !isPast && {
-            backgroundColor: theme.palette.primary.main,
-            color: theme.palette.primary.contrastText,
-            border: 'none',
-            '&:hover': {
-              backgroundColor: theme.palette.primary.dark,
-            },
-          }),
-        }}
-      />
-    );
-  }
 
   return (
     <Modal open={open} onClose={onClose} aria-labelledby="book-appointment-modal-title">
@@ -450,19 +244,8 @@ export default function BookAppointmentModal({
                             onChange={handleDateChange}
                             views={["day"]} // Only show day view
                             openTo="day"
-                            // defaultCalendarMonth={currentMonth} // Control displayed month IF needed
-                            onMonthChange={handleMonthChange} // Update month state when user navigates
                             disablePast // Don't allow past dates
-                            disabled={!selectedProviderId || loadingMonthAvailability} // Disable if no provider or loading
-                            slots={{
-                                day: (dayProps) => (
-                                    <DayWithHighlight 
-                                        {...dayProps} 
-                                        highlightedDays={availableDatesInMonth}
-                                    />
-                                ),
-                            }}
-                            loading={loadingMonthAvailability} // Show loading indicator
+                            disabled={!selectedProviderId} // Simple disable if no provider
                         />
                     </Box>
                 </Stack>

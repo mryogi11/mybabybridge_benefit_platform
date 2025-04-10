@@ -33,47 +33,6 @@ export default function LoginPage() {
   const { signIn, isLoading: isAuthLoading, user, profile, isProfileLoading } = useAuth();
   const theme = useTheme();
   
-  const checkSession = useCallback(async () => {
-    try {
-      console.log("Checking for existing session...");
-      const { data, error } = await supabase.auth.getSession();
-
-      if (error) {
-        console.error('Error fetching session:', error.message);
-        return;
-      }
-
-      if (data && data.session && data.session.user) {
-        const userId = data.session.user.id;
-        console.log('Existing session found for user:', userId);
-
-        const { data: profileData, error: profileError } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', userId)
-          .single();
-
-        if (profileError) {
-          console.warn('Session exists but failed to fetch profile on initial load:', profileError.message);
-        } else if (profileData && profileData.role) {
-          console.log('Profile fetched, user role:', profileData.role);
-          setUserRole(profileData.role);
-          setLoginSuccess(true);
-        } else {
-            console.warn('Session exists and profile fetched, but no role found for user:', userId);
-        }
-      } else {
-        console.log('No active session found.');
-      }
-    } catch (err) {
-        if (err instanceof Error) {
-            console.error('Error in checkSession function:', err.message);
-        } else {
-            console.error('An unknown error occurred in checkSession:', err);
-        }
-    }
-  }, []);
-  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -83,23 +42,13 @@ export default function LoginPage() {
     try {
       const result = await signIn(email, password);
 
-      if (!result || !result.session) {
-         setError('Login failed. Please check your credentials.');
-         setLoading(false);
-         return;
-      }
-
-      console.log("Sign-in call potentially successful, waiting for AuthContext update...");
+      console.log("Sign-in call completed. Waiting for AuthContext update...");
 
     } catch (err: any) {
       console.error('Login handleSubmit error:', err);
       setError(err?.message || 'An unexpected error occurred during login.');
       setLoading(false);
     }
-  };
-
-  const setLoggedInCookie = () => {
-    document.cookie = 'loggedIn=true; path=/;';
   };
 
   const getRedirectPath = (role: User['role'] | null): string => {
@@ -116,40 +65,16 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    if (loginSuccess && userRole) {
-      const path = getRedirectPath(userRole);
-      console.log(`Login successful. Redirecting immediately to: ${path}`);
-      setLoggedInCookie();
-      router.push(path);
+    console.log("Redirect Check Effect: User:", user?.id, "Profile Role:", profile?.role);
+    if (user && profile?.role) {
+        if (!isAuthLoading && !isProfileLoading) { 
+            const path = getRedirectPath(profile.role as User['role']);
+            console.log(`AuthContext ready. Redirecting to: ${path}`);
+            setLoginSuccess(true); 
+            router.push(path);
+        }
     }
-  }, [loginSuccess, userRole, router]);
-
-  useEffect(() => {
-    if (loading && !isAuthLoading && !isProfileLoading) {
-       console.log("AuthContext updated after login attempt. User:", user?.id, "Profile Role:", profile?.role);
-      if (user && profile?.role) {
-        console.log("Setting local login success state...");
-        setUserRole(profile.role as User['role']);
-        setLoginSuccess(true);
-        setLoading(false);
-      } else if (user && !profile) {
-         console.warn("User context updated, but profile role not yet available.");
-      } else if (!user) {
-          console.error("Login attempt finished, but no user found in AuthContext.");
-          setError("Login completed but user session is invalid. Please try again.");
-          setLoading(false);
-      }
-    }
-  }, [user, profile, loading, isAuthLoading, isProfileLoading]);
-
-  useEffect(() => {
-    const setupAuth = async () => {
-    };
-    
-    setupAuth();
-    
-    checkSession();
-  }, [checkSession]);
+  }, [user, profile, isAuthLoading, isProfileLoading, router]);
 
   return (
     <Container component="main" maxWidth={false} disableGutters>
