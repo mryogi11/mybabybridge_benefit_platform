@@ -86,7 +86,7 @@ export default function TreatmentsPage() {
 
         // Attempt to fetch profile
         const { data: profile, error: profileError } = await supabase
-          .from('profiles')
+          .from('patient_profiles')
           .select('id')
           .eq('user_id', userData.user.id)
           .single();
@@ -177,7 +177,7 @@ export default function TreatmentsPage() {
           .from('treatments')
           .select(`
             *,
-            provider:profiles!provider_id (
+            provider:provider_id (
               first_name,
               last_name,
               specialization
@@ -252,7 +252,7 @@ export default function TreatmentsPage() {
             setError(`Error fetching treatments: ${treatmentsError.message}`);
           }
         } else {
-        setTreatments(data || []);
+          setTreatments((data || []) as unknown as Treatment[]);
           setError(null);
         }
       } catch (err) {

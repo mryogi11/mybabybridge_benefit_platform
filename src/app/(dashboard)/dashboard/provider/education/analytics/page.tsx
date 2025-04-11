@@ -44,7 +44,7 @@ interface Category {
 interface ResourceEngagement {
   resource_id: string;
   title: string;
-  category_id: string;
+  category_id?: string | null;
   total_views: number;
   completion_rate: number;
   average_time_spent: number;
@@ -136,7 +136,9 @@ export default function ProviderEducationAnalyticsPage() {
         };
       });
 
-      setResourceEngagement(engagementData);
+      if (resourcesError) throw resourcesError;
+
+      setResourceEngagement(engagementData as any);
 
       // Calculate category engagement
       const categoryData = categoriesData.map((category) => {
@@ -157,7 +159,7 @@ export default function ProviderEducationAnalyticsPage() {
         };
       });
 
-      setCategoryEngagement(categoryData);
+      setCategoryEngagement(categoryData as any);
 
       // Fetch daily engagement
       const { data: dailyData, error: dailyError } = await supabase
@@ -168,7 +170,13 @@ export default function ProviderEducationAnalyticsPage() {
 
       if (dailyError) throw dailyError;
 
+      // Aggregate daily stats
       const dailyStats = dailyData.reduce((acc: { [key: string]: DailyEngagement }, curr) => {
+        // Check if last_accessed_at is a valid string
+        if (!curr.last_accessed_at || typeof curr.last_accessed_at !== 'string') {
+          return acc; // Skip this record if date is invalid
+        }
+        // Proceed if date is valid
         const date = new Date(curr.last_accessed_at).toISOString().split('T')[0];
         if (!acc[date]) {
           acc[date] = {
@@ -178,11 +186,12 @@ export default function ProviderEducationAnalyticsPage() {
             average_time_spent: 0,
           };
         }
+
         acc[date].views++;
         if (curr.completed_at) {
           acc[date].completions++;
         }
-        acc[date].average_time_spent += curr.progress_percentage;
+        acc[date].average_time_spent += curr.progress_percentage ?? 0;
         return acc;
       }, {});
 

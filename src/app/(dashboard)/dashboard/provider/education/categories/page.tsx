@@ -26,8 +26,8 @@ import { supabase } from '@/lib/supabase/client';
 interface EducationCategory {
   id: string;
   name: string;
-  description: string;
-  icon_url: string;
+  description?: string | null;
+  icon_url?: string | null;
 }
 
 export default function ProviderEducationCategoriesPage() {
@@ -43,10 +43,12 @@ export default function ProviderEducationCategoriesPage() {
   });
 
   useEffect(() => {
-    fetchData();
+    fetchCategories();
   }, []);
 
-  const fetchData = async () => {
+  const fetchCategories = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const { data, error } = await supabase
         .from('education_categories')
@@ -54,7 +56,7 @@ export default function ProviderEducationCategoriesPage() {
         .order('name');
 
       if (error) throw error;
-      setCategories(data);
+      setCategories(data as any || []);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching categories:', error);
@@ -68,8 +70,8 @@ export default function ProviderEducationCategoriesPage() {
       setEditingCategory(category);
       setFormData({
         name: category.name,
-        description: category.description,
-        icon_url: category.icon_url,
+        description: category.description || '',
+        icon_url: category.icon_url || '',
       });
     } else {
       setEditingCategory(null);
@@ -105,7 +107,7 @@ export default function ProviderEducationCategoriesPage() {
       }
 
       handleCloseDialog();
-      fetchData();
+      fetchCategories();
     } catch (error) {
       console.error('Error saving category:', error);
       setError('Failed to save education category');
@@ -122,7 +124,7 @@ export default function ProviderEducationCategoriesPage() {
         .eq('id', id);
 
       if (error) throw error;
-      fetchData();
+      fetchCategories();
     } catch (error) {
       console.error('Error deleting category:', error);
       setError('Failed to delete education category');

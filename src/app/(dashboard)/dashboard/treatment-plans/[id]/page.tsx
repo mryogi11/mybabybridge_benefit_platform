@@ -74,7 +74,7 @@ export default function PatientTreatmentPlanPage() {
       return;
     }
 
-    setTreatmentPlan(data);
+    setTreatmentPlan(data as any);
   };
 
   const fetchMilestones = async () => {
@@ -89,7 +89,7 @@ export default function PatientTreatmentPlanPage() {
       return;
     }
 
-    setMilestones(data);
+    setMilestones(data as any);
     // Set active step to first incomplete milestone
     const firstIncompleteIndex = data.findIndex(m => m.status !== 'completed');
     setActiveStep(firstIncompleteIndex === -1 ? data.length - 1 : firstIncompleteIndex);
@@ -110,7 +110,7 @@ export default function PatientTreatmentPlanPage() {
       return;
     }
 
-    setNotes(data);
+    setNotes(data as any);
   };
 
   const getStatusColor = (status: string) => {

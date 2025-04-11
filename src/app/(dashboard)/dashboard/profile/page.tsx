@@ -55,7 +55,12 @@ interface MedicalHistory {
 export default function PatientProfilePage() {
   const router = useRouter();
   const theme = useTheme();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState({
+    initial: true,
+    savingProfile: false,
+    emergencyContacts: false,
+    medicalHistory: false,
+  });
   const [saving, setSaving] = useState(false);
   const [gravatarUrl, setGravatarUrl] = useState('');
   const [profile, setProfile] = useState({
@@ -96,12 +101,12 @@ export default function PatientProfilePage() {
         ]);
         
         if (isMounted) {
-          setLoading(false);
+          setLoading(prev => ({ ...prev, initial: false }));
         }
       } catch (error) {
         console.error('Error loading profile data:', error);
         if (isMounted) {
-          setLoading(false);
+          setLoading(prev => ({ ...prev, initial: false }));
         }
       }
     };
@@ -182,7 +187,7 @@ export default function PatientProfilePage() {
   };
 
   const handleSaveProfile = async () => {
-    setSaving(true);
+    setLoading(prev => ({ ...prev, savingProfile: true }));
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -199,7 +204,7 @@ export default function PatientProfilePage() {
       return;
     }
 
-    setSaving(false);
+    setLoading(prev => ({ ...prev, savingProfile: false }));
   };
 
   const handleSaveContact = async () => {
@@ -207,25 +212,40 @@ export default function PatientProfilePage() {
     if (!user) return;
 
     if (editingContact) {
-      const { error } = await supabase
-        .from('emergency_contacts')
-        .update({
-          ...editingContact,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', editingContact.id);
+      setLoading(prev => ({ ...prev, emergencyContacts: true }));
+      try {
+        const { error } = await supabase
+          .from('emergency_contacts')
+          .update({
+            ...editingContact,
+            updated_at: new Date().toISOString(),
+          } as any)
+          .eq('id', editingContact.id);
 
-      if (error) {
-        console.error('Error updating contact:', error);
-        return;
+        if (error) {
+          console.error('Error updating contact:', error);
+          setError('Failed to update contact.');
+        } else {
+          fetchEmergencyContacts();
+          setOpenContactDialog(false);
+        }
+      } catch(err) {
+        console.error('Exception updating contact:', err);
+        setError('An unexpected error occurred.');
+      } finally {
+        setLoading(prev => ({ ...prev, emergencyContacts: false }));
       }
     } else {
+      const contactToInsert = {
+        patient_id: user.id,
+        name: newContact.name || '',
+        relationship: newContact.relationship || '',
+        phone: newContact.phone || '',
+        email: newContact.email || null,
+      };
       const { error } = await supabase
         .from('emergency_contacts')
-        .insert({
-          patient_id: user.id,
-          ...newContact,
-        });
+        .insert(contactToInsert);
 
       if (error) {
         console.error('Error creating contact:', error);
@@ -244,25 +264,40 @@ export default function PatientProfilePage() {
     if (!user) return;
 
     if (editingHistory) {
-      const { error } = await supabase
-        .from('medical_history')
-        .update({
-          ...editingHistory,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', editingHistory.id);
+      setLoading(prev => ({ ...prev, medicalHistory: true }));
+      try {
+        const { error } = await supabase
+          .from('medical_history')
+          .update({
+            ...editingHistory,
+            updated_at: new Date().toISOString(),
+          } as any)
+          .eq('id', editingHistory.id);
 
-      if (error) {
-        console.error('Error updating history:', error);
-        return;
+        if (error) {
+          console.error('Error updating history:', error);
+          setError('Failed to update medical history.');
+        } else {
+          fetchMedicalHistory();
+          setOpenHistoryDialog(false);
+        }
+      } catch(err) {
+        console.error('Exception updating history:', err);
+        setError('An unexpected error occurred.');
+      } finally {
+        setLoading(prev => ({ ...prev, medicalHistory: false }));
       }
     } else {
+      const historyToInsert = {
+        patient_id: user.id,
+        condition: newHistory.condition || '',
+        diagnosis_date: newHistory.diagnosis_date || null,
+        treatment: newHistory.treatment || null,
+        notes: newHistory.notes || null,
+      };
       const { error } = await supabase
         .from('medical_history')
-        .insert({
-          patient_id: user.id,
-          ...newHistory,
-        });
+        .insert(historyToInsert as any);
 
       if (error) {
         console.error('Error creating history:', error);
@@ -308,7 +343,7 @@ export default function PatientProfilePage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    setLoading(prevState => ({ ...prevState, emergencyContacts: true }));
+    setLoading(prev => ({ ...prev, emergencyContacts: true }));
     try {
       const contactToInsert = {
         patient_id: user.id,
@@ -333,7 +368,7 @@ export default function PatientProfilePage() {
       console.error('Error adding emergency contact:', error);
       setError('Failed to add contact.');
     } finally {
-      setLoading(prevState => ({ ...prevState, emergencyContacts: false }));
+      setLoading(prev => ({ ...prev, emergencyContacts: false }));
     }
   };
 
@@ -341,7 +376,7 @@ export default function PatientProfilePage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    setLoading(prevState => ({ ...prevState, medicalHistory: true }));
+    setLoading(prev => ({ ...prev, medicalHistory: true }));
     try {
       const historyToInsert = {
         patient_id: user.id,
@@ -353,7 +388,7 @@ export default function PatientProfilePage() {
 
       const { error } = await supabase
         .from('medical_history')
-        .insert(historyToInsert);
+        .insert(historyToInsert as any);
 
       if (error) {
         throw error;
@@ -366,11 +401,11 @@ export default function PatientProfilePage() {
       console.error('Error adding medical history:', error);
       setError('Failed to add medical history.');
     } finally {
-      setLoading(prevState => ({ ...prevState, medicalHistory: false }));
+      setLoading(prev => ({ ...prev, medicalHistory: false }));
     }
   };
 
-  if (loading) {
+  if (loading.initial) {
     return (
       <Box sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 200px)' }}>
         <Stack alignItems="center" spacing={2}>
@@ -444,7 +479,7 @@ export default function PatientProfilePage() {
             <Button 
               variant="contained" 
               onClick={handleSaveProfile}
-              disabled={saving}
+              disabled={loading.savingProfile}
               sx={{ 
                 bgcolor: 'rgba(255,255,255,0.15)', 
                 '&:hover': { 
@@ -455,7 +490,7 @@ export default function PatientProfilePage() {
                 py: 1
               }}
             >
-              {saving ? 'Saving...' : 'Save All Changes'}
+              {loading.savingProfile ? 'Saving...' : 'Save All Changes'}
             </Button>
           </Grid>
         </Grid>
@@ -830,7 +865,7 @@ export default function PatientProfilePage() {
                       secondary={
                         <Box sx={{ mt: 0.5 }}>
                           <Typography variant="body2" color="text.secondary" component="span" sx={{ display: 'block' }}>
-                            <strong>Diagnosed:</strong> {new Date(history.diagnosis_date).toLocaleDateString()}
+                            <strong>Diagnosed:</strong> {history.diagnosis_date ? new Date(history.diagnosis_date).toLocaleDateString() : 'N/A'}
                           </Typography>
                           {history.treatment && (
                             <Typography variant="body2" color="text.secondary" component="span" sx={{ display: 'block' }}>

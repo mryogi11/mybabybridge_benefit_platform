@@ -43,16 +43,20 @@ export default function ProviderProfilePage() {
   const fetchProfile = async () => {
     try {
       setLoading(true);
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
 
       const { data, error } = await supabase
         .from('providers')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .single();
 
       if (error) throw error;
 
-      setProfile(data);
+      setProfile(data as any);
+      setNewEducation(data.education?.join(', ') || '');
     } catch (error) {
       console.error('Error fetching profile:', error);
       showSnackbar('Failed to load profile', 'error');
@@ -106,7 +110,7 @@ export default function ProviderProfilePage() {
           ...profile,
           user_id: user?.id,
           updated_at: new Date().toISOString(),
-        });
+        } as any);
 
       if (error) throw error;
 

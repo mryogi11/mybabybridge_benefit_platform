@@ -71,8 +71,32 @@ export default function TreatmentPlansPage() {
       .from('treatment_plans')
       .select(`
         *,
-        patient:patient_id (first_name, last_name),
-        provider:provider_id (first_name, last_name, specialization)
+        patient:patient_id (
+          id,
+          user_id,
+          first_name,
+          last_name,
+          email,
+          date_of_birth,
+          phone,
+          address,
+          created_at,
+          updated_at
+        ),
+        provider:provider_id (
+          id,
+          user_id,
+          first_name,
+          last_name,
+          specialization,
+          bio,
+          experience_years,
+          education,
+          certifications,
+          availability,
+          created_at,
+          updated_at
+        )
       `)
       .order('created_at', { ascending: false });
 
@@ -81,7 +105,7 @@ export default function TreatmentPlansPage() {
       return;
     }
 
-    setTreatmentPlans(data);
+    setTreatmentPlans(data as any);
   };
 
   const handleOpenDialog = (plan?: TreatmentPlan) => {
@@ -136,7 +160,7 @@ export default function TreatmentPlansPage() {
     if (selectedPlan) {
       const { error } = await supabase
         .from('treatment_plans')
-        .update(planData)
+        .update(planData as any)
         .eq('id', selectedPlan.id);
 
       if (error) {
@@ -146,7 +170,7 @@ export default function TreatmentPlansPage() {
     } else {
       const { error } = await supabase
         .from('treatment_plans')
-        .insert([planData]);
+        .insert(planData as any);
 
       if (error) {
         console.error('Error creating treatment plan:', error);

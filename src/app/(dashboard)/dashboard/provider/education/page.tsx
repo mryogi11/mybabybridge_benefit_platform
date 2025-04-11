@@ -27,20 +27,20 @@ import { supabase } from '@/lib/supabase/client';
 interface EducationCategory {
   id: string;
   name: string;
-  description: string;
-  icon_url: string;
+  description?: string | null;
+  icon_url?: string | null;
 }
 
 interface EducationResource {
   id: string;
-  category_id: string;
+  category_id: string | null;
   title: string;
-  description: string;
+  description: string | null;
   content: string;
   media_url: string | null;
   media_type: 'image' | 'video' | 'document' | null;
-  reading_time: number;
-  difficulty_level: 'beginner' | 'intermediate' | 'advanced';
+  reading_time: number | null;
+  difficulty_level: 'beginner' | 'intermediate' | 'advanced' | null;
 }
 
 export default function ProviderEducationPage() {
@@ -66,6 +66,8 @@ export default function ProviderEducationPage() {
   }, []);
 
   const fetchData = async () => {
+    setLoading(true);
+    setError(null);
     try {
       // Fetch categories
       const { data: categoriesData, error: categoriesError } = await supabase
@@ -74,7 +76,7 @@ export default function ProviderEducationPage() {
         .order('name');
 
       if (categoriesError) throw categoriesError;
-      setCategories(categoriesData);
+      setCategories(categoriesData as any || []);
 
       // Fetch resources
       const { data: resourcesData, error: resourcesError } = await supabase
@@ -83,7 +85,7 @@ export default function ProviderEducationPage() {
         .order('title');
 
       if (resourcesError) throw resourcesError;
-      setResources(resourcesData);
+      setResources(resourcesData as any);
 
       setLoading(false);
     } catch (error) {
@@ -98,11 +100,11 @@ export default function ProviderEducationPage() {
       setEditingResource(resource);
       setFormData({
         title: resource.title,
-        description: resource.description,
+        description: resource.description || '',
         content: resource.content,
-        category_id: resource.category_id,
-        reading_time: resource.reading_time.toString(),
-        difficulty_level: resource.difficulty_level,
+        category_id: resource.category_id || '',
+        reading_time: resource.reading_time?.toString() || '',
+        difficulty_level: resource.difficulty_level || 'beginner',
         media_url: resource.media_url || '',
         media_type: resource.media_type || '',
       });

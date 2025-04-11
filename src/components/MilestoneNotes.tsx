@@ -76,7 +76,7 @@ export default function MilestoneNotes({ milestoneId, appointmentId }: Milestone
       return;
     }
 
-    setNotes(data);
+    setNotes(data as any);
   };
 
   const handleOpenDialog = (note?: TreatmentNote) => {
@@ -118,7 +118,7 @@ export default function MilestoneNotes({ milestoneId, appointmentId }: Milestone
     if (selectedNote) {
       const { error } = await supabase
         .from('treatment_notes')
-        .update(noteData)
+        .update(noteData as any)
         .eq('id', selectedNote.id);
 
       if (error) {
@@ -128,7 +128,7 @@ export default function MilestoneNotes({ milestoneId, appointmentId }: Milestone
     } else {
       const { error } = await supabase
         .from('treatment_notes')
-        .insert([noteData]);
+        .insert(noteData as any);
 
       if (error) {
         console.error('Error creating note:', error);

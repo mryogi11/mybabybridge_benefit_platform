@@ -83,8 +83,32 @@ export default function TreatmentMilestonesPage() {
       .from('treatment_plans')
       .select(`
         *,
-        patient:patient_id (first_name, last_name),
-        provider:provider_id (first_name, last_name, specialization)
+        patient:patient_id (
+          id,
+          user_id,
+          first_name,
+          last_name,
+          email,
+          date_of_birth,
+          phone,
+          address,
+          created_at,
+          updated_at
+        ),
+        provider:provider_id (
+          id,
+          user_id,
+          first_name,
+          last_name,
+          specialization,
+          bio,
+          experience_years,
+          education,
+          certifications,
+          availability,
+          created_at,
+          updated_at
+        )
       `)
       .eq('id', planId)
       .single();
@@ -94,7 +118,7 @@ export default function TreatmentMilestonesPage() {
       return;
     }
 
-    setTreatmentPlan(data);
+    setTreatmentPlan(data as any);
   };
 
   const fetchMilestones = async () => {
@@ -109,7 +133,7 @@ export default function TreatmentMilestonesPage() {
       return;
     }
 
-    setMilestones(data);
+    setMilestones(data as any);
   };
 
   const fetchDependencies = async () => {
@@ -123,7 +147,7 @@ export default function TreatmentMilestonesPage() {
       return;
     }
 
-    setDependencies(data);
+    setDependencies(data as any);
   };
 
   const handleOpenDialog = (milestone?: TreatmentMilestone) => {
@@ -177,7 +201,7 @@ export default function TreatmentMilestonesPage() {
     if (selectedMilestone) {
       const { error } = await supabase
         .from('treatment_milestones')
-        .update(milestoneData)
+        .update(milestoneData as any)
         .eq('id', selectedMilestone.id);
 
       if (error) {
@@ -188,7 +212,7 @@ export default function TreatmentMilestonesPage() {
     } else {
       const { data, error } = await supabase
         .from('treatment_milestones')
-        .insert([milestoneData])
+        .insert(milestoneData as any)
         .select()
         .single();
 
@@ -218,7 +242,7 @@ export default function TreatmentMilestonesPage() {
 
       const { error: insertError } = await supabase
         .from('milestone_dependencies')
-        .insert(newDependencies);
+        .insert(newDependencies as any);
 
       if (insertError) {
         console.error('Error creating dependencies:', insertError);

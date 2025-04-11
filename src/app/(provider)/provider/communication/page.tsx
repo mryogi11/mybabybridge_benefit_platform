@@ -110,7 +110,7 @@ export default function ProviderCommunicationPage() {
             date_of_birth
           )
         `)
-        .eq('provider_id', user?.id)
+        .eq('provider_id', user?.id ?? '')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -155,7 +155,7 @@ export default function ProviderCommunicationPage() {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setMessages(data || []);
+      setMessages((data || []) as unknown as MessageWithAttachment[]);
     } catch (error) {
       console.error('Error fetching messages:', error);
       setError('Failed to load messages');
@@ -188,14 +188,14 @@ export default function ProviderCommunicationPage() {
 
       const { error } = await supabase
         .from('messages')
-        .insert([
+        .insert(
           {
-            sender_id: user?.id,
+            sender_id: user?.id ?? '',
             receiver_id: selectedPatient.id,
             content: newMessage,
             attachment_url: attachmentUrl,
           },
-        ]);
+        );
 
       if (error) throw error;
 
