@@ -144,7 +144,7 @@ export default function AnalyticsPage() {
     setAnalyticsData({
       revenue: revenueData,
       treatmentSuccess: treatmentData,
-      patientProgress: progressData,
+      patientProgress: progressData.map(p => ({ ...p, inProgress: p.in_progress })) as AnalyticsData['patientProgress'],
       appointmentStats: appointmentData,
     });
     setLoading(false);

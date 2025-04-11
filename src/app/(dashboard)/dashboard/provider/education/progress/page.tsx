@@ -28,15 +28,15 @@ interface Patient {
 interface EducationResource {
   id: string;
   title: string;
-  category_id: string;
-  difficulty_level: string;
+  category_id: string | null;
+  difficulty_level: string | null;
 }
 
 interface PatientProgress {
-  patient_id: string;
-  resource_id: string;
-  status: 'not_started' | 'in_progress' | 'completed';
-  progress_percentage: number;
+  patient_id: string | null;
+  resource_id: string | null;
+  status: 'not_started' | 'in_progress' | 'completed' | null;
+  progress_percentage: number | null;
   last_accessed_at: string | null;
   completed_at: string | null;
 }
@@ -64,12 +64,12 @@ export default function ProviderEducationProgressPage() {
     try {
       // Fetch patients
       const { data: patientsData, error: patientsError } = await supabase
-        .from('patients')
-        .select('id, first_name, last_name, email')
+        .from('patient_profiles')
+        .select('id, user_id, first_name, last_name, email')
         .order('first_name');
 
       if (patientsError) throw patientsError;
-      setPatients(patientsData);
+      setPatients(patientsData as any);
 
       // Fetch categories
       const { data: categoriesData, error: categoriesError } = await supabase
@@ -87,7 +87,7 @@ export default function ProviderEducationProgressPage() {
         .order('title');
 
       if (resourcesError) throw resourcesError;
-      setResources(resourcesData);
+      setResources(resourcesData as any);
 
       setLoading(false);
     } catch (error) {
@@ -111,7 +111,7 @@ export default function ProviderEducationProgressPage() {
         .eq('patient_id', selectedPatient);
 
       if (error) throw error;
-      setProgress(data);
+      setProgress(data as any);
     } catch (error) {
       console.error('Error fetching progress:', error);
       setError('Failed to load patient progress');
@@ -208,18 +208,18 @@ export default function ProviderEducationProgressPage() {
                               Progress
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                              {progress.progress_percentage}%
+                              {progress.progress_percentage ?? 0}%
                             </Typography>
                           </Stack>
                           <LinearProgress
                             variant="determinate"
-                            value={progress.progress_percentage}
+                            value={progress.progress_percentage ?? 0}
                             color={progress.status === 'completed' ? 'success' : 'primary'}
                           />
                         </Box>
 
                         <Typography variant="body2" color="text.secondary">
-                          Status: {progress.status.replace('_', ' ')}
+                          Status: {progress.status?.replace('_', ' ') || 'not started'}
                         </Typography>
                         {progress.last_accessed_at && (
                           <Typography variant="body2" color="text.secondary">

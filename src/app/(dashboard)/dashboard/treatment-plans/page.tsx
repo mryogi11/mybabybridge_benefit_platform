@@ -27,15 +27,17 @@ interface Provider {
 
 interface TreatmentPlan {
   id: string;
-  patient_id: string;
-  provider_id: string;
+  patient_id: string | null;
+  provider_id: string | null;
   type: string;
-  description: string;
+  description: string | null;
   status: string;
   start_date: string;
-  end_date: string;
+  end_date: string | null;
   created_at: string;
-  provider?: Provider;
+  title: string;
+  updated_at: string;
+  provider?: Provider | null;
 }
 
 export default function TreatmentPlansPage() {
@@ -66,7 +68,7 @@ export default function TreatmentPlansPage() {
 
         // Attempt to fetch profile
         const { data: profile, error: profileError } = await supabase
-          .from('profiles')
+          .from('patient_profiles')
           .select('id')
           .eq('user_id', userData.user.id)
           .single();
@@ -97,33 +99,37 @@ export default function TreatmentPlansPage() {
               patient_id: '1',
               provider_id: '101',
               type: 'Speech Therapy',
+              title: 'Speech Development Plan',
               description: 'Comprehensive speech therapy plan focusing on articulation and language development.',
               status: 'active',
               start_date: new Date().toISOString(),
               end_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 90 days later
               created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
               provider: {
                 first_name: 'Jane',
                 last_name: 'Smith',
                 specialization: 'Speech Therapy'
               }
-            },
+            } as TreatmentPlan,
             {
               id: '2',
               patient_id: '1',
               provider_id: '102',
               type: 'Physical Therapy',
+              title: 'Motor Skills Development',
               description: 'Physical therapy plan to improve motor skills and coordination.',
               status: 'active',
               start_date: new Date().toISOString(),
               end_date: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(), // 60 days later
               created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
               provider: {
                 first_name: 'Robert',
                 last_name: 'Johnson',
                 specialization: 'Physical Therapy'
               }
-            }
+            } as TreatmentPlan
           ];
           setPlans(mockPlans);
           setLoading(false);
@@ -135,7 +141,7 @@ export default function TreatmentPlansPage() {
           .from('treatment_plans')
           .select(`
             *,
-            provider:profiles!provider_id (
+            provider:provider_id (
               first_name,
               last_name,
               specialization
@@ -154,33 +160,37 @@ export default function TreatmentPlansPage() {
                 patient_id: '1',
                 provider_id: '101',
                 type: 'Speech Therapy',
+                title: 'Speech Development Plan',
                 description: 'Comprehensive speech therapy plan focusing on articulation and language development.',
                 status: 'active',
                 start_date: new Date().toISOString(),
                 end_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 90 days later
                 created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
                 provider: {
                   first_name: 'Jane',
                   last_name: 'Smith',
                   specialization: 'Speech Therapy'
                 }
-              },
+              } as TreatmentPlan,
               {
                 id: '2',
                 patient_id: '1',
                 provider_id: '102',
                 type: 'Physical Therapy',
+                title: 'Motor Skills Development',
                 description: 'Physical therapy plan to improve motor skills and coordination.',
                 status: 'active',
                 start_date: new Date().toISOString(),
                 end_date: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(), // 60 days later
                 created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
                 provider: {
                   first_name: 'Robert',
                   last_name: 'Johnson',
                   specialization: 'Physical Therapy'
                 }
-              }
+              } as TreatmentPlan
             ];
             setPlans(mockPlans);
             setError(null);
@@ -188,7 +198,7 @@ export default function TreatmentPlansPage() {
             setError(`Error fetching treatment plans: ${plansError.message}`);
           }
         } else {
-          setPlans(data || []);
+          setPlans((data || []) as unknown as TreatmentPlan[]);
           setError(null);
         }
       } catch (err) {

@@ -119,6 +119,8 @@ export default function ProviderDashboardPage() {
           .from('appointments')
           .select(`
             *,
+            duration,
+            type,
             patient:patient_profiles (
               id,
               first_name,
@@ -136,8 +138,7 @@ export default function ProviderDashboardPage() {
         }
         
         console.log('Provider Dashboard: Raw appointment data fetched:', data);
-        // Type assertion might not be needed if select matches Appointment type
-        setUpcomingAppointments(data || []); // Directly set using base Appointment type
+        setUpcomingAppointments((data || []) as unknown as Appointment[]);
 
       } catch (err: any) {
         console.error('Provider Dashboard: Error fetching appointments:', err);
