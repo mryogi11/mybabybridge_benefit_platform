@@ -60,6 +60,7 @@ The application uses Supabase for authentication with the following key componen
 5. **Educational Resources**: Curated content for fertility education
 6. **Analytics**: Treatment success metrics and insights
 7. **Payments**: Integration with payment processing (Status: In Development / Partially Implemented)
+8. **Benefit Verification**: Employer/health plan benefit verification and package management (Status: Planning / Implementation guide in `docs/BENEFIT_MODULE_GUIDE.md`)
 
 ## Development Work Completed
 
@@ -280,7 +281,8 @@ These changes have significantly enhanced the platform's professional appearance
 *   [x] Database schema applied via `npx supabase db reset --linked` using corrected migrations.
 *   [x] Clear understanding of the current feature set and limitations.
 *   [ ] Familiarity with the key code locations listed above.
-*   [ ] Review `TODO.md` for pending tasks and priorities. 
+*   [ ] Review `TODO.md` for pending tasks and priorities.
+*   [ ] Review `BENEFIT_MODULE_GUIDE.md` for new feature implementation.
 
 ## Technical Stack Overview
 

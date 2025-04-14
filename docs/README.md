@@ -106,6 +106,7 @@ npm start
 - **Educational Resources**: Curated content for fertility education
 - **Analytics**: Treatment success metrics and insights
 - **Payments**: Integration with payment processing
+- **Benefit Verification**: Employer/health plan benefit verification and package management
 
 ## Prerequisites
 
@@ -163,3 +164,47 @@ src/
 
 ## License
 
+
+## Getting Started
+
+First, run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+
+## Database Setup (Drizzle ORM)
+
+This project uses **Drizzle ORM** to manage the database schema and interact with the Supabase PostgreSQL database. The Supabase CLI migration system (`supabase/migrations`) is **no longer used** for applying schema changes; use the Drizzle workflow described here.
+
+### Key Components:
+
+*   **Schema Definition:** The database schema is defined in TypeScript at `src/lib/db/schema.ts`.
+*   **Drizzle Client:** The database client instance is configured in `src/lib/db/index.ts`.
+*   **Migration Tool:** `drizzle-kit` is used to generate SQL migrations based on schema changes.
+*   **Configuration:** Drizzle Kit configuration is in `drizzle.config.js`.
+*   **Migrations:** Generated SQL migration files are stored in the `./drizzle` directory.
+
+### Environment Variables:
+
+Ensure your `.env.local` file contains the `DATABASE_URL` variable pointing to your Supabase **connection pooling URI** (as described in the "Environment Setup" section).
+
+```env
+DATABASE_URL="postgres://<user>:<password>@<host>:<port>/postgres?pgbouncer=true&connection_limit=1"
+```
+
+**Important:** Do *not* use the standard Supabase CLI migration commands (`npx supabase db reset`, `npx supabase migration up`, `npx supabase link`, etc.) as they are incompatible with the Drizzle workflow used in this project and may cause issues.
+
+## Learn More 
