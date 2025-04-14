@@ -25,16 +25,18 @@ This document tracks the features and tasks for the MyBabyBridge platform.
 
 **Pending Features ⏳ / In Progress 🚧**
 
-*   [🚧] **Patient Module - Appointments:**
-    *   [x] View upcoming appointments (Page exists, fetches data, displays calendar/list, has detail view).
-    *   [x] Cancel appointments (Functionality exists in detail view).
-    *   [x] Schedule new appointments (Functionality **TODO**).
-    *   [x] Edit appointments (Functionality **TODO**).
-    *   *Note:* Page has fallback mock data logic that might need review/removal.
-*   [🚧] **Provider Module - Appointments:**
-    *   [🚧] View upcoming/past appointments (Page exists, needs UI/fetch logic).
-    *   [🚧] Schedule new appointments (Functionality **TODO**).
-    *   [🚧] Cancel/Reschedule/Complete appointments (Functionality **TODO**).
+*   [✅] **Patient Module - Appointments:**
+    *   [✅] View upcoming appointments (Page exists, fetches data, displays calendar/list, has detail view).
+    *   [✅] Cancel appointments (Functionality exists in detail view).
+    *   [✅] Schedule new appointments (Modal exists, connects to server action, fetches provider availability, shows slots).
+    *   [ ] Edit appointments (Modal exists but needs connection/logic).
+    *   [✅] Calendar Styling (Booked = blue bg, Cancelled-only = orange bg).
+    *   [✅] Booking Modal Calendar Styling (Booked=blue bg, Cancelled-only=orange bg, Available=blue border).
+*   [✅] **Provider Module - Appointments:**
+    *   [✅] View upcoming/past appointments (Page exists, fetches data, displays calendar/list).
+    *   [ ] Schedule new appointments (Functionality **TODO**).
+    *   [✅] Cancel/Complete appointments (Functionality exists via menu).
+    *   [✅] Calendar Styling (Booked = blue bg, Cancelled-only = orange bg).
 *   [🚧] **Provider Module - Profile Management:**
     *   [🚧] View/Edit own profile details (Specialization, Bio, Experience, Education, Certifications).
     *   [🚧] Upload/Manage profile picture.
@@ -74,7 +76,7 @@ This document tracks the features and tasks for the MyBabyBridge platform.
     *   [🚧] Integration tests.
     *   [🚧] End-to-end tests.
 *   [🚧] **Documentation:**
-    *   [x] Update `HANDOVER.md` as features are completed.
+    *   [✅] Update `HANDOVER.md` & `TODO.md` as features are completed.
     *   [🚧] Add comprehensive code comments where necessary.
     *   [🚧] User guide documentation?
 
@@ -83,16 +85,16 @@ This document tracks the features and tasks for the MyBabyBridge platform.
 *Track pages/sections that exist but need proper links/navigation integration.* 
 
 *   **Patient Dashboard:**
-    *   [x] `/dashboard` (Accessible via login)
+    *   [✅] `/dashboard` (Accessible via login)
     *   [🚧] `/profile` (Needs linking from patient nav)
-    *   [x] `/appointments` (Linked from dashboard, page partially implemented)
+    *   [✅] `/appointments` (Linked from dashboard, page implemented)
     *   [🚧] `/messages` (Needs linking from patient nav)
     *   [🚧] `/settings` (Needs linking from patient nav)
 *   **Provider Portal:**
-    *   [x] `/provider/dashboard` (Accessible via login & sidebar)
+    *   [✅] `/provider/dashboard` (Accessible via login & sidebar)
     *   [x] `/provider/profile` (Linked in sidebar, page exists, functionality **TODO**)
     *   [x] `/provider/patients` (Linked in sidebar, page exists, functionality **TODO**)
-    *   [x] `/provider/appointments` (Linked in sidebar, page exists, functionality **TODO**)
+    *   [✅] `/provider/appointments` (Linked in sidebar, page implemented)
     *   [x] `/provider/messages` (Linked in sidebar, page exists, functionality **TODO**)
     *   [x] `/provider/settings` (Linked via user menu, page exists, functionality **TODO**)
 *   **Admin Portal:**
@@ -102,35 +104,33 @@ This document tracks the features and tasks for the MyBabyBridge platform.
 
 ## Priorities (High to Low)
 
-1.  **Provider Module - Appointments:** Implement core UI and fetch logic for provider appointments.
-2.  **Admin/Staff Appointment Management:** Implement UI and logic for admins/staff to view/manage appointments.
-3.  **Investigate Cookie Warnings:** Analyze warnings like `Route "/dashboard/appointments" used `cookies()...` appearing during server action calls (e.g., `getAvailableSlots`). Ensure cookie handling is correct, potentially related to Next.js configuration or middleware. 
-4.  **Implement Real `getMonthlyAvailability`:** Replace placeholder logic with actual database queries to determine monthly availability for the calendar view.
-5.  **Refine Error Handling:** Improve user feedback for various error scenarios (booking, fetching slots, etc.).
-6.  **Complete Patient Profile Fields:** Ensure all required fields for the `Patient` type are fetched or handled correctly (e.g., `email`).
-7.  **Provider Module Core:** Implement Profile, Patient list, Messaging pages.
-8.  **Patient Module Core:** Implement basic Dashboard, Profile, Appointments, Messaging pages (refine existing appointment page).
-9.  **Admin User Editing/Deletion:** Complete user management functionality.
-10. **Security Refinement:** Thoroughly review and test RLS policies.
-11. **Payment Integration:** Connect billing functionality.
-12. **Testing:** Implement basic test coverage.
-13. **Deployment Prep:** Configure environments.
+1.  **Refine Appointment Error Handling:** Improve user feedback for various error scenarios (booking, fetching slots, etc.).
+2.  **Implement Appointment Editing:** Connect edit modal logic for Patient/Provider.
+3.  **Implement Provider Appointment Scheduling:** Allow providers to book appointments.
+4.  **Provider Module Core:** Implement Profile, Patient list, Messaging pages.
+5.  **Patient Module Core:** Implement basic Dashboard refinement, Profile, Messaging pages.
+6.  **Admin User Editing/Deletion:** Complete user management functionality.
+7.  **Security Refinement:** Thoroughly review and test RLS policies.
+8.  **Payment Integration:** Connect billing functionality.
+9.  **Testing:** Implement basic test coverage.
+10. **Deployment Prep:** Configure environments.
 
 *Self-reflect and critique: Prioritization might shift based on client feedback or technical blockers.*
 
 ## Completed
 
 *   Core Auth & User Roles (Patient, Provider, Admin, Staff)
-*   Database Schema Setup (Initial + Migrations)
+*   Database Schema Setup & Migration to Drizzle ORM
+*   Drizzle ORM Client & Migration Workflow Setup
 *   Supabase Project Linking & Basic Config
-*   Manual DB Setup Script (`manual-db-setup.sql`)
 *   Auth Trigger Function (`handle_new_user`)
 *   RLS Policies (Basic select/insert for users/profiles/appointments)
 *   Admin User Creation Page
-*   Patient Appointment Booking Modal (Basic functionality)
+*   Patient Appointment Page (View, Book, Cancel, Calendar Styling)
+*   Provider Appointment Page (View, Update Status, Calendar Styling)
+*   Appointment Booking Modal (Provider/Date/Slot selection, Availability Fetching, Calendar Styling)
 *   Provider Availability Management Page (Basic UI + Weekly Schedule Add)
-*   Fixes for appointment booking/fetching type errors.
-*   Fixes for `getAvailableSlots` auth and data fetching issues (basic schedule check).
+*   Fixes for appointment booking/fetching logic (Server Actions & Supabase Client Hints).
 
 ## Backlog / Future Enhancements
 

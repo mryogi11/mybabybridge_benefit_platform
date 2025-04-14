@@ -8,11 +8,13 @@ MyBabyBridge is a comprehensive fertility care platform designed to connect pati
 
 - **Frontend**: Next.js 14 (App Router), React, TypeScript
 - **UI Framework**: Material UI v5
-- **Backend/Database**: Supabase (PostgreSQL)
+- **Database**: Supabase (PostgreSQL)
+- **ORM**: Drizzle ORM
+- **Migration Tool**: Drizzle Kit
 - **Authentication**: Supabase Auth
 - **State Management**: React Context API
 - **Styling**: Material UI with custom theming
-- **API**: REST endpoints with Next.js API routes
+- **API**: REST endpoints with Next.js API routes & Next.js Server Actions
 
 ## Application Structure
 
@@ -27,9 +29,12 @@ The application follows the Next.js 14 App Router structure with route groups an
 - `src/components/`: Reusable UI components
 - `src/contexts/`: React context providers
 - `src/lib/`: Utility libraries and functions
+  - `db/`: Drizzle ORM client (`index.ts`) and schema definition (`schema.ts`)
 - `src/styles/`: Global styles and theme configuration
-- `src/types/`: TypeScript type definitions
+- `src/types/`: TypeScript type definitions (including shared types like `AppointmentStatus` in `lib/types.ts`)
 - `public/`: Static assets
+- `drizzle/`: Generated Drizzle ORM SQL migration files
+- `drizzle.config.js`: Configuration for Drizzle Kit
 
 ## Authentication Flow
 
@@ -109,8 +114,8 @@ The application uses Supabase for authentication with the following key componen
 
 ## Known Issues and Challenges
 
-1. **Migration File Management (Resolved):** Previously, duplicate migration timestamps and inconsistent table naming (`patients` vs `patient_profiles`) caused issues with the Supabase CLI (`db reset`, `migrations up`). This required manual renaming of migration files and correction of SQL references. **Ensure all new migrations use unique `<YYYYMMDDHHMMSS>` prefixes.**
-2. **Non-Standard Migration Filenames (Partially Resolved):** The payment migrations (`...a_...` and `...b_...`) were skipped by `db reset` due to non-standard names. They need renaming to the standard `<timestamp>_<name>.sql` format if payment features are required.
+1. **Database Schema Synchronization (Drizzle):** If manual SQL changes are made to the Supabase database without updating the Drizzle schema (`src/lib/db/schema.ts`), or vice-versa, `drizzle-kit generate` might produce incorrect migration scripts (e.g., trying to create tables/columns that already exist, or drop things unexpectedly). Careful review of generated SQL is essential before application. The migration file `drizzle/0001_ambitious_blur.sql` required significant manual commenting-out due to initial sync issues.
+2. **Historical Migration Files (`supabase/migrations`):** The project contains historical migration files in `supabase/migrations/` from the previous Supabase CLI workflow. These are **no longer used** for applying schema changes but serve as a reference for the database's intended structure. The payment-related migrations in this directory may have non-standard filenames and were likely never applied correctly.
 3. **Authentication Redirect Issues**: Sometimes there can be issues with redirection after login. The code now includes fallback mechanisms.
 4. **API Routes with Cookies**: Some API routes use cookies which causes warnings during build about dynamic server usage.
 5. **TypeScript Errors**: Ensure careful type handling when working with Supabase responses.
@@ -132,34 +137,38 @@ The application uses Supabase for authentication with the following key componen
 ## Development Workflow
 
 1. Run development server: `npm run dev`
-2. Build the project: `npm run build`
-3. Start production server: `npm start`
-4. The project uses ESLint for code quality: `npm run lint`
+2. Modify Drizzle schema (`src/lib/db/schema.ts`) if needed.
+3. Generate SQL migration: `npx drizzle-kit generate` (may require temporary `tsconfig.json` target change to `es2016`).
+4. Review generated SQL in `./drizzle/`.
+5. Apply SQL migration manually via Supabase SQL Editor.
+6. Build the project: `npm run build`
+7. Start production server: `npm start`
+8. The project uses ESLint for code quality: `npm run lint`
 
-## Supabase Schema Overview
+## Database Setup (Drizzle ORM)
 
-The database schema is managed via SQL migration files in `supabase/migrations/`. The schema was recently cleaned up and reset using `npx supabase db reset --linked`. Key tables include:
+The database schema is managed exclusively via **Drizzle ORM**. The previous workflow using the Supabase CLI and migration files in `supabase/migrations/` is **deprecated and should not be used**.
 
-*   `users`: Created by `initial_schema`. Contains base user info (`email`, `role`) linked to `auth.users` via `id`.
-*   `providers`: Created by `..._create_providers_table`. Contains provider-specific details, linked to `auth.users` via `user_id`.
-*   `patient_profiles`: Created by `..._create_patient_profile_tables`. Contains patient-specific profile details, linked to `auth.users` via `user_id`.
-*   `appointments`: Created by `..._create_appointments_table`. Links `providers` (via `provider_id`) and `patient_profiles` (via `patient_id`).
-*   `packages`: Defined in `initial_schema`.
-*   `patient_packages`: Defined in `initial_schema`.
-*   `treatment_plans`: Defined in `..._create_treatment_tables`.
-*   `treatment_milestones`: Defined in `..._create_treatment_tables`.
-*   `notifications`: Defined in `..._create_notification_functions`.
-*   `messages`: Defined in `..._create_messaging_tables`.
-*   `documents`: Defined in `..._create_document_tables`.
-*   `feedback_tables` (various): Defined in `..._create_feedback_tables`.
-*   `education_tables` (various): Defined in `..._create_education_tables_v1` (commented out) and `..._create_education_tables_v2`.
-*   `analytics_tables` (various): Defined in `..._create_analytics_tables`.
-*   `payment_tables` (various - Stripe focused): Defined in `..._create_stripe_payment_tables` (Note: this migration was skipped due to filename, needs renaming to apply). Generic payment tables in `..._create_generic_payment_tables` were mostly commented out.
+*   **Schema Definition:** The source of truth for the database schema is `src/lib/db/schema.ts`. All table structures and relations are defined here using Drizzle's TypeScript syntax.
+*   **Drizzle Client:** The database client instance (`db`) is initialized in `src/lib/db/index.ts` and uses the `DATABASE_URL` environment variable.
+*   **Migration Generation:** Use `drizzle-kit` to compare the schema definition (`schema.ts`) with the database state (introspected via `DATABASE_URL`) and generate SQL migration files. Command: `npx drizzle-kit generate`.
+    *   *Troubleshooting:* If `drizzle-kit` fails with errors related to `const` or `es5` target, temporarily change `compilerOptions.target` in `tsconfig.json` to `es2016`, run the command, and immediately change it back to `es5`.
+*   **Migration Files:** Generated SQL files are stored in the `./drizzle` directory. They contain the SQL statements needed to synchronize the database schema with the `schema.ts` definition.
+*   **Migration Application:** Generated SQL migrations **must be applied manually**. Copy the SQL content from the relevant file in `./drizzle` and execute it using the Supabase Dashboard > SQL Editor against your database.
+*   **Configuration:** Drizzle Kit settings are in `drizzle.config.js`.
+*   **Historical Migrations:** The `supabase/migrations/` directory contains old migration files. **Do not run `npx supabase migration up` or similar commands.** These files only serve as historical context.
 
-**Important Notes:**
-*   Ensure consistency in referencing patient data via `patient_profiles`.
-*   RLS policies were updated, especially for `appointments`, to correctly join via the `providers` table.
-*   The `update_updated_at_column` function is assumed to be created early (e.g., in `initial_schema`) and reused by triggers.
+**Key Tables (Defined in `src/lib/db/schema.ts`):**
+
+*   `users`: Mirrors essential user data from `auth.users`.
+*   `providers`: Provider-specific details.
+*   `patient_profiles`: Patient-specific profile details.
+*   `appointments`: Links providers and patients, stores appointment details.
+*   `provider_weekly_schedules`: Defines provider availability.
+*   `provider_time_blocks`: Defines specific unavailable times for providers.
+*   Other tables related to treatments, messages, documents, etc., are also defined in the schema file.
+
+**Important:** Always review generated SQL migrations carefully before applying them manually to avoid unintended data loss or schema conflicts.
 
 ## Next Steps and Future Work
 
@@ -176,14 +185,22 @@ The database schema is managed via SQL migration files in `supabase/migrations/`
 
 ## Environment Setup
 
-The project requires the following environment variables in `.env.local`:
+The project requires the following environment variables in `.env.local` (refer also to `README.md`):
 
 ```
+# Drizzle ORM Database Connection (REQUIRED for server-side operations)
+DATABASE_URL=your-supabase-connection-pooling-uri
+
+# Supabase Client Configuration (REQUIRED for client-side auth, etc.)
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+
+# Stripe Configuration (if payments are used)
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key
 STRIPE_SECRET_KEY=your-stripe-secret-key
 STRIPE_WEBHOOK_SECRET=your-stripe-webhook-secret
+
+# Application URL
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
@@ -217,23 +234,30 @@ These changes have significantly enhanced the platform's professional appearance
 ## Project Status
 
 *   **Overall:** Development in progress. Core authentication and basic layouts for Admin and Provider are functional. Admin user listing and creation (including detailed provider creation via Server Action) is implemented. Provider login and dashboard access issues have been resolved.
-*   **Auth:** Supabase Auth is used. Basic sign-up/sign-in/sign-out works. Role handling is implemented via custom claims/users table.
-*   **Database:** Supabase Postgres. Schema rebuilt via cleaned-up migrations. Key tables include `users`, `providers`, `patient_profiles`, `appointments`, `messages`. Payment migrations need filename correction to apply.
+*   **Auth:** Supabase Auth is used. Basic sign-up/sign-in/sign-out works. Role handling is implemented via `users` table.
+*   **Database:** Supabase Postgres. Schema is managed via **Drizzle ORM** (`src/lib/db/schema.ts`) and manual application of migrations generated by `drizzle-kit` (stored in `./drizzle`). Historical Supabase CLI migrations exist in `supabase/migrations` but are **not used**.
 *   **Admin Module:** User list page with search/filter implemented. User creation dialog allows adding all roles, including providers with specific details. Edit/Delete functionality is pending.
-*   **Provider Module:** Basic layout and sidebar navigation implemented. Dashboard is accessible after login. Specific pages (Profile, Patients, Appointments, etc.) are linked but need content and functionality.
-*   **Patient Module:** Layout exists but functionality is pending.
+*   **Provider Module:** Basic layout and sidebar navigation implemented. Dashboard is accessible after login. Appointments page shows provider's schedule with status updates (complete/cancel). Patient list, Profile, Messages, Settings need content/functionality.
+*   **Patient Module:** Layout exists. Appointments page allows viewing, booking (via modal with provider availability), and cancelling appointments. Profile, Messages, Settings need content/functionality.
+*   **Appointments:** 
+    *   Patient can view appointments, book new ones (selecting provider, date, time slot based on Drizzle-fetched availability), and cancel.
+    *   Provider can view their appointments and update status (Complete, Cancel).
+    *   Calendars on patient/provider dashboards and booking modal visually indicate booked (blue), available (blue border - modal only), and cancelled-only (orange) dates.
 *   **UI/UX:** Using Material UI (MUI) with a custom Minimal theme, aiming for consistency. 
     *   **Visual Target:** Component styling aims to emulate the Minimal UI Kit free demo ([https://free.minimals.cc/](https://free.minimals.cc/)). Theme overrides are used to centralize styles.
 *   **Payments:** Stripe integration is planned but not started.
 
 ## Key Code Locations
 
-*   **Authentication:** `src/contexts/AuthContext.tsx`, `src/app/(auth)/login/page.tsx`, Supabase Auth UI/helpers.
+*   **Authentication:** `src/contexts/AuthContext.tsx`, `src/app/(auth)/login/page.tsx`, Supabase client helpers.
 *   **Layouts:** `src/components/layouts/`, `src/app/(admin)/layout.tsx`, `src/app/(provider)/layout.tsx`.
 *   **Admin User Management:** `src/app/(admin)/admin/users/page.tsx`, `src/actions/userActions.ts` (for creation).
 *   **Provider Components:** `src/app/(provider)/...` (Dashboard, Sidebar Content).
-*   **Database Types:** `src/lib/supabase/database.types.ts` (Path needs confirmation).
-*   **Supabase Client:** `src/lib/supabase/client.ts` (Client-side), Server Actions use `@supabase/auth-helpers-nextjs` or direct client creation.
+*   **Database Schema:** `src/lib/db/schema.ts` (Drizzle schema definition)
+*   **Database Client:** `src/lib/db/index.ts` (Drizzle client initialization)
+*   **Migrations:** `./drizzle/` (Generated SQL migration files), `drizzle.config.js`
+*   **Server Actions (using DB):** e.g., `src/actions/appointmentActions.ts`
+*   **Supabase Client (client-side):** `src/lib/supabase/client.ts` (Path needs confirmation if still used heavily outside Auth)
 
 ## Next Steps / Priorities
 
@@ -245,9 +269,10 @@ These changes have significantly enhanced the platform's professional appearance
 
 ## Potential Issues / Blockers
 
-*   Confirming the correct path for generated Supabase database types (`database.types.ts`).
-*   Ensuring all Supabase client initializations (client-side, server components, server actions) use appropriate keys and handle sessions correctly.
-*   Further RLS policy refinement might be complex depending on requirements.
+*   Ensuring Drizzle schema (`schema.ts`), generated migrations (`./drizzle`), and the actual database state remain synchronized. Careful review of generated SQL is critical.
+*   Complexity in Drizzle queries involving multiple relations or advanced filtering.
+*   Ensuring all Supabase client initializations (client-side, server components, server actions) use appropriate keys and handle sessions correctly, especially distinguishing between Supabase client usage (Auth) and Drizzle client usage (DB operations).
+*   Further RLS policy refinement might be complex depending on requirements and how they interact with Drizzle queries.
 
 ## Handover Checklist
 
@@ -268,3 +293,50 @@ These changes have significantly enhanced the platform's professional appearance
 *   **Forms:** React Hook Form (^7.50.1) + Zod (^3.22.4)
 *   **State:** React Context API
 *   **Deployment Target:** Vercel 
+
+## Database Management (Drizzle ORM)
+
+**IMPORTANT:** This project utilizes **Drizzle ORM** for managing the database schema and performing migrations, replacing the standard Supabase CLI migration workflow.
+
+### Overview:
+
+*   Database interactions in the application code are handled via the Drizzle client (`db`).
+*   The database schema is defined as TypeScript code in `src/lib/db/schema.ts`.
+*   The Drizzle client is initialized in `src/lib/db/index.ts`.
+*   Database schema migrations are generated using `drizzle-kit` based on changes to `schema.ts`.
+
+### Key Files & Directories:
+
+*   `src/lib/db/schema.ts`: Source of truth for database table structures.
+*   `src/lib/db/index.ts`: Drizzle client initialization.
+*   `drizzle.config.js`: Configuration file for `drizzle-kit`.
+*   `./drizzle/`: Directory containing generated SQL migration files.
+*   `.env.local`: Must contain the `DATABASE_URL` for the Supabase connection pooler.
+
+### Environment Setup:
+
+Ensure the `.env.local` file has the correct `DATABASE_URL` pointing to your Supabase **connection pooling URI**:
+
+```env
+DATABASE_URL="postgres://<user>:<password>@<host>:<port>/postgres?pgbouncer=true&connection_limit=1"
+```
+
+Find this in your Supabase Dashboard > Project Settings > Database > Connection string (Use URI).
+
+### Workflow for Schema Changes:
+
+1.  **Modify Schema:** Edit the table definitions in `src/lib/db/schema.ts`.
+2.  **Generate Migration:** Run the following command in your terminal:
+    ```bash
+    npx drizzle-kit generate
+    ```
+    *   **Troubleshooting:** If you encounter errors related to `const` or `es5` target during generation, you may need to temporarily edit `tsconfig.json`, change `compilerOptions.target` to `es2016`, run `npx drizzle-kit generate`, and then **immediately change the target back to `es5`** in `tsconfig.json`.
+3.  **Review Migration:** A new `.sql` file will be created in the `./drizzle` directory. Carefully review this file to ensure the generated SQL commands are correct and expected.
+4.  **Apply Migration:** 
+    *   Go to your Supabase project dashboard.
+    *   Navigate to the **SQL Editor**.
+    *   Copy the **entire content** of the newly generated `.sql` migration file.
+    *   Paste the SQL into the editor.
+    *   Click **RUN**.
+
+**Crucial Note:** Do **NOT** use the Supabase CLI commands like `supabase db reset`, `supabase migrations up`, or `supabase db push`. These commands interact with the `supabase/migrations` system, which is **not** synchronized with the Drizzle schema defined in this project. Applying schema changes *only* through the Drizzle workflow described above is essential for maintaining consistency. 

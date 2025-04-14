@@ -121,7 +121,7 @@ export default function ProviderDashboardPage() {
             *,
             duration,
             type,
-            patient:patient_profiles (
+            patient:patient_profiles!appointments_patient_id_patient_profiles_id_fk (
               id,
               first_name,
               last_name

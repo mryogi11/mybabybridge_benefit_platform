@@ -1,5 +1,15 @@
 # Updating User Roles in Supabase
 
+**IMPORTANT NOTE ON DATABASE MIGRATIONS:**
+
+This project now uses **Drizzle ORM** and **`drizzle-kit`** for managing database schema changes, not the standard Supabase CLI migration workflow (`supabase/migrations`, `supabase db reset`, `supabase migrations up`).
+
+The instructions below regarding Supabase roles and permissions are likely still relevant, but any steps involving the Supabase CLI for applying schema migrations should be **disregarded**. 
+
+Please refer to the project `README.md` or `HANDOVER.md` for the correct Drizzle-based migration workflow.
+
+---
+
 Follow these steps to update the roles for your test accounts:
 
 ## Step 1: Access Supabase SQL Editor

@@ -23,7 +23,13 @@ const palette: PaletteOptions = {
   },
   // Add other palette settings like error, warning, info, success if needed
   error: { main: '#dc3545' },
-  warning: { main: '#ffc107' },
+  warning: { 
+    main: '#FF4D00', // Use custom orange
+    contrastText: '#FFFFFF', // Set contrast text to white
+    // Optionally define light/dark variations
+    light: '#FF7033', // Lighter shade
+    dark: '#D44000', // Darker shade (used for hover)
+  },
   info: { main: '#17a2b8' },
   success: { main: '#28a745' },
 };

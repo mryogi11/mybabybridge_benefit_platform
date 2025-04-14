@@ -13,37 +13,76 @@ import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3';
 import { PickersDay, PickersDayProps } from '@mui/x-date-pickers/PickersDay';
+import { useTheme } from '@mui/material/styles';
 
 // Define structure for fetched appointment with patient details
-export interface FetchedAppointment extends Omit<Appointment, 'patient' | 'provider'> {
+export interface FetchedAppointment extends Omit<Appointment, 'patient' | 'provider' | 'status'> {
   patient_profiles: {
     first_name: string | null;
     last_name: string | null;
   } | null;
+  status: Appointment['status']; // Use union type
 }
 
 // --- Define DayWithIndicator outside the main component ---
 // It receives appointments via slotProps
 function DayWithIndicator(props: PickersDayProps<Date> & { appointments?: FetchedAppointment[] }) {
   // Make appointments prop optional here and check for it
-  const { day, outsideCurrentMonth, appointments = [], ...other } = props; 
+  const { day, outsideCurrentMonth, appointments = [], selected, ...other } = props; 
+  const theme = useTheme();
   
-  // Check if there's an appointment on this specific day using passed state
-  const hasAppointment = appointments.some(appointment => 
-    appointment && appointment.appointment_date && isSameDay(parseISO(appointment.appointment_date), day)
+  // Check appointments on this specific day
+  const appointmentsOnDay = appointments.filter(appointment => 
+    !outsideCurrentMonth && appointment && appointment.appointment_date && isSameDay(parseISO(appointment.appointment_date), day)
   );
+  const hasAppointment = appointmentsOnDay.length > 0;
+  const hasOnlyCancelled = hasAppointment && appointmentsOnDay.every(appt => appt.status === 'cancelled');
+  const hasActiveAppointment = hasAppointment && !hasOnlyCancelled;
+  const isSelected = selected;
 
+  let daySx = {};
+  if (hasOnlyCancelled) {
+    // Only cancelled appt -> Orange background
+    daySx = {
+      // Use theme color
+      backgroundColor: theme.palette.warning.main + ' !important',
+      color: theme.palette.warning.contrastText + ' !important', 
+      borderRadius: '50%',
+      border: 'none',
+      '&:hover': {
+         // Use theme color
+        backgroundColor: theme.palette.warning.dark + ' !important',
+      }
+    };
+  } else if (hasActiveAppointment) {
+    // Active appt -> Blue background
+     daySx = {
+      backgroundColor: theme.palette.primary.main + ' !important',
+      color: theme.palette.primary.contrastText + ' !important',
+      borderRadius: '50%',
+      border: 'none',
+      '&:hover': {
+        backgroundColor: theme.palette.primary.dark + ' !important',
+      },
+      // Keep selection style consistent if needed
+      '&.Mui-selected': {
+          backgroundColor: theme.palette.primary.main + ' !important',
+          color: theme.palette.primary.contrastText + ' !important',
+      },
+      '&.Mui-selected:hover': {
+          backgroundColor: theme.palette.primary.dark + ' !important',
+      },
+    };
+  }
+  
   return (
     <PickersDay 
       {...other} 
       outsideCurrentMonth={outsideCurrentMonth} 
       day={day} 
-      sx={(theme) => ({
-        ...(hasAppointment && !outsideCurrentMonth && { 
-          border: `2px solid ${theme.palette.primary.main}`,
-          borderRadius: '50%', 
-        }),
-      })}
+      selected={isSelected} // Pass selection state
+      disabled={hasAppointment} // Disable days with any appointment for provider view?
+      sx={daySx}
     />
   );
 }
@@ -265,7 +304,7 @@ export default function ProviderAppointmentsPage() {
           .from('appointments')
           .select(`
             *,
-          patient_profiles ( 
+          patient:patient_profiles!appointments_patient_id_patient_profiles_id_fk ( 
               first_name,
             last_name
           )
@@ -285,12 +324,51 @@ export default function ProviderAppointmentsPage() {
         // Log the raw data BEFORE mapping
         console.log("Fetched provider appointments data (raw from Supabase):", appointmentsData);
         
-        // Ensure the fetched data structure matches FetchedAppointment
-        const typedAppointments = (appointmentsData || []).map(appt => ({
-          ...appt,
-          // Ensure patient_profiles is correctly handled (might be null if join fails)
-          patient_profiles: appt.patient_profiles || null 
-        })) as FetchedAppointment[];
+        // Ensure the fetched data structure matches FetchedAppointment with safe mapping
+        const typedAppointments: FetchedAppointment[] = (appointmentsData || []).map(apptInput => {
+            const appt = apptInput as any; // Cast input to any to simplify
+
+            let patientProfileData: FetchedAppointment['patient_profiles'] = null;
+            
+            // Check if the joined patient data exists and has the expected shape
+            if (appt.patient && typeof appt.patient === 'object' && 'first_name' in appt.patient && 'last_name' in appt.patient) {
+                const validPatientProfile = appt.patient as { 
+                    first_name: string | null;
+                    last_name: string | null;
+                };
+                patientProfileData = {
+                    first_name: validPatientProfile.first_name,
+                    last_name: validPatientProfile.last_name,
+                };
+            } else if (appt.patient) {
+                console.warn("Patient profile data received but has unexpected structure:", appt.patient);
+            }
+
+            // Validate status
+            let validStatus: Appointment['status'] = 'pending'; // Default if invalid/missing
+            const possibleStatuses: Appointment['status'][] = ['scheduled', 'completed', 'cancelled', 'pending'];
+            if (appt.status && possibleStatuses.includes(appt.status)) {
+                validStatus = appt.status as Appointment['status'];
+            } else if (appt.status) {
+                console.warn(`Invalid status value received from DB: ${appt.status}, defaulting to 'pending'.`);
+            }
+
+            // Construct the final object conforming to FetchedAppointment
+            const finalAppointment: FetchedAppointment = {
+                 id: appt.id,
+                 patient_id: appt.patient_id,
+                 provider_id: appt.provider_id,
+                 appointment_date: appt.appointment_date,
+                 duration: appt.duration,
+                 type: appt.type,
+                 status: validStatus, // Assign validated status
+                 notes: appt.notes,
+                 created_at: appt.created_at,
+                 updated_at: appt.updated_at,
+                 patient_profiles: patientProfileData,
+            };
+            return finalAppointment;
+        }); // No final cast needed
         
         console.log("Mapped appointments for state:", typedAppointments); // Log after mapping too
         setAppointments(typedAppointments);

@@ -22,6 +22,7 @@ import {
   Grid,
   Snackbar,
   Badge,
+  useTheme,
 } from '@mui/material';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -128,7 +129,7 @@ export default function AppointmentsPage() {
           status,
           notes,
           created_at,
-          provider:providers (
+          provider:providers!appointments_provider_id_providers_id_fk (
             id,
             user_id,
             first_name,
@@ -273,30 +274,72 @@ export default function AppointmentsPage() {
 
   // Custom Day component for the calendar
   function DayWithIndicator(props: PickersDayProps<Date>) {
-    const { day, outsideCurrentMonth, ...other } = props;
-    // Check if there's an appointment on this specific day
-    const hasAppointment = appointments.some(appointment => 
-      isSameDay(parseISO(appointment.appointment_date), day)
+    const { day, outsideCurrentMonth, selected, ...other } = props;
+    const theme = useTheme();
+
+    const appointmentsOnDay = appointments.filter(appointment => 
+        !outsideCurrentMonth && isSameDay(parseISO(appointment.appointment_date), day)
     );
 
+    const hasAppointment = appointmentsOnDay.length > 0;
+    const hasOnlyCancelled = hasAppointment && appointmentsOnDay.every(appt => appt.status === 'cancelled');
+    const hasActiveAppointment = hasAppointment && !hasOnlyCancelled;
+    const isSelected = selected;
+
+    let daySx = {};
+    if (hasOnlyCancelled) {
+      daySx = {
+        backgroundColor: theme.palette.warning.main + ' !important',
+        color: theme.palette.warning.contrastText + ' !important',
+        borderRadius: '50%',
+        border: 'none',
+        '&:hover': {
+          backgroundColor: theme.palette.warning.dark + ' !important', 
+        }
+      };
+    } else if (hasActiveAppointment) {
+      daySx = {
+        backgroundColor: theme.palette.primary.main + ' !important',
+        color: theme.palette.primary.contrastText + ' !important',
+        borderRadius: '50%',
+        border: 'none',
+        '&:hover': {
+          backgroundColor: theme.palette.primary.dark + ' !important',
+        },
+        '&.Mui-selected': {
+          backgroundColor: theme.palette.primary.main + ' !important',
+          color: theme.palette.primary.contrastText + ' !important',
+        },
+        '&.Mui-selected:hover': {
+          backgroundColor: theme.palette.primary.dark + ' !important',
+        },
+      };
+    }
+
     return (
-      // Apply conditional styling directly to PickersDay
-      <PickersDay 
-        {...other} 
-        outsideCurrentMonth={outsideCurrentMonth} 
-        day={day} 
-        // Apply sx prop with theme callback for dynamic styling
-        sx={(theme) => ({
-          // Base styles for the day can go here if needed
-          // Conditional styles for the blue circle
-          ...(hasAppointment && !outsideCurrentMonth && { 
-            border: `2px solid ${theme.palette.primary.main}`, // Blue border using theme color
-            borderRadius: '50%', // Makes the border circular
-          }),
-        })}
+      <PickersDay
+        {...other}
+        outsideCurrentMonth={outsideCurrentMonth}
+        day={day}
+        selected={isSelected} // Pass selection state
+        sx={daySx}
       />
     );
   }
+
+  // Wrapper function to adapt server action result for the modal
+  const getSlotsForModal = async (providerId: string, dateStr: string): Promise<{ slots: string[] | null; error: string | null; }> => {
+    try {
+      // Call the server action which now returns the correct object structure
+      const result = await getAvailableSlots(providerId, dateStr);
+      
+      // No need to adapt anymore, just return the result directly
+      return result; 
+    } catch (err: any) {
+        console.error("Error fetching slots for modal:", err);
+        return { slots: null, error: err.message || "Failed to fetch slots." };
+    }
+  };
 
   if (loading) {
     return (
@@ -349,13 +392,16 @@ export default function AppointmentsPage() {
           <Grid container spacing={3}>
             <Grid item xs={12} md={4}>
               <Paper sx={{ p: 2 }}>
-                <DateCalendar
-                  value={selectedDate}
-                  onChange={(newDate) => setSelectedDate(newDate)}
-                  slots={{
-                    day: DayWithIndicator,
-                  }}
-                />
+                <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+                  <DateCalendar
+                    value={selectedDate}
+                    onChange={(newDate) => setSelectedDate(newDate)}
+                    loading={loading || fetchingProviders}
+                    slots={{
+                      day: DayWithIndicator,
+                    }}
+                  />
+                </Box>
               </Paper>
             </Grid>
 
@@ -451,9 +497,10 @@ export default function AppointmentsPage() {
           onClose={() => setIsBookingModalOpen(false)}
           availableProviders={availableProviders}
           onBookAppointment={handleBookAppointment}
-          getAvailableSlots={getAvailableSlots}
+          getAvailableSlots={getSlotsForModal}
           accessToken={session?.access_token}
           patientId={user?.id || ''}
+          existingAppointments={appointments}
         />
 
         <Snackbar 

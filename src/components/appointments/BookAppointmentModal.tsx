@@ -19,9 +19,10 @@ import {
 } from '@mui/material';
 import { DatePicker, DateTimePicker, LocalizationProvider, DateCalendar, PickersDay, PickersDayProps } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3';
-import { isValid, format, startOfDay as dateFnsStartOfDay, isSameDay, isBefore } from 'date-fns';
+import { isValid, format, startOfDay, isSameDay, isBefore, addDays, isAfter, parseISO } from 'date-fns';
 import { alpha, useTheme } from '@mui/material/styles';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { getAvailableSlots, getAvailableDatesForProvider } from '../../actions/appointmentActions'; // Import the new action
 
 // Import the new server action
 // import { getMonthlyAvailability } from '@/actions/appointmentActions'; // Adjust path if needed
@@ -35,6 +36,11 @@ interface ProviderInfo {
   specialization: string | null;
 }
 
+interface Appointment {
+  appointment_date: string;
+  status: string; // Add status
+}
+
 // --- Updated Props Interface ---
 interface BookAppointmentModalProps {
   open: boolean;
@@ -42,7 +48,7 @@ interface BookAppointmentModalProps {
   patientId: string; // Change back to required string
   availableProviders: ProviderInfo[];
   accessToken: string | null | undefined; 
-  getAvailableSlots: (providerId: string, dateStr: string) => Promise<string[]>; 
+  getAvailableSlots: (providerId: string, dateStr: string) => Promise<{ slots: string[] | null; error: string | null }>; 
   onBookAppointment: (bookingDetails: { 
       providerId: string; 
       dateTime: Date; 
@@ -50,6 +56,7 @@ interface BookAppointmentModalProps {
       patientId: string; 
       accessToken: string; 
   }) => Promise<{ success: boolean; error?: string }>; 
+  existingAppointments: Appointment[]; // Add prop for existing appointments
 }
 
 // --- Modal Style (Same as Edit Modal) ---
@@ -67,6 +74,79 @@ const style = {
   p: 4,
 };
 
+// Custom Day component for the calendar inside the modal
+function ModalDayWithIndicator(props: PickersDayProps<Date> & { 
+  availableDates?: Set<string>; 
+  existingAppointments?: Appointment[]; // Add prop for existing appointments
+}) {
+  const { day, outsideCurrentMonth, availableDates = new Set(), existingAppointments = [], selected, ...other } = props;
+  const theme = useTheme();
+  const dayFormatted = format(startOfDay(day), 'yyyy-MM-dd');
+  
+  // Check availability for the selected provider
+  const isAvailable = !outsideCurrentMonth && availableDates.has(dayFormatted);
+  
+  // Check patient's existing appointments for this day
+  const appointmentsOnDay = existingAppointments.filter(appt => 
+    !outsideCurrentMonth && appt && appt.appointment_date && isSameDay(parseISO(appt.appointment_date), day)
+  );
+  const hasBookedAppointment = appointmentsOnDay.length > 0;
+  const hasOnlyCancelled = hasBookedAppointment && appointmentsOnDay.every(appt => appt.status === 'cancelled');
+  const hasActiveBooked = hasBookedAppointment && !hasOnlyCancelled;
+
+  const isSelected = selected;
+
+  let daySx = {};
+  if (hasOnlyCancelled) {
+    // Priority 1: Only cancelled booked appt -> Orange background
+    daySx = {
+      backgroundColor: theme.palette.warning.main + ' !important',
+      color: theme.palette.warning.contrastText + ' !important',
+      borderRadius: '50%',
+      border: 'none',
+      '&:hover': {
+        backgroundColor: theme.palette.warning.dark + ' !important',
+      }
+    };
+  } else if (hasActiveBooked) {
+    // Priority 2: Active booked appt -> Blue background
+    daySx = {
+      backgroundColor: theme.palette.primary.main + ' !important',
+      color: theme.palette.primary.contrastText + ' !important',
+      borderRadius: '50%',
+      border: 'none',
+      '&:hover': {
+        backgroundColor: theme.palette.primary.dark + ' !important',
+      }
+    };
+  } else if (isSelected) {
+      // Priority 3: Selected (and not booked) -> Blue background (standard selection)
+      daySx = {
+        backgroundColor: theme.palette.primary.main + ' !important',
+        color: theme.palette.primary.contrastText + ' !important',
+        borderRadius: '50%',
+        border: 'none',
+     };
+  } else if (isAvailable) {
+    // Priority 4: Available (and not booked/selected) -> Blue border
+    daySx = {
+      border: `2px solid ${theme.palette.primary.main}`,
+      borderRadius: '50%',
+    };
+  }
+
+  return (
+    <PickersDay
+      {...other}
+      outsideCurrentMonth={outsideCurrentMonth}
+      day={day}
+      selected={isSelected && !hasBookedAppointment} // Only show MUI selection style if not booked
+      disabled={hasBookedAppointment} // Disable booked dates
+      sx={daySx}
+    />
+  );
+}
+
 // --- Component with Updated Props ---
 export default function BookAppointmentModal({
   open,
@@ -76,28 +156,34 @@ export default function BookAppointmentModal({
   accessToken, // Destructure accessToken prop
   getAvailableSlots, // Use renamed prop
   onBookAppointment, // Use renamed prop
+  existingAppointments, // Destructure existingAppointments prop
 }: BookAppointmentModalProps) {
   // State
   const [selectedProviderId, setSelectedProviderId] = useState<string>('');
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(addDays(new Date(), 1)); // Default to tomorrow
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [booking, setBooking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // State for available dates in the modal calendar
+  const [modalAvailableDates, setModalAvailableDates] = useState<Set<string>>(new Set());
+  const [fetchingModalAvailability, setFetchingModalAvailability] = useState(false);
 
   // Reset state when modal opens/closes or providers change
   useEffect(() => {
     if (open) {
         setSelectedProviderId('');
-        setSelectedDate(null);
+        setSelectedDate(addDays(new Date(), 1));
         setTimeSlots([]);
         setSelectedSlot('');
         setNotes('');
         setError(null);
         setLoadingSlots(false);
         setBooking(false);
+        setModalAvailableDates(new Set());
+        setFetchingModalAvailability(false);
     } 
   }, [open]);
 
@@ -110,11 +196,20 @@ export default function BookAppointmentModal({
         setTimeSlots([]);
         setSelectedSlot('');
         try {
-          const dateStr = format(selectedDate, 'yyyy-MM-dd'); // Format correctly here too
+          const dateStr = format(selectedDate, 'yyyy-MM-dd');
           console.log(`Modal fetching slots (Restored Effect) for ${selectedProviderId} / ${dateStr}`);
-          const slots = await getAvailableSlots(selectedProviderId, dateStr); 
-          setTimeSlots(slots);
-          if (slots.length === 0) {
+          // Rename variable to avoid confusion
+          const slotResult = await getAvailableSlots(selectedProviderId, dateStr);
+          
+          // Throw error if the action returned one
+          if (slotResult.error) throw new Error(slotResult.error);
+
+          // Use the .slots property from the result object
+          const actualSlots = slotResult.slots || [];
+          setTimeSlots(actualSlots);
+
+          // Check the length of the actual slots array
+          if (actualSlots.length === 0) { 
              setError('No available slots found for the selected provider and date.');
           }
         } catch (err: any) {
@@ -134,6 +229,90 @@ export default function BookAppointmentModal({
         }
     }
   }, [selectedProviderId, selectedDate, getAvailableSlots]); 
+
+  // --- Fetch Available DATES for the selected provider --- 
+  const fetchAvailableDatesForProvider = useCallback(async (providerId: string) => {
+      if (!providerId) return;
+      setFetchingModalAvailability(true);
+      setError(null); // Clear previous errors
+      console.log(`Modal: Fetching available DATES for provider ${providerId}`);
+      try {
+          // --- Call the actual server action (only needs providerId) ---
+          const result = await getAvailableDatesForProvider(providerId);
+          
+          if (result.error) throw new Error(result.error);
+          
+          // Format the dates into 'yyyy-MM-dd' strings before creating the Set
+          const formattedDates = (result.availableDates || []).map(date => {
+              try {
+                  return format(startOfDay(date), 'yyyy-MM-dd');
+              } catch (formatError) {
+                  console.error("Error formatting date:", date, formatError);
+                  return null; // Handle potential date formatting errors
+              }
+          }).filter((dateStr): dateStr is string => dateStr !== null); // Filter out nulls
+
+          const fetchedDatesSet = new Set(formattedDates);
+          console.log("Modal: Setting available dates (formatted strings) from server action:", fetchedDatesSet);
+          setModalAvailableDates(fetchedDatesSet); // Now passing Set<string>
+          // --- End server action call --- 
+      } catch (err: any) {
+          console.error("Modal: Error fetching available dates:", err);
+          setError("Could not load available dates for the provider.");
+          setModalAvailableDates(new Set()); // Clear on error
+      } finally {
+          setFetchingModalAvailability(false);
+      }
+  }, []); 
+
+  // Fetch available dates when provider or viewed month changes
+  useEffect(() => {
+    if (selectedProviderId) {
+        console.log("Modal: Provider selected, fetching available dates...");
+        fetchAvailableDatesForProvider(selectedProviderId);
+    }
+  }, [selectedProviderId, fetchAvailableDatesForProvider]); // Removed selectedDate dependency here
+
+  // Function to handle month change in modal calendar
+  const handleModalMonthChange = (date: Date) => {
+      console.log("Modal: Month changed, fetching available dates...");
+      if (selectedProviderId) {
+        fetchAvailableDatesForProvider(selectedProviderId);
+      }
+  };
+
+  // --- Fetch Available SLOTS for the selected provider and date --- 
+  useEffect(() => {
+    // Only fetch slots if date is valid and *after* today (since minDate is tomorrow)
+    if (selectedProviderId && selectedDate && isValid(selectedDate) && isAfter(startOfDay(selectedDate), startOfDay(new Date()))) {
+      const fetchSlots = async () => {
+        setLoadingSlots(true);
+        setTimeSlots([]); // Clear previous slots
+        setSelectedSlot(''); // Clear selected time
+        setError(null);
+        console.log(`Modal: Fetching available SLOTS for provider ${selectedProviderId} on date ${format(selectedDate, 'yyyy-MM-dd')}`);
+        try {
+          // Use the prop function (which now returns the object)
+          const result = await getAvailableSlots(selectedProviderId, format(selectedDate, 'yyyy-MM-dd'));
+          
+          // Handle the new return structure { slots: string[] | null, error: string | null }
+          if (result.error) throw new Error(result.error);
+
+          console.log("Modal: Fetched Slots:", result.slots);
+          setTimeSlots(result.slots || []);
+        } catch (err: any) {
+          console.error("Modal: Error fetching available slots:", err);
+          setError("Could not load available time slots for this date.");
+        }
+        setLoadingSlots(false);
+      };
+      fetchSlots();
+    } else {
+      setTimeSlots([]); // Clear slots if no provider/date selected or date is invalid/past
+      setSelectedSlot(''); 
+    }
+    // Depend only on provider and date for fetching slots
+  }, [selectedProviderId, selectedDate, getAvailableSlots]);
 
   // Handlers
   const handleProviderChange = (event: SelectChangeEvent<string>) => {
@@ -240,12 +419,20 @@ export default function BookAppointmentModal({
                     {/* Calendar */}
                      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
                         <DateCalendar
-                            value={selectedDate} // Keep using value for selected day
+                            value={selectedDate}
                             onChange={handleDateChange}
-                            views={["day"]} // Only show day view
-                            openTo="day"
-                            disablePast // Don't allow past dates
-                            disabled={!selectedProviderId} // Simple disable if no provider
+                            onMonthChange={handleModalMonthChange} // Handle month change
+                            minDate={addDays(new Date(), 1)} // Can't book for today or past
+                            loading={fetchingModalAvailability}
+                            slots={{
+                                day: ModalDayWithIndicator,
+                            }}
+                            slotProps={{
+                                day: { 
+                                    availableDates: modalAvailableDates,
+                                    existingAppointments: existingAppointments // Pass existing appointments here
+                                } as any, // Use 'as any' to bypass strict type check if needed
+                            }}
                         />
                     </Box>
                 </Stack>

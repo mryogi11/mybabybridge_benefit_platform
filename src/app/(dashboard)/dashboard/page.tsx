@@ -215,7 +215,7 @@ export default function PatientDashboardPage() {
         .from('appointments')
         .select(`
           *,
-          provider:providers (
+          provider:providers!appointments_provider_id_providers_id_fk (
             id,
             user_id,
             first_name,
@@ -235,20 +235,55 @@ export default function PatientDashboardPage() {
       }
 
       console.log('Raw upcoming appointment data fetched:', data);
-      // Ensure type compatibility
-       const typedAppointments = (data || []).map(appt => ({
-           ...appt,
-           // Ensure provider structure matches DashboardAppointment
-           provider: appt.provider ? {
-               id: appt.provider.id,
-               user_id: appt.provider.user_id,
-               first_name: appt.provider.first_name,
-               last_name: appt.provider.last_name,
-               specialization: appt.provider.specialization,
-           } : undefined,
-       })) as DashboardAppointment[];
+      // Ensure type compatibility and handle potential join errors
+       const typedAppointments: DashboardAppointment[] = (data || []).map(apptInput => {
+           // Cast the input to any to simplify type handling for this complex case
+           const appt = apptInput as any; 
+           
+           let providerData: DashboardAppointment['provider'] = undefined;
 
-      setUpcomingAppointments(typedAppointments);
+           // Check if appt.provider exists and looks like a valid provider object
+           if (appt.provider && typeof appt.provider === 'object' && 'id' in appt.provider && 'user_id' in appt.provider) {
+               // Cast *after* checks pass, within this block
+               const validProvider = appt.provider as {
+                   id: string;
+                   user_id: string;
+                   first_name: string | null;
+                   last_name: string | null;
+                   specialization: string | null;
+               };
+               providerData = {
+                   id: validProvider.id,
+                   user_id: validProvider.user_id,
+                   first_name: validProvider.first_name,
+                   last_name: validProvider.last_name,
+                   specialization: validProvider.specialization,
+               };
+           } else if (appt.provider) {
+               console.warn("Provider data received but has unexpected structure:", appt.provider);
+           }
+
+           // Construct the final object conforming to DashboardAppointment
+           // Access properties directly from 'appt' (cast to any)
+           const finalAppointment: DashboardAppointment = {
+               id: appt.id,
+               patient_id: appt.patient_id,
+               provider_id: appt.provider_id,
+               appointment_date: appt.appointment_date,
+               duration: appt.duration, // Should exist on the base appt object from '*'
+               type: appt.type,       // Should exist on the base appt object from '*'
+               status: appt.status,
+               notes: appt.notes,
+               created_at: appt.created_at,
+               updated_at: appt.updated_at,
+               // Assign the processed provider data
+               provider: providerData,
+           };
+           return finalAppointment; // Ensure the map returns the correct type
+       }); // No final 'as' cast needed
+
+       console.log("Dashboard: Mapped upcoming appointments:", typedAppointments);
+       setUpcomingAppointments(typedAppointments);
     } catch (err) {
       console.error('Unexpected error in fetchUpcomingAppointments:', err);
       setUpcomingAppointments([]);

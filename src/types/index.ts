@@ -126,8 +126,8 @@ export type Appointment = {
   patient_id: string;
   provider_id: string;
   appointment_date: string;
-  duration: number;
-  type: string;
+  duration?: number;
+  type?: string;
   status: 'scheduled' | 'completed' | 'cancelled' | 'pending';
   notes?: string | null;
   created_at: string;

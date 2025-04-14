@@ -13,6 +13,8 @@
 *   **Form Handling:** React Hook Form (^7.50.1) with Zod (^3.22.4) for validation
 *   **Data Fetching:** Supabase Client Library, React Server Components / Server Actions, Fetch API
 *   **Backend/Database:** Supabase (PostgreSQL)
+*   **ORM:** Drizzle ORM (Schema defined in `src/lib/db/schema.ts`)
+*   **Database Migrations:** Drizzle Kit (`drizzle-kit` via `npx drizzle-kit generate`, config: `drizzle.config.js`, output: `./drizzle`)
 *   **Authentication:** Supabase Auth (@supabase/auth-helpers-nextjs ^0.9.0)
 *   **Language:** TypeScript
 *   **Package Manager:** npm (or Yarn - confirm from lock file if needed)
