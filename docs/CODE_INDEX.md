@@ -26,7 +26,6 @@ src/
 │   │       ├── profile/           # User profile
 │   │       ├── provider/          # Provider information
 │   │       ├── settings/          # User settings
-│   │       ├── treatment-plans/   # Treatment plan management
 │   │       └── treatments/        # Treatment information
 │   ├── (provider)/         # Provider-specific pages
 │   └── api/                # API routes
@@ -95,7 +94,7 @@ The application uses a combination of React Context API and local component stat
    - Session is synchronized between tabs using authSync.ts
 
 2. **Data Caching Strategy**:
-   - Treatment and appointment data is cached using in-memory techniques
+   - Package, benefit, and appointment data is cached using in-memory techniques
    - Cache expires after a configurable timeframe (typically 5 minutes)
    - Force refresh options allow bypassing the cache when needed
 
@@ -173,7 +172,7 @@ For better user experience, the application uses optimistic updates for common o
 - **Appointments**: Appointment scheduling and history
 - **Treatments**: Available treatments and information
 - **Treatment Plans**: Active and historical treatment plans
-- **Packages**: Treatment packages available for purchase
+- **Packages**: Benefit/Treatment packages available for verification/purchase
 - **Messages**: Secure messaging between patients and providers
 - **Notifications**: User notifications center
 - **Education**: Educational resources for patients
@@ -208,13 +207,13 @@ Below is a visual representation of the key component dependencies in the applic
     ┌───────┴────────┬───────────────┬───────────────┐
     ▼                ▼               ▼               ▼
 ┌─────────┐    ┌─────────┐    ┌─────────────┐  ┌─────────────┐
-│ Profile │    │Treatment│    │Appointments │  │   Other     │
+│ Profile │    │ Package │    │Appointments │  │   Other     │
 │  Page   │    │  Pages  │    │    Page     │  │  Dashboard  │
 └────┬────┘    └────┬────┘    └──────┬──────┘  │    Pages    │
      │              │                │         └─────────────┘
      ▼              ▼                ▼
 ┌─────────┐    ┌─────────┐    ┌─────────────┐
-│ Gravatar│    │Treatment│    │Appointment  │
+│ Gravatar│    │ Package │    │Appointment  │
 │ Support │    │  Cards  │    │   Cards     │
 └─────────┘    └─────────┘    └─────────────┘
 ```
@@ -246,7 +245,7 @@ Below is a visual representation of the key component dependencies in the applic
 
 7. **Dashboard Home**
    - Depends on: AuthContext, Navigation, various card components
-   - Uses: AppointmentCard, TreatmentPlanCard, Notifications
+   - Uses: AppointmentCard, PackageCard, Notifications
 
 ## Backend Integration
 

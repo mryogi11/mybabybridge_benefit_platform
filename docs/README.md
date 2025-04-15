@@ -100,13 +100,12 @@ npm start
 ## Features
 
 - **User Dashboards**: Patient and provider dashboards with role-specific views
-- **Treatment Plans**: Creation, tracking, and analytics for fertility treatment plans
 - **Appointment Management**: Scheduling, history, and reminders
 - **Secure Messaging**: Communication between patients and providers
 - **Educational Resources**: Curated content for fertility education
 - **Analytics**: Treatment success metrics and insights
 - **Payments**: Integration with payment processing
-- **Benefit Verification**: Employer/health plan benefit verification and package management
+- **Benefit Verification**: Employer/health plan benefit verification and package management (replaces previous Treatment Plans concept)
 
 ## Prerequisites
 

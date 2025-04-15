@@ -54,13 +54,12 @@ The application uses Supabase for authentication with the following key componen
 ## Key Features
 
 1. **User Dashboards**: Patient and provider dashboards with role-specific views
-2. **Treatment Plans**: Creation, tracking, and analytics for fertility treatment plans
-3. **Appointment Management**: Scheduling, history, and reminders
-4. **Secure Messaging**: Communication between patients and providers
-5. **Educational Resources**: Curated content for fertility education
-6. **Analytics**: Treatment success metrics and insights
-7. **Payments**: Integration with payment processing (Status: In Development / Partially Implemented)
-8. **Benefit Verification**: Employer/health plan benefit verification and package management (Status: Planning / Implementation guide in `docs/BENEFIT_MODULE_GUIDE.md`)
+2. **Appointment Management**: Scheduling, history, and reminders
+3. **Secure Messaging**: Communication between patients and providers
+4. **Educational Resources**: Curated content for fertility education
+5. **Analytics**: Treatment success metrics and insights
+6. **Payments**: Integration with payment processing (Status: In Development / Partially Implemented)
+7. **Benefit Verification**: Employer/health plan benefit verification and package management (Replaces previous Treatment Plans concept. Status: Planning / Implementation guide in `docs/BENEFIT_MODULE_GUIDE.md`)
 
 ## Development Work Completed
 
@@ -69,7 +68,7 @@ The application uses Supabase for authentication with the following key componen
 3. ✅ Implementation of authentication flow (login, register, session management)
 4. ✅ Creation of main application layouts and navigation
 5. ✅ Development of dashboard pages for patients and providers
-6. ✅ Implementation of treatment plan management features
+6. ❌ Implementation of treatment plan management features (Superseded by Benefit/Package module)
 7. ✅ Addition of appointment scheduling and history views
 8. ✅ Integration of MyBabyBridge branding and logo
 9. ✅ Responsive design for mobile and desktop
@@ -167,20 +166,20 @@ The database schema is managed exclusively via **Drizzle ORM**. The previous wor
 *   `appointments`: Links providers and patients, stores appointment details.
 *   `provider_weekly_schedules`: Defines provider availability.
 *   `provider_time_blocks`: Defines specific unavailable times for providers.
-*   Other tables related to treatments, messages, documents, etc., are also defined in the schema file.
+*   Other tables related to messages, documents, etc., are also defined in the schema file. (Note: Treatment-related tables may be deprecated/removed due to Benefit module replacing Treatment Plans).
 
 **Important:** Always review generated SQL migrations carefully before applying them manually to avoid unintended data loss or schema conflicts.
 
 ## Next Steps and Future Work
 
-1. Complete payment integration with Stripe
-2. Implement real-time notifications
-3. Enhance analytics dashboards for providers
-4. Add document upload and management
-5. Implement email notifications for important events
-6. Create a mobile application using React Native
-7. Expand treatment plan tracking features
-8. Add more detailed IVF-specific workflow tracking
+1. **Implement Benefit Verification Module**: Follow guide in `docs/BENEFIT_MODULE_GUIDE.md`
+2. Complete payment integration with Stripe
+3. Implement real-time notifications
+4. Enhance analytics dashboards for providers
+5. Add document upload and management
+6. Implement email notifications for important events
+7. Create a mobile application using React Native
+8. Add more detailed IVF-specific workflow tracking (Potentially part of Package details)
 9. Implement two-factor authentication for enhanced security
 10. Create provider-specific dashboards with patient management
 

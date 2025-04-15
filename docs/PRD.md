@@ -36,18 +36,12 @@
     - **UI Guidelines:** Use Modern Material UI components for forms and buttons
 
 ### 2. **Patient Dashboard**
-  - **Description:** A personalized dashboard for patients to view their treatment milestones.
+  - **Description:** A personalized dashboard for patients to view their selected package and related progress.
   - **Requirements:**
-    - Display packages purchased
-    - Show ongoing treatments
-    - Indicate completed treatments
-    - Provide real-time updates on treatment progress
-    - Treatment Milestones Tracking:
-      - Patient Details
-      - Initial Consultation
-      - Treatment Phase
-      - Prenatal Care
-    - **UI Guidelines:** Utilize Material UI's grid system for layout and cards for displaying treatment milestones
+    - Display packages purchased/selected
+    - Show progress related to the selected package (e.g., appointment usage, next steps)
+    - Provide real-time updates relevant to package status and next actions.
+    - **UI Guidelines:** Utilize Material UI's grid system for layout and cards for displaying package information and progress.
 
 ### 3. **Package Selection**
   - **Description:** Patients can browse and purchase different fertility treatment packages created by admins.
@@ -125,7 +119,7 @@
   - **Requirements:**
     - Email notifications for key events
     - In-app notifications for logged-in users
-    - Treatment milestone notifications
+    - Package-related notifications (e.g., verification status, next steps)
     - Package expiry notifications
     - **UI Guidelines:** Use Material UI's snackbar for in-app notifications
 
@@ -172,11 +166,11 @@ The analytics module provides comprehensive insights into the platform's perform
 - User acquisition channels
 
 #### 4. Treatment Analytics
-- Treatment type distribution
-- Success rates by treatment type
-- Treatment duration analysis
-- Treatment completion rates
-- Treatment abandonment rates
+- Package type distribution
+- Success rates by package type (?)
+- Package duration analysis
+- Package completion rates (?)
+- Package abandonment rates (?)
 
 #### 5. Performance Metrics
 - Platform usage statistics
@@ -328,7 +322,7 @@ fertility-care-platform/
   - `created_at`
   - `updated_at`
 
-- **Treatments Table:**
+- **Treatments Table:** (Note: This table is likely deprecated/to be removed due to Benefit module replacing Treatment Plans)
   - `id` (primary key)
   - `patient_package_id` (foreign key referencing PatientPackages)
   - `milestone` (enum: 'patient_details', 'initial_consultation', 'treatment_phase', 'prenatal_care')
@@ -353,10 +347,10 @@ fertility-care-platform/
   - `DELETE /api/packages/:id`: Delete package (admin only)
 
 - **Patient Dashboard Endpoints:**
-  - `GET /api/patient/dashboard`: Get patient dashboard data
-  - `POST /api/patient/packages`: Purchase a package
-  - `GET /api/patient/treatments`: Get patient treatments
-  - `PUT /api/patient/treatments/:id`: Update treatment status
+  - `GET /api/patient/dashboard`: Get patient dashboard data (focused on package/benefits)
+  - `POST /api/patient/packages`: Purchase/Select a package
+  - `GET /api/patient/benefit/status`: Check benefit verification status
+  - `POST /api/patient/benefit/verify`: Submit information for verification
 
 - **Admin Endpoints:**
   - `GET /api/admin/users`: List all users
@@ -405,10 +399,10 @@ fertility-care-platform/
    - Set up analytics dashboard
 
 4. **Develop Patient Dashboard:**
-   - Create dashboard UI
-   - Implement treatment milestone tracking
-   - Set up package purchase flow
-   - Create notification system
+   - Create dashboard UI (focused on selected Benefit/Package)
+   - Implement package progress tracking/display
+   - Set up package purchase/selection flow (Post-verification)
+   - Create notification system (focused on package/benefit events)
 
 5. **Integrate Payment Gateway:**
    - Set up Stripe integration
