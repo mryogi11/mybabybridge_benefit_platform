@@ -25,8 +25,8 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EmailIcon from '@mui/icons-material/Email'; // Added EmailIcon
-import EditIcon from '@mui/icons-material/Edit'; // Added EditIcon (for future use)
-import DeleteIcon from '@mui/icons-material/Delete'; // Added DeleteIcon
+// import EditIcon from '@mui/icons-material/Edit'; // REMOVE EditIcon
+// import DeleteIcon from '@mui/icons-material/Delete'; // REMOVE DeleteIcon
 import { getOrganizations } from '@/actions/adminActions'; // Import server action
 import type { organizations as OrganizationTableType } from '@/lib/db/schema'; // Import type from schema
 
@@ -38,7 +38,7 @@ export default function AdminOrganizationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // State for the modal
+  // State for the Add modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newOrgName, setNewOrgName] = useState('');
   const [newOrgDomain, setNewOrgDomain] = useState('');
@@ -46,22 +46,18 @@ export default function AdminOrganizationsPage() {
   const [addModalError, setAddModalError] = useState<string | null>(null);
   const [showAddSuccessSnackbar, setShowAddSuccessSnackbar] = useState(false);
 
-  // Edit Modal State
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
-  const [editOrgName, setEditOrgName] = useState('');
-  const [editOrgDomain, setEditOrgDomain] = useState('');
-  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
-  const [editModalError, setEditModalError] = useState<string | null>(null);
-  const [showEditSuccessSnackbar, setShowEditSuccessSnackbar] = useState(false);
+  // REMOVED Edit Modal State
+  /* ... */
 
-  // Delete Dialog State
+  // REMOVE Delete Dialog State
+  /*
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deletingOrgId, setDeletingOrgId] = useState<string | null>(null);
   const [deletingOrgName, setDeletingOrgName] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showDeleteSuccessSnackbar, setShowDeleteSuccessSnackbar] = useState(false);
+  */
 
   useEffect(() => {
     fetchOrgs();
@@ -85,7 +81,7 @@ export default function AdminOrganizationsPage() {
     }
   };
 
-  // Modal Handlers
+  // Add Modal Handlers
   const handleOpenAddModal = () => {
     setIsAddModalOpen(true);
     setNewOrgName('');
@@ -124,53 +120,11 @@ export default function AdminOrganizationsPage() {
     }
   };
 
-  // Edit Modal Handlers
-  const handleOpenEditModal = (org: Organization) => {
-    setEditingOrg(org);
-    setEditOrgName(org.name);
-    setEditOrgDomain(org.domain || '');
-    setEditModalError(null);
-    setIsEditModalOpen(true);
-  };
+  // REMOVED Edit Modal Handlers
+  /* ... */
 
-  const handleCloseEditModal = () => {
-    if (isSubmittingEdit) return;
-    setIsEditModalOpen(false);
-    setEditingOrg(null);
-  };
-
-  const handleEditOrganization = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!editingOrg) return;
-    setIsSubmittingEdit(true);
-    setEditModalError(null);
-    try {
-      // Call the PUT API endpoint
-      const response = await fetch(`/api/admin/organizations/${editingOrg.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-              name: editOrgName, 
-              domain: editOrgDomain || undefined 
-          }),
-      });
-      const result = await response.json();
-      if (!response.ok || !result.success) {
-           let errorMessage = result.message || `HTTP error! status: ${response.status}`;
-           if (result.errors?._errors?.length) errorMessage = result.errors._errors.join(', ');
-           throw new Error(errorMessage);
-      }
-      handleCloseEditModal();
-      setShowEditSuccessSnackbar(true);
-      fetchOrgs(); // Refetch list
-    } catch (err) {
-      setEditModalError(err instanceof Error ? err.message : 'Failed to update organization');
-    } finally {
-      setIsSubmittingEdit(false);
-    }
-  };
-
-  // Delete Dialog Handlers
+  // REMOVE Delete Dialog Handlers
+  /*
   const handleOpenDeleteDialog = (org: Organization) => {
     setDeletingOrgId(org.id);
     setDeletingOrgName(org.name);
@@ -206,6 +160,7 @@ export default function AdminOrganizationsPage() {
       setIsDeleting(false);
     }
   };
+  */
 
   if (loading && organizations.length === 0) { // Show loading only initially
     return (
@@ -248,14 +203,7 @@ export default function AdminOrganizationsPage() {
               <ListItem
                  secondaryAction={
                    <Stack direction="row" spacing={0.5}> {/* Use Stack for button group */}
-                     <IconButton 
-                       edge="end" 
-                       aria-label="edit" 
-                       title="Edit Organization"
-                       onClick={() => handleOpenEditModal(org)}
-                     >
-                       <EditIcon />
-                     </IconButton>
+                     {/* REMOVED EDIT BUTTON */}
                      <IconButton 
                        edge="end" 
                        aria-label="manage emails" 
@@ -265,6 +213,8 @@ export default function AdminOrganizationsPage() {
                      >
                        <EmailIcon />
                      </IconButton>
+                     {/* REMOVE DELETE BUTTON */}
+                     {/*
                      <IconButton 
                        edge="end" 
                        aria-label="delete" 
@@ -273,6 +223,7 @@ export default function AdminOrganizationsPage() {
                      >
                        <DeleteIcon />
                      </IconButton>
+                      */}
                    </Stack>
                  }
               >
@@ -333,26 +284,11 @@ export default function AdminOrganizationsPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Edit Organization Modal */}
-      <Dialog open={isEditModalOpen} onClose={handleCloseEditModal} PaperProps={{ component: 'form', onSubmit: handleEditOrganization }}>
-        <DialogTitle>Edit Organization</DialogTitle>
-        <DialogContent>
-          {editModalError && <Alert severity="error" sx={{ mb: 2 }}>{editModalError}</Alert>}
-          <DialogContentText sx={{ mb: 2 }}>
-            Update the details for {editingOrg?.name || 'the organization'}.
-          </DialogContentText>
-          <TextField autoFocus required margin="dense" id="edit-name" label="Organization Name" type="text" fullWidth variant="outlined" value={editOrgName} onChange={(e) => setEditOrgName(e.target.value)} disabled={isSubmittingEdit} />
-          <TextField margin="dense" id="edit-domain" label="Domain (Optional)" helperText="e.g., example.com" type="text" fullWidth variant="outlined" value={editOrgDomain} onChange={(e) => setEditOrgDomain(e.target.value)} disabled={isSubmittingEdit} />
-        </DialogContent>
-        <DialogActions sx={{ p: '16px 24px'}}>
-          <Button onClick={handleCloseEditModal} disabled={isSubmittingEdit}>Cancel</Button>
-          <Button type="submit" variant="contained" disabled={isSubmittingEdit || !editOrgName}>
-            {isSubmittingEdit ? <CircularProgress size={24} color="inherit" /> : 'Save Changes'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* REMOVED Edit Organization Modal */}
+      {/* ... */}
 
-      {/* Delete Confirmation Dialog */}
+      {/* REMOVE Delete Confirmation Dialog */}
+      {/*
       <Dialog
         open={isDeleteDialogOpen}
         onClose={handleCloseDeleteDialog}
@@ -372,11 +308,12 @@ export default function AdminOrganizationsPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      */}
 
        {/* Success Snackbars */}
        <Snackbar open={showAddSuccessSnackbar} autoHideDuration={4000} onClose={() => setShowAddSuccessSnackbar(false)} message="Organization added successfully!" />
-       <Snackbar open={showEditSuccessSnackbar} autoHideDuration={4000} onClose={() => setShowEditSuccessSnackbar(false)} message="Organization updated successfully!" />
-       <Snackbar open={showDeleteSuccessSnackbar} autoHideDuration={4000} onClose={() => setShowDeleteSuccessSnackbar(false)} message="Organization deleted successfully!" />
+       {/* REMOVED Edit Snackbar */}
+       {/* <Snackbar open={showDeleteSuccessSnackbar} autoHideDuration={4000} onClose={() => setShowDeleteSuccessSnackbar(false)} message="Organization deleted successfully!" /> */}{/* REMOVE Delete Snackbar */}
 
     </Box>
   );
