@@ -169,11 +169,12 @@ This implementation provides a user-friendly approach to fertility benefit verif
 
 ### Pending Items / Potential Enhancements:
 
+*   **Admin Edit/Delete Functionality (Organizations):** Temporarily removed due to persistent Next.js 15.x build errors related to PUT/DELETE handlers on dynamic API routes (`/api/admin/organizations/[orgId]`). Needs to be re-implemented, potentially by refactoring routes (e.g., using POST for updates/deletes) or waiting for a fix in Next.js.
+*   **Admin Edit/Delete Functionality (Approved Emails):** Frontend logic for deleting emails is implemented, but full Edit capability is pending.
 *   **Real Verification Logic:** Implement robust verification beyond the basic email check in `submitVerificationInfo`.
 *   **Dynamic Package Filtering:** Update `getBenefitPackages` to filter based on the user's *actual* verified organization and status.
 *   **Stripe Webhooks:** Implement webhook handler for reliable payment confirmation (e.g., `payment_intent.succeeded`).
 *   **User Profile Update:** Update `patient_profiles` table with verified info after successful setup.
-*   **Admin Functionality:** Add delete/edit capabilities for organizations and emails.
 *   **UI/UX Refinements:** Improve loading states, error handling, and edge case management.
 *   **Thorough Testing:** Conduct end-to-end testing of all user paths.
 
