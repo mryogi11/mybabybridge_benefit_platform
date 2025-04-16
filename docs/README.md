@@ -1,3 +1,4 @@
+
 # MyBabyBridge Fertility Care Platform
 
 A comprehensive fertility care platform for connecting patients with providers, tracking treatment plans, and providing educational resources.
@@ -162,7 +163,6 @@ src/
 
 ## License
 
-This project is private and confidential.
 
 ## Getting Started
 
@@ -204,4 +204,6 @@ Ensure your `.env.local` file contains the `DATABASE_URL` variable pointing to y
 DATABASE_URL="postgres://<user>:<password>@<host>:<port>/postgres?pgbouncer=true&connection_limit=1"
 ```
 
-**Important:** Do *not* use the standard Supabase CLI migration commands (`
+**Important:** Do *not* use the standard Supabase CLI migration commands (`npx supabase db reset`, `npx supabase migration up`, `npx supabase link`, etc.) as they are incompatible with the Drizzle workflow used in this project and may cause issues.
+
+## Learn More 
