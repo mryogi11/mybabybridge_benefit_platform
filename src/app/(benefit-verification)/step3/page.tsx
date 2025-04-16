@@ -1,0 +1,327 @@
+'use client';
+
+import React, { useState, useTransition, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import {
+    Box,
+    Typography,
+    TextField,
+    Button,
+    Stepper,
+    Step,
+    StepLabel,
+    Container,
+    Grid,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
+    CircularProgress,
+    Alert
+} from '@mui/material';
+
+import { submitVerificationInfo } from '@/actions/benefitActions';
+import { useBenefitVerification } from '@/contexts/BenefitVerificationContext';
+
+// Zod schema for validation
+const personalInfoSchema = z.object({
+    firstName: z.string().min(1, 'First name is required'),
+    lastName: z.string().min(1, 'Last name is required'),
+    dobMonth: z.string().min(1, 'Month is required'),
+    dobDay: z.string().regex(/^\d{1,2}$/, 'Invalid day').transform(Number).refine(v => v >= 1 && v <= 31, 'Invalid day'),
+    dobYear: z.string().regex(/^\d{4}$/, 'Invalid year').transform(Number).refine(v => v >= 1900 && v <= new Date().getFullYear(), 'Invalid year'),
+    // Basic phone validation - could be enhanced
+    countryCode: z.string().min(1, 'Country code required'), 
+    phoneNumber: z.string().min(5, 'Phone number is required').regex(/^[\d\s\-\(\)]+$/, 'Invalid phone number'),
+});
+
+type PersonalInfoFormData = z.infer<typeof personalInfoSchema>;
+
+const steps = ['Benefit Verification', 'Organization Search', 'Personal Information', 'Package Selection'];
+const months = [
+    { value: '01', label: 'January' }, { value: '02', label: 'February' }, { value: '03', label: 'March' },
+    { value: '04', label: 'April' }, { value: '05', label: 'May' }, { value: '06', label: 'June' },
+    { value: '07', label: 'July' }, { value: '08', label: 'August' }, { value: '09', label: 'September' },
+    { value: '10', label: 'October' }, { value: '11', label: 'November' }, { value: '12', label: 'December' },
+];
+// TODO: Add more comprehensive country code list
+const countryCodes = [{ value: '+1', label: '+1 (USA/CAN)' }, { value: '+44', label: '+44 (UK)' }];
+
+export default function PersonalInfoScreen() {
+    const router = useRouter();
+    const { sponsoringOrganizationId, setBenefitStatus } = useBenefitVerification();
+    const [error, setError] = useState<string | null>(null);
+    const [isPending, startTransition] = useTransition();
+    
+    // Check if orgId is available from context
+    const isOrgIdMissing = !sponsoringOrganizationId;
+
+    const {
+        control,
+        handleSubmit,
+        formState: { errors, isValid },
+    } = useForm<PersonalInfoFormData>({
+        resolver: zodResolver(personalInfoSchema),
+        mode: 'onChange', // Validate on change for better UX
+        defaultValues: {
+            firstName: '',
+            lastName: '',
+            dobMonth: '',
+            dobDay: undefined,
+            dobYear: undefined,
+            countryCode: '+1', // Default to +1
+            phoneNumber: '',
+        },
+    });
+
+    const onSubmit = (data: PersonalInfoFormData) => {
+        if (isOrgIdMissing) {
+            setError("Sponsoring organization not selected. Please go back.");
+            return;
+        }
+        setError(null);
+        startTransition(async () => {
+            // Construct full DOB and phone
+            const dateOfBirth = `${data.dobYear}-${data.dobMonth}-${String(data.dobDay).padStart(2, '0')}`;
+            const fullPhoneNumber = `${data.countryCode}${data.phoneNumber.replace(/\D/g, '')}`; // Clean phone number
+
+            // Prepare data for server action
+            const verificationData = {
+                sponsoringOrganizationId: sponsoringOrganizationId, // Use context value
+                firstName: data.firstName,
+                lastName: data.lastName,
+                dateOfBirth: dateOfBirth, 
+                phoneNumber: fullPhoneNumber,
+                workEmail: '' // Work email collected in next step, pass empty for now
+            };
+
+            // Call server action
+            const result = await submitVerificationInfo(verificationData);
+
+            if (result.success) {
+                // Update context with the final status from the action
+                setBenefitStatus(result.verificationStatus || 'declined'); 
+
+                // Navigate based on the returned status
+                if (result.verificationStatus === 'verified') {
+                    // Verification successful, proceed to optional work email step
+                    router.push('/step4'); 
+                } else { 
+                    // Verification failed ('declined') or other status
+                    // Navigate to package selection (Step 5), potentially passing status info
+                    // TODO: Decide if we need to pass status via query param or if step 5 should check context
+                    console.log("Verification not successful (", result.verificationStatus,"). Navigating to package options.");
+                    router.push('/step5'); 
+                }
+            } else {
+                // Action itself failed (e.g., database error)
+                setError(result.message || 'Failed to submit verification information.');
+                setBenefitStatus('declined'); // Set status to declined on error
+            }
+        });
+    };
+
+    return (
+        <Container maxWidth="sm">
+            <Box sx={{ width: '100%', my: 4 }}>
+                <Stepper activeStep={2} alternativeLabel sx={{ mb: 4 }}>
+                    {steps.map((label) => (
+                        <Step key={label}>
+                            <StepLabel>{label}</StepLabel>
+                        </Step>
+                    ))}
+                </Stepper>
+
+                <Typography variant="h4" component="h1" gutterBottom align="center">
+                    Let's verify your information for benefit eligibility
+                </Typography>
+                <Typography variant="subtitle1" gutterBottom align="center" sx={{ mb: 3 }}>
+                    Please use the information your organization has on file
+                </Typography>
+
+                {error && (
+                    <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+                )}
+
+                {isOrgIdMissing && (
+                     <Alert severity="warning" sx={{ mb: 2 }}>Could not determine sponsoring organization. Please go back.</Alert>
+                )}
+
+                <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate sx={{ mt: 1 }}>
+                    <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6}>
+                            <Controller
+                                name="firstName"
+                                control={control}
+                                render={({ field }) => (
+                                    <TextField
+                                        {...field}
+                                        required
+                                        fullWidth
+                                        id="firstName"
+                                        label="First Name"
+                                        autoComplete="given-name"
+                                        error={!!errors.firstName}
+                                        helperText={errors.firstName?.message}
+                                        disabled={isPending || isOrgIdMissing}
+                                    />
+                                )}
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <Controller
+                                name="lastName"
+                                control={control}
+                                render={({ field }) => (
+                                    <TextField
+                                        {...field}
+                                        required
+                                        fullWidth
+                                        id="lastName"
+                                        label="Last Name"
+                                        autoComplete="family-name"
+                                        error={!!errors.lastName}
+                                        helperText={errors.lastName?.message}
+                                        disabled={isPending || isOrgIdMissing}
+                                    />
+                                )}
+                            />
+                        </Grid>
+                        
+                        {/* Date of Birth Fields */}
+                        <Grid item xs={12}>
+                             <Typography variant="subtitle2" gutterBottom>Date of Birth</Typography>
+                        </Grid>
+                         <Grid item xs={5} >
+                             <Controller
+                                name="dobMonth"
+                                control={control}
+                                render={({ field }) => (
+                                    <FormControl fullWidth error={!!errors.dobMonth} disabled={isPending || isOrgIdMissing}>
+                                        <InputLabel id="dob-month-label">Month</InputLabel>
+                                        <Select
+                                            {...field}
+                                            labelId="dob-month-label"
+                                            id="dobMonth"
+                                            label="Month"
+                                        >
+                                            {months.map((month) => (
+                                                <MenuItem key={month.value} value={month.value}>{month.label}</MenuItem>
+                                            ))}
+                                        </Select>
+                                        {errors.dobMonth && <Typography color="error" variant="caption">{errors.dobMonth.message}</Typography>}
+                                    </FormControl>
+                                )}
+                             />
+                        </Grid>
+                         <Grid item xs={3}>
+                             <Controller
+                                name="dobDay"
+                                control={control}
+                                render={({ field }) => (
+                                    <TextField
+                                        {...field}
+                                        required
+                                        fullWidth
+                                        id="dobDay"
+                                        label="Day"
+                                        type="number" 
+                                        inputProps={{ maxLength: 2 }}
+                                        error={!!errors.dobDay}
+                                        helperText={errors.dobDay?.message}
+                                        disabled={isPending || isOrgIdMissing}
+                                    />
+                                )}
+                             />
+                        </Grid>
+                        <Grid item xs={4}>
+                            <Controller
+                                name="dobYear"
+                                control={control}
+                                render={({ field }) => (
+                                    <TextField
+                                        {...field}
+                                        required
+                                        fullWidth
+                                        id="dobYear"
+                                        label="Year"
+                                        type="number"
+                                        inputProps={{ maxLength: 4 }}
+                                        error={!!errors.dobYear}
+                                        helperText={errors.dobYear?.message}
+                                        disabled={isPending || isOrgIdMissing}
+                                    />
+                                )}
+                            />
+                        </Grid>
+
+                        {/* Phone Number Fields */}
+                         <Grid item xs={12}>
+                             <Typography variant="subtitle2" gutterBottom sx={{ mt: 1 }}>Phone Number</Typography>
+                        </Grid>
+                         <Grid item xs={4}>
+                             <Controller
+                                name="countryCode"
+                                control={control}
+                                render={({ field }) => (
+                                    <FormControl fullWidth error={!!errors.countryCode} disabled={isPending || isOrgIdMissing}>
+                                        <InputLabel id="country-code-label">Code</InputLabel>
+                                        <Select
+                                            {...field}
+                                            labelId="country-code-label"
+                                            id="countryCode"
+                                            label="Code"
+                                        >
+                                            {countryCodes.map((code) => (
+                                                <MenuItem key={code.value} value={code.value}>{code.label}</MenuItem>
+                                            ))}
+                                        </Select>
+                                         {errors.countryCode && <Typography color="error" variant="caption">{errors.countryCode.message}</Typography>}
+                                    </FormControl>
+                                )}
+                            />
+                        </Grid>
+                         <Grid item xs={8}>
+                             <Controller
+                                name="phoneNumber"
+                                control={control}
+                                render={({ field }) => (
+                                    <TextField
+                                        {...field}
+                                        required
+                                        fullWidth
+                                        id="phoneNumber"
+                                        label="Phone Number"
+                                        autoComplete="tel-national"
+                                        error={!!errors.phoneNumber}
+                                        helperText={errors.phoneNumber?.message}
+                                        disabled={isPending || isOrgIdMissing}
+                                    />
+                                )}
+                            />
+                        </Grid>
+                    </Grid>
+
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={!isValid || isPending || isOrgIdMissing}
+                             sx={{ 
+                                py: 1.5, 
+                                px: 5,
+                                textTransform: 'none'
+                            }}
+                             startIcon={isPending ? <CircularProgress size={20} color="inherit" /> : null}
+                        >
+                             {isPending ? 'Submitting...' : 'Next'}
+                        </Button>
+                    </Box>
+                </Box>
+            </Box>
+        </Container>
+    );
+} 

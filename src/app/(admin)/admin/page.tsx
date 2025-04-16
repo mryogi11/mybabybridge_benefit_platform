@@ -167,10 +167,11 @@ export default function AdminDashboardPage() {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'in_progress');
 
-      const { data: packagePrices } = await supabase
+      // Fetch total revenue (Example: Sum of all package prices)
+      const { data: packagePrices, error: priceError } = await supabase
         .from('packages')
-        .select('price');
-      const totalRevenue = packagePrices?.reduce((sum, pkg) => sum + Number(pkg.price || 0), 0) || 0;
+        .select('monthly_cost'); // Use monthly_cost instead of price
+      const totalRevenue = packagePrices?.reduce((sum, pkg) => sum + (pkg.monthly_cost || 0), 0) || 0; // Use monthly_cost
 
       setStats({
         totalUsers: usersCount || 0,

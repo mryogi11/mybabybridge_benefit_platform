@@ -1,9 +1,12 @@
 'use server';
 
-import { createServerActionClient } from '@supabase/auth-helpers-nextjs';
+// Remove auth-helpers import
+// import { createServerActionClient } from '@supabase/auth-helpers-nextjs';
+import { createServerClient } from '@supabase/ssr'; // Use ssr
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { UserRole } from '@/types';
+import type { Database } from '@/types/supabase'; // Assuming Database type
 // Removed Database import temporarily - Please provide correct path later
 // import { Database } from '@/lib/supabase/database.types'; 
 
@@ -21,12 +24,15 @@ interface NewUserData {
 }
 
 export async function createUserAction(userData: NewUserData): Promise<{ success: boolean; error?: string }> {
-    // Client for database operations (can use RLS if needed, though service role bypasses it)
-    // Removed <Database> type temporarily
-    const supabase = createServerActionClient({ cookies });
+    // Removed unused server action client based on ssr
+    // const cookieStore = cookies();
+    // const supabase = createServerClient<Database>(
+    //     process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    //     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    //     { /* cookies config */ }
+    // );
 
-    // Direct Admin Client using Service Role Key from environment variables
-    // Ensure these are set in your .env.local or server environment!
+    // Admin client using Service Role remains the same
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -35,8 +41,7 @@ export async function createUserAction(userData: NewUserData): Promise<{ success
         return { success: false, error: "Server configuration error." };
     }
 
-    // Removed <Database> type temporarily
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
+    const supabaseAdmin = createClient<Database>(supabaseUrl!, serviceKey!, {
         auth: { 
             autoRefreshToken: false, 
             persistSession: false 

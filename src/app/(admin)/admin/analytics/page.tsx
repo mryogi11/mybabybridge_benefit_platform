@@ -21,7 +21,8 @@ import {
   Pie,
   Cell,
 } from 'recharts';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserClient } from '@supabase/ssr';
+import type { Database } from '@/types/supabase';
 
 interface AnalyticsData {
   revenueByMonth: { month: string; revenue: number }[];
@@ -36,46 +37,51 @@ export default function AdminAnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const supabase = createClientComponentClient();
+  const [supabase] = useState(() => createBrowserClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  ));
 
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
         // Fetch revenue by month
-        const { data: revenueData, error: revenueError } = await supabase
-          .from('payments')
-          .select('amount, created_at')
-          .order('created_at');
+        // const { data: revenueData, error: revenueError } = await supabase
+        //   .from('payments')
+        //   .select('amount, created_at')
+        //   .order('created_at');
 
-        if (revenueError) throw revenueError;
+        // if (revenueError) throw revenueError;
 
-        const revenueByMonth = revenueData.reduce((acc: { month: string; revenue: number }[], payment) => {
-          const month = new Date(payment.created_at).toLocaleString('default', { month: 'short' });
-          const existingMonth = acc.find((item) => item.month === month);
+        // const revenueByMonth = revenueData.reduce((acc: { month: string; revenue: number }[], payment) => {
+        //   const month = new Date(payment.created_at).toLocaleString('default', { month: 'short' });
+        //   const existingMonth = acc.find((item) => item.month === month);
           
-          if (existingMonth) {
-            existingMonth.revenue += Number(payment.amount);
-          } else {
-            acc.push({ month, revenue: Number(payment.amount) });
-          }
+        //   if (existingMonth) {
+        //     existingMonth.revenue += Number(payment.amount);
+        //   } else {
+        //     acc.push({ month, revenue: Number(payment.amount) });
+        //   }
           
-          return acc;
-        }, []);
+        //   return acc;
+        // }, []);
+        const revenueByMonth: { month: string; revenue: number }[] = []; // Provide empty array as default
 
         // Fetch treatments by type
         const { data: treatmentsData, error: treatmentsError } = await supabase
           .from('treatment_plans')
-          .select('type');
+          .select('title');
 
         if (treatmentsError) throw treatmentsError;
 
         const treatmentsByType = treatmentsData.reduce((acc: { name: string; value: number }[], treatment) => {
-          const existingType = acc.find((item) => item.name === treatment.type);
+          const typeName = treatment.title || 'Unknown Type';
+          const existingType = acc.find((item) => item.name === typeName);
           
           if (existingType) {
             existingType.value += 1;
           } else {
-            acc.push({ name: treatment.type, value: 1 });
+            acc.push({ name: typeName, value: 1 });
           }
           
           return acc;
@@ -83,12 +89,13 @@ export default function AdminAnalyticsPage() {
 
         // Fetch user growth
         const { data: usersData, error: usersError } = await supabase
-          .from('profiles')
+          .from('users')
           .select('created_at');
 
         if (usersError) throw usersError;
 
         const userGrowth = usersData.reduce((acc: { month: string; users: number }[], user) => {
+          if (!user.created_at) return acc;
           const month = new Date(user.created_at).toLocaleString('default', { month: 'short' });
           const existingMonth = acc.find((item) => item.month === month);
           
@@ -109,7 +116,7 @@ export default function AdminAnalyticsPage() {
         ];
 
         setData({
-          revenueByMonth,
+          revenueByMonth, // Use the empty array
           treatmentsByType,
           userGrowth,
           successRates,
@@ -157,18 +164,13 @@ export default function AdminAnalyticsPage() {
         <Grid container spacing={4}>
           {/* Revenue Chart */}
           <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Revenue by Month
-              </Typography>
-              <LineChart width={500} height={300} data={data.revenueByMonth}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="revenue" stroke="#8884d8" />
-              </LineChart>
+            <Paper sx={{ p: 3, minHeight: 380 }}> {/* Adjust size if needed */}
+              <Typography variant="h6" gutterBottom>Revenue by Month</Typography>
+              <Box display="flex" justifyContent="center" alignItems="center" height="100%">
+                <Typography variant="body1" color="textSecondary">
+                  (Payment data not available)
+                </Typography>
+              </Box>
             </Paper>
           </Grid>
 

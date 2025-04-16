@@ -1,5 +1,6 @@
 'use client';
-
+import { createBrowserClient } from '@supabase/ssr';
+import type { Database } from '@/types/supabase'; // If you use generated types
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -30,7 +31,6 @@ import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 // Define the type for a provider menu item (can be simpler if no sub-menus planned)
 interface ProviderMenuItemType {
@@ -99,7 +99,11 @@ export default function ProviderSideDrawerContent() {
   const router = useRouter();
   const [isNavigating, setIsNavigating] = useState(false);
   const [currentNavPath, setCurrentNavPath] = useState<string | null>(null);
-  const supabase = createClientComponentClient(); // Initialize supabase client
+       // Use createBrowserClient from @supabase/ssr
+       const [supabase] = useState(() => createBrowserClient<Database>( // Remove <Database> if you don't have the type
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      ));
 
   // Placeholder Logout Handler
   const handleLogout = async () => {

@@ -1,17 +1,32 @@
-import { loadStripe, Stripe } from '@stripe/stripe-js';
+import { loadStripe, Stripe as StripeJs } from '@stripe/stripe-js';
+import Stripe from 'stripe';
 
-let stripePromise: Promise<Stripe | null>;
+let stripeJsPromise: Promise<StripeJs | null>;
 
-export const getStripe = () => {
-  if (!stripePromise) {
-    stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('STRIPE_SECRET_KEY is missing in environment variables');
+}
+
+// Backend Stripe Client Instance
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: '2023-10-16', // Use API version expected by installed library types
+  typescript: true,
+});
+
+// Frontend Stripe Client Loader
+export const getStripe = (): Promise<StripeJs | null> => {
+  if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+    throw new Error('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is missing from environment variables.');
   }
-  return stripePromise;
+  if (!stripeJsPromise) {
+    stripeJsPromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+  }
+  return stripeJsPromise;
 };
 
 // This function needs to be used with Stripe Elements
 // For direct API calls, use the server-side API
-export const createPaymentMethod = async (elements: any, stripe: Stripe | null) => {
+export const createPaymentMethod = async (elements: any, stripe: StripeJs | null) => {
   if (!stripe || !elements) throw new Error('Stripe not initialized or Elements not available');
 
   const cardElement = elements.getElement('card');

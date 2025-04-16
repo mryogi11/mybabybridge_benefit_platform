@@ -32,12 +32,14 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
+import BusinessIcon from '@mui/icons-material/Business';
 
 const drawerWidth = 240;
 
 const adminNavItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/admin' },
   { text: 'Users', icon: <PeopleIcon />, path: '/admin/users' },
+  { text: 'Organizations', icon: <BusinessIcon />, path: '/admin/organizations' },
   { text: 'Packages', icon: <ShoppingCartIcon />, path: '/admin/packages' },
   { text: 'Settings', icon: <SettingsIcon />, path: '/admin/settings' },
 ];

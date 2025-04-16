@@ -45,8 +45,8 @@ export default function AdminAppointmentsPage() {
         .from('appointments')
         .select(`
           *,
-          patient:patient_profiles (id, user_id, first_name, last_name),
-          provider:providers (id, user_id, first_name, last_name, specialization)
+          patient_profiles (id, user_id, first_name, last_name),
+          providers (id, user_id, first_name, last_name, specialization)
         `)
         .order('appointment_date', { ascending: false }); // Default order
 

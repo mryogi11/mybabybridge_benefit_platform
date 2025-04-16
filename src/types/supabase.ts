@@ -7,31 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          operationName?: string
-          query?: string
-          variables?: Json
-          extensions?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       analytics_events: {
@@ -179,43 +154,63 @@ export type Database = {
         Row: {
           appointment_date: string
           created_at: string
+          duration: number | null
           id: string
           notes: string | null
           patient_id: string
           provider_id: string
-          status: string
+          status: Database["public"]["Enums"]["appointment_status"]
+          type: string | null
           updated_at: string
         }
         Insert: {
           appointment_date: string
           created_at?: string
+          duration?: number | null
           id?: string
           notes?: string | null
           patient_id: string
           provider_id: string
-          status: string
+          status: Database["public"]["Enums"]["appointment_status"]
+          type?: string | null
           updated_at?: string
         }
         Update: {
           appointment_date?: string
           created_at?: string
+          duration?: number | null
           id?: string
           notes?: string | null
           patient_id?: string
           provider_id?: string
-          status?: string
+          status?: Database["public"]["Enums"]["appointment_status"]
+          type?: string | null
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "appointments_patient_user_id_fkey"
+            foreignKeyName: "appointments_patient_id_users_id_fk"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_patient_profile_id_fkey"
             columns: ["patient_id"]
             isOneToOne: false
             referencedRelation: "patient_profiles"
-            referencedColumns: ["user_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "appointments_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_provider_id_providers_id_fk"
             columns: ["provider_id"]
             isOneToOne: false
             referencedRelation: "providers"
@@ -703,39 +698,109 @@ export type Database = {
           },
         ]
       }
+      organization_approved_emails: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          organization_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          organization_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_approved_emails_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          default_benefit_package_id: string | null
+          domain: string | null
+          hr_contact_info: string | null
+          id: string
+          name: string
+          updated_at: string
+          verification_domains: string[] | null
+        }
+        Insert: {
+          created_at?: string
+          default_benefit_package_id?: string | null
+          domain?: string | null
+          hr_contact_info?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          verification_domains?: string[] | null
+        }
+        Update: {
+          created_at?: string
+          default_benefit_package_id?: string | null
+          domain?: string | null
+          hr_contact_info?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          verification_domains?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organizations_default_benefit_package_id_packages_id_fk"
+            columns: ["default_benefit_package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       packages: {
         Row: {
           created_at: string
           description: string | null
+          features: string[] | null
           id: string
+          is_upgrade_option: boolean
+          monthly_cost: number
           name: string
-          price: number
-          purchase_type: Database["public"]["Enums"]["purchase_type"]
-          tier: Database["public"]["Enums"]["package_tier"]
+          tier_level: number
           updated_at: string
-          validity_period: number | null
         }
         Insert: {
           created_at?: string
           description?: string | null
+          features?: string[] | null
           id?: string
+          is_upgrade_option?: boolean
+          monthly_cost?: number
           name: string
-          price: number
-          purchase_type: Database["public"]["Enums"]["purchase_type"]
-          tier: Database["public"]["Enums"]["package_tier"]
+          tier_level: number
           updated_at?: string
-          validity_period?: number | null
         }
         Update: {
           created_at?: string
           description?: string | null
+          features?: string[] | null
           id?: string
+          is_upgrade_option?: boolean
+          monthly_cost?: number
           name?: string
-          price?: number
-          purchase_type?: Database["public"]["Enums"]["purchase_type"]
-          tier?: Database["public"]["Enums"]["package_tier"]
+          tier_level?: number
           updated_at?: string
-          validity_period?: number | null
         }
         Relationships: []
       }
@@ -823,13 +888,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "patient_packages_package_id_fkey"
-            columns: ["package_id"]
-            isOneToOne: false
-            referencedRelation: "packages"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "patient_packages_patient_id_fkey"
             columns: ["patient_id"]
             isOneToOne: false
@@ -842,64 +900,98 @@ export type Database = {
         Row: {
           address: string | null
           allergies: string | null
+          benefit_status: Database["public"]["Enums"]["benefit_status"]
+          benefit_verified_at: string | null
           blood_type: string | null
           city: string | null
           created_at: string
           date_of_birth: string | null
           email: string | null
-          first_name: string
+          first_name: string | null
           id: string
           insurance_id: string | null
           insurance_provider: string | null
-          last_name: string
+          last_name: string | null
           medications: string | null
+          organization_id: string | null
           phone: string | null
+          selected_package_id: string | null
           state: string | null
           updated_at: string
-          user_id: string | null
+          user_id: string
           zip_code: string | null
         }
         Insert: {
           address?: string | null
           allergies?: string | null
+          benefit_status?: Database["public"]["Enums"]["benefit_status"]
+          benefit_verified_at?: string | null
           blood_type?: string | null
           city?: string | null
           created_at?: string
           date_of_birth?: string | null
           email?: string | null
-          first_name: string
+          first_name?: string | null
           id?: string
           insurance_id?: string | null
           insurance_provider?: string | null
-          last_name: string
+          last_name?: string | null
           medications?: string | null
+          organization_id?: string | null
           phone?: string | null
+          selected_package_id?: string | null
           state?: string | null
           updated_at?: string
-          user_id?: string | null
+          user_id: string
           zip_code?: string | null
         }
         Update: {
           address?: string | null
           allergies?: string | null
+          benefit_status?: Database["public"]["Enums"]["benefit_status"]
+          benefit_verified_at?: string | null
           blood_type?: string | null
           city?: string | null
           created_at?: string
           date_of_birth?: string | null
           email?: string | null
-          first_name?: string
+          first_name?: string | null
           id?: string
           insurance_id?: string | null
           insurance_provider?: string | null
-          last_name?: string
+          last_name?: string | null
           medications?: string | null
+          organization_id?: string | null
           phone?: string | null
+          selected_package_id?: string | null
           state?: string | null
           updated_at?: string
-          user_id?: string | null
+          user_id?: string
           zip_code?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "patient_profiles_organization_id_organizations_id_fk"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_profiles_selected_package_id_packages_id_fk"
+            columns: ["selected_package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_profiles_user_id_users_id_fk"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       provider_reviews: {
         Row: {
@@ -995,6 +1087,13 @@ export type Database = {
             referencedRelation: "providers"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "provider_time_blocks_provider_id_providers_id_fk"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
         ]
       }
       provider_weekly_schedules: {
@@ -1028,6 +1127,13 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "provider_weekly_schedules_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_weekly_schedules_provider_id_providers_id_fk"
             columns: ["provider_id"]
             isOneToOne: false
             referencedRelation: "providers"
@@ -1324,29 +1430,116 @@ export type Database = {
           },
         ]
       }
+      user_benefit_verification_attempts: {
+        Row: {
+          created_at: string
+          failure_reason: string | null
+          id: string
+          organization_id: string | null
+          status: Database["public"]["Enums"]["verification_status"]
+          submitted_dob: string | null
+          submitted_first_name: string | null
+          submitted_last_name: string | null
+          submitted_phone: string | null
+          submitted_work_email: string | null
+          user_id: string
+          verification_attempt_timestamp: string
+        }
+        Insert: {
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          organization_id?: string | null
+          status?: Database["public"]["Enums"]["verification_status"]
+          submitted_dob?: string | null
+          submitted_first_name?: string | null
+          submitted_last_name?: string | null
+          submitted_phone?: string | null
+          submitted_work_email?: string | null
+          user_id: string
+          verification_attempt_timestamp?: string
+        }
+        Update: {
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          organization_id?: string | null
+          status?: Database["public"]["Enums"]["verification_status"]
+          submitted_dob?: string | null
+          submitted_first_name?: string | null
+          submitted_last_name?: string | null
+          submitted_phone?: string | null
+          submitted_work_email?: string | null
+          user_id?: string
+          verification_attempt_timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_benefit_verification_attempts_organization_id_organization"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_benefit_verification_attempts_user_id_users_id_fk"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
+          benefit_source: Database["public"]["Enums"]["benefit_source"] | null
+          benefit_status: Database["public"]["Enums"]["benefit_status"] | null
           created_at: string
           email: string
           id: string
           role: Database["public"]["Enums"]["user_role"]
+          selected_package_id: string | null
+          sponsoring_organization_id: string | null
           updated_at: string
         }
         Insert: {
+          benefit_source?: Database["public"]["Enums"]["benefit_source"] | null
+          benefit_status?: Database["public"]["Enums"]["benefit_status"] | null
           created_at?: string
           email: string
           id: string
           role?: Database["public"]["Enums"]["user_role"]
+          selected_package_id?: string | null
+          sponsoring_organization_id?: string | null
           updated_at?: string
         }
         Update: {
+          benefit_source?: Database["public"]["Enums"]["benefit_source"] | null
+          benefit_status?: Database["public"]["Enums"]["benefit_status"] | null
           created_at?: string
           email?: string
           id?: string
           role?: Database["public"]["Enums"]["user_role"]
+          selected_package_id?: string | null
+          sponsoring_organization_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "users_selected_package_id_packages_id_fk"
+            columns: ["selected_package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "users_sponsoring_organization_id_organizations_id_fk"
+            columns: ["sponsoring_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -1400,7 +1593,15 @@ export type Database = {
         }[]
       }
       is_admin: {
-        Args: Record<PropertyKey, never>
+        Args: { user_id: string } | Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_users_patient_profile: {
+        Args: { profile_id: string }
+        Returns: boolean
+      }
+      is_users_provider_profile: {
+        Args: { profile_id: string }
         Returns: boolean
       }
       send_appointment_notification: {
@@ -1422,6 +1623,19 @@ export type Database = {
       }
     }
     Enums: {
+      appointment_status:
+        | "scheduled"
+        | "completed"
+        | "cancelled"
+        | "pending"
+        | "confirmed"
+      benefit_source: "employer_or_plan" | "partner_or_parent" | "none"
+      benefit_status:
+        | "pending_verification"
+        | "verified"
+        | "declined"
+        | "not_applicable"
+        | "not_started"
       package_status: "purchased" | "active" | "expired" | "completed"
       package_tier: "basic" | "premium" | "custom"
       purchase_type: "subscription" | "one-time"
@@ -1432,6 +1646,7 @@ export type Database = {
         | "prenatal_care"
       treatment_status: "pending" | "in_progress" | "completed"
       user_role: "admin" | "staff" | "provider" | "patient"
+      verification_status: "pending" | "success" | "failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1545,11 +1760,23 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
+      appointment_status: [
+        "scheduled",
+        "completed",
+        "cancelled",
+        "pending",
+        "confirmed",
+      ],
+      benefit_source: ["employer_or_plan", "partner_or_parent", "none"],
+      benefit_status: [
+        "pending_verification",
+        "verified",
+        "declined",
+        "not_applicable",
+        "not_started",
+      ],
       package_status: ["purchased", "active", "expired", "completed"],
       package_tier: ["basic", "premium", "custom"],
       purchase_type: ["subscription", "one-time"],
@@ -1561,6 +1788,7 @@ export const Constants = {
       ],
       treatment_status: ["pending", "in_progress", "completed"],
       user_role: ["admin", "staff", "provider", "patient"],
+      verification_status: ["pending", "success", "failed"],
     },
   },
 } as const

@@ -21,10 +21,10 @@ import {
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
-import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserClient } from '@supabase/ssr';
+import type { Database } from '@/types/supabase';
 
 interface Provider {
   id: string;
@@ -68,7 +68,10 @@ export default function PatientCommunicationPage() {
   const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const supabase = createClientComponentClient();
+  const [supabase] = useState(() => createBrowserClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  ));
 
   useEffect(() => {
     fetchProviders();
@@ -77,7 +80,7 @@ export default function PatientCommunicationPage() {
       const channel = supabase.channel('messages');
       channel.unsubscribe();
     };
-  }, []);
+  }, [supabase, user?.id]);
 
   useEffect(() => {
     if (selectedProvider) {
@@ -104,7 +107,7 @@ export default function PatientCommunicationPage() {
         channel.unsubscribe();
       };
     }
-  }, [selectedProvider, user?.id]);
+  }, [selectedProvider, user?.id, supabase]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -112,6 +115,7 @@ export default function PatientCommunicationPage() {
   }, [messages]);
 
   const fetchProviders = async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -150,29 +154,33 @@ export default function PatientCommunicationPage() {
   };
 
   const fetchMessages = async (providerId: string) => {
+    if (!user?.id) return;
     try {
+      // Fetch messages and their related attachments
       const { data, error } = await supabase
         .from('messages')
         .select(`
           *,
-          sender:profiles!sender_id (
-            first_name,
-            last_name,
-            role
-          ),
-          receiver:profiles!receiver_id (
-            first_name,
-            last_name,
-            role
-          )
+          message_attachments ( id, file_name, file_url )
         `)
-        .or(`sender_id.eq.${user?.id},receiver_id.eq.${user?.id}`)
-        .eq('sender_id', providerId)
-        .eq('receiver_id', providerId)
+        .or(`(sender_id.eq.${user.id},receiver_id.eq.${providerId}),(sender_id.eq.${providerId},receiver_id.eq.${user.id})`)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setMessages(data || []);
+
+      // Process data to match the local Message type (attachments as string[])
+      // or adjust the Message type to expect an array of attachment objects.
+      // For now, let's format it to fit the existing Message type expecting string[].
+      const formattedMessages = (data || []).map(msg => ({
+          ...msg,
+          // Extract file_url from attachments or default to empty array
+          attachments: msg.message_attachments?.map((att: any) => att.file_url) || [],
+          sender: undefined, // Explicitly set sender/receiver as undefined for now
+          receiver: undefined
+      }));
+
+      // Use type assertion temporarily
+      setMessages(formattedMessages as Message[]);
     } catch (error) {
       console.error('Error fetching messages:', error);
       setError('Failed to load messages');
@@ -181,7 +189,7 @@ export default function PatientCommunicationPage() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProvider || !newMessage.trim()) return;
+    if (!selectedProvider || !newMessage.trim() || !user?.id) return;
 
     try {
       let attachments: string[] = [];

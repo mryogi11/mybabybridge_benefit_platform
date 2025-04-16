@@ -51,6 +51,31 @@ interface DashboardMilestone extends Omit<TreatmentMilestone, 'treatment_plan'> 
   } | undefined; // Allow undefined, but not null
 }
 
+// Helper function to fetch user benefit status
+async function getUserBenefitStatus(userId: string): Promise<string | null> {
+  if (!userId) return null;
+  try {
+    const { data, error } = await supabase
+      .from('users') // Query the public users table
+      .select('benefit_status')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error("Error fetching user benefit status:", error);
+      if (error.code === 'PGRST116') { // Handle case where user record doesn't exist (shouldn't happen for logged in user)
+         console.warn("User record not found for status check.");
+         return null;
+      } 
+      return null;
+    }
+    return data?.benefit_status || null;
+  } catch (err) {
+    console.error("Exception fetching user benefit status:", err);
+    return null;
+  }
+}
+
 export default function PatientDashboardPage() {
   const theme = useTheme();
   const router = useRouter();
@@ -62,6 +87,7 @@ export default function PatientDashboardPage() {
   const [upcomingAppointments, setUpcomingAppointments] = useState<DashboardAppointment[]>([]);
   const [recentMilestones, setRecentMilestones] = useState<DashboardMilestone[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isBenefitSetupComplete, setIsBenefitSetupComplete] = useState<boolean | null>(null); // Add state to track setup completion
 
   // Debug user state from context
   useEffect(() => {
@@ -79,6 +105,60 @@ export default function PatientDashboardPage() {
 
     return () => clearTimeout(timer);
   }, [authUser, session, router]);
+
+  // Initial check for user and benefit status
+  useEffect(() => {
+    if (!authUser) {
+      console.log("Dashboard: Waiting for authUser...");
+      // Optional: Redirect if no user after a delay (as before)
+      return; 
+    }
+
+    console.log("Dashboard: Auth user found:", authUser.id);
+    setLoading(true); // Start loading for status check
+
+    getUserBenefitStatus(authUser.id).then(status => {
+      console.log(`Dashboard: User ${authUser.id} benefit status: ${status}`);
+      if (status === 'not_started') {
+        console.log("Dashboard: User has not started benefit setup, redirecting to /step1");
+        router.push('/step1');
+        // Keep loading true or don't fetch other data if redirecting
+      } else if (status === null) {
+         // Could not fetch status, maybe show error or proceed cautiously
+         console.warn("Dashboard: Could not determine benefit status.");
+         setIsBenefitSetupComplete(null); // Indicate unknown status
+         // Proceed to fetch other data, but UI might need to handle unknown status
+         fetchDashboardData(authUser.id);
+      } else {
+         // Any status other than 'not_started' means they have started or completed
+         setIsBenefitSetupComplete(true); // Consider setup started/done
+         // Proceed to fetch normal dashboard data
+         fetchDashboardData(authUser.id);
+      }
+    });
+
+  }, [authUser, router]); // Depend on authUser and router
+
+  // Function to fetch main dashboard data (plans, appointments etc.)
+  const fetchDashboardData = async (userId: string) => {
+      setLoading(true);
+      setError(null);
+      console.log("Dashboard: Fetching main dashboard data for user:", userId);
+      try {
+        await Promise.all([
+          fetchTreatmentPlans(userId),
+          fetchUpcomingAppointments(userId),
+          fetchRecentMilestones(userId),
+          fetchNotifications(userId)
+        ]);
+      } catch (err: any) {
+        console.error("Dashboard: Error fetching dashboard data:", err);
+        setError(err.message || "Failed to load dashboard data.");
+      } finally {
+        setLoading(false);
+        console.log("Dashboard: Main data fetch complete.");
+      }
+  };
 
   // Fetch user profile, treatment plans, and appointments on component mount
    useEffect(() => {
@@ -416,7 +496,7 @@ export default function PatientDashboardPage() {
 
   // --- Render Logic ---
 
-  if (loading) {
+  if (loading && isBenefitSetupComplete === null) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
         <CircularProgress />
