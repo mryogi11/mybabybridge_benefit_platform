@@ -1,3 +1,5 @@
+console.log('[db/index.ts] STARTING MODULE LOAD');
+
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema'; // Import all exports from schema.ts
