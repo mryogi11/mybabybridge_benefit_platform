@@ -6,12 +6,14 @@ import * as schema from './schema'; // Import all exports from schema.ts
 
 console.log('[db/index.ts] Imports completed.');
 
+// --- TEMPORARY HARDCODING TEST --- 
 // Ensure DATABASE_URL is set in your environment variables
-const connectionString = process.env.DATABASE_URL;
+// const connectionString = process.env.DATABASE_URL; // <-- Comment out original line
+const connectionString = "postgresql://postgres:Mybabybridge12%23@db.uenmvvraiamjzzgxsybf.supabase.co:5432/postgres"; // <-- Hardcode the CORRECT string here
+console.log('[db/index.ts] Using HARDCODED connection string for testing.');
+// --- END TEMPORARY HARDCODING TEST ---
 
-console.log(`[db/index.ts] Retrieved DATABASE_URL. Found: ${connectionString ? 'Yes' : 'No'}`);
-// Avoid logging the full string here if it contains secrets, just log its presence/absence or length maybe
-// console.log(`[db/index.ts] Value: ${connectionString}`); 
+console.log(`[db/index.ts] Retrieved ConnectionString. Found: ${connectionString ? 'Yes' : 'No'}`);
 console.log(`[db/index.ts] Connection String Length: ${connectionString?.length ?? 0}`);
 
 if (!connectionString) {
