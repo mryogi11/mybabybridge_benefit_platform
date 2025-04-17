@@ -1,36 +1,50 @@
-console.log('[db/index.ts] STARTING MODULE LOAD');
+console.log('[db/index.ts] >>> STARTING MODULE LOAD <<<');
 
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema'; // Import all exports from schema.ts
 
+console.log('[db/index.ts] Imports completed.');
+
 // Ensure DATABASE_URL is set in your environment variables
 const connectionString = process.env.DATABASE_URL;
 
-// Log the connection string during module initialization
-console.log(`[db/index.ts] Initializing DB. ConnectionString found: ${connectionString ? 'Yes' : 'No'}`);
-console.log(`[db/index.ts] Value: ${connectionString}`); // Log the actual value
+console.log(`[db/index.ts] Retrieved DATABASE_URL. Found: ${connectionString ? 'Yes' : 'No'}`);
+// Avoid logging the full string here if it contains secrets, just log its presence/absence or length maybe
+// console.log(`[db/index.ts] Value: ${connectionString}`); 
+console.log(`[db/index.ts] Connection String Length: ${connectionString?.length ?? 0}`);
 
 if (!connectionString) {
-  console.error('[db/index.ts] DATABASE_URL environment variable is not set.');
-  throw new Error('DATABASE_URL environment variable is not set.');
+  console.error('[db/index.ts] CRITICAL: DATABASE_URL environment variable is not set or empty.');
+  throw new Error('DATABASE_URL environment variable is not set or empty.');
 }
 
 let client;
 try {
+  console.log('[db/index.ts] Attempting to initialize postgres client...');
   // For Serverless environments recommend using `max: 1`
-  // Read more: https://github.com/drizzle-team/drizzle-orm/issues/507
-  client = postgres(connectionString, { prepare: false });
-  console.log('[db/index.ts] Postgres client initialized successfully.');
+  client = postgres(connectionString, { 
+    prepare: false, 
+    // Add connection logging if supported by postgres library
+    // debug: (connection, query, parameters) => {
+    //   console.log('[db/index.ts] PG Debug:', { connection: connection?.id, query, parameters });
+    // }
+  });
+  console.log('[db/index.ts] SUCCESS: Postgres client initialized.');
 } catch (error) {
-  console.error('[db/index.ts] Failed to initialize Postgres client:', error);
+  console.error('[db/index.ts] CRITICAL: Failed to initialize Postgres client:', error);
+  // Log details of the error, including code and hostname if available
+  if (error instanceof Error) {
+    console.error(`[db/index.ts] Error Details: code=${(error as any).code}, syscall=${(error as any).syscall}, hostname=${(error as any).hostname}, message=${error.message}`);
+  }
   // Re-throw the error to ensure the application knows initialization failed
   throw error; 
 }
 
+console.log('[db/index.ts] Attempting to initialize Drizzle...');
 // Initialize Drizzle with the client and the imported schema
 export const db = drizzle(client, { schema });
-console.log('[db/index.ts] Drizzle instance created.');
+console.log('[db/index.ts] SUCCESS: Drizzle instance created.');
 
 // You might need separate clients for different connection types (e.g., pooling for server, direct for migrations)
 // Example for a pooled client (if needed):

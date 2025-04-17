@@ -4,32 +4,67 @@ import { createServerClient } from '@supabase/ssr';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 
-import { db } from '@/lib/db';
+console.log('[route.ts] >>> STARTING MODULE LOAD <<<');
+console.log('[route.ts] Attempting to import db...');
+import { db } from '@/lib/db'; // This should trigger logs in db/index.ts
+console.log('[route.ts] Successfully imported db.');
+
 import { organizations, users, userRoleEnum } from '@/lib/db/schema';
 import type { Database } from '@/types/supabase'; // Assuming you have this type
 
-// Helper to authorize admin (reusing the one from dynamic route, ensure it's correct)
-// NOTE: This relies on the db instance being initialized correctly based on process.env.DATABASE_URL
+console.log('[route.ts] All imports completed.');
+
+// Helper to authorize admin
 async function authorizeAdmin(request: NextRequest) {
-    const supabase = createServerClient<Database>(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                get(name: string) {
-                    return request.cookies.get(name)?.value;
+    console.log('[authorizeAdmin] Starting authorization...');
+    let supabase;
+    try {
+        supabase = createServerClient<Database>(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                cookies: {
+                    get(name: string) {
+                        const cookieValue = request.cookies.get(name)?.value;
+                        // console.log(`[authorizeAdmin] Getting cookie: ${name}, Value found: ${!!cookieValue}`); // Potentially too verbose
+                        return cookieValue;
+                    },
                 },
-            },
-        }
-    );
+            }
+        );
+        console.log('[authorizeAdmin] Supabase client created.');
+    } catch(err) {
+        console.error('[authorizeAdmin] CRITICAL: Failed to create Supabase client:', err);
+        throw new Error('Failed to initialize auth client.');
+    }
+
+    console.log('[authorizeAdmin] Attempting to get user from Supabase...');
     const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
+    if (userError) {
+        console.error('[authorizeAdmin] Supabase getUser error:', userError);
+        throw new Error("Authentication error checking user.");
+    }
+     if (!user) {
+        console.warn('[authorizeAdmin] No authenticated user found.');
         throw new Error("User is not authenticated.");
     }
-    const userRecord = await db.select({ role: users.role }).from(users).where(eq(users.id, user.id)).limit(1);
+    console.log(`[authorizeAdmin] User found: ${user.id}`);
+
+    console.log(`[authorizeAdmin] Checking user role in DB for user: ${user.id}`);
+    let userRecord;
+    try {
+        userRecord = await db.select({ role: users.role }).from(users).where(eq(users.id, user.id)).limit(1);
+        console.log(`[authorizeAdmin] DB check completed. Records found: ${userRecord.length}`);
+    } catch (dbError) {
+        console.error(`[authorizeAdmin] CRITICAL: Database error checking user role for ${user.id}:`, dbError);
+        throw new Error("Database error during authorization.");
+    }
+
     if (!userRecord.length || userRecord[0].role !== userRoleEnum.enumValues[0]) { // 'admin'
+        console.warn(`[authorizeAdmin] User ${user.id} is not an admin. Role found: ${userRecord[0]?.role}`);
         throw new Error("User is not authorized.");
     }
+    console.log(`[authorizeAdmin] SUCCESS: User ${user.id} authorized as admin.`);
     return user;
 }
 
@@ -41,46 +76,57 @@ const AddOrganizationSchema = z.object({
 
 // POST handler for /api/admin/organizations
 export async function POST(request: NextRequest): Promise<NextResponse> {
+    console.log('[POST /api/admin/organizations] Handler invoked.');
     // Log the DATABASE_URL value seen by the function runtime
-    console.log(`[API /admin/organizations POST] Runtime DATABASE_URL: ${process.env.DATABASE_URL}`);
+    console.log(`[POST /api/admin/organizations] Runtime DATABASE_URL length: ${process.env.DATABASE_URL?.length ?? 0}`);
 
     try {
+        console.log('[POST /api/admin/organizations] Calling authorizeAdmin...');
         await authorizeAdmin(request);
+        console.log('[POST /api/admin/organizations] authorizeAdmin succeeded.');
 
-        // 2. Parse Request Body
+        console.log('[POST /api/admin/organizations] Parsing request body...');
         const reqBody = await request.json();
+        console.log('[POST /api/admin/organizations] Parsing complete. Validating schema...');
         const validation = AddOrganizationSchema.safeParse(reqBody);
 
         if (!validation.success) {
-            // Use .format() for more detailed Zod errors
+            console.warn('[POST /api/admin/organizations] Schema validation failed:', validation.error.format());
             return NextResponse.json({ success: false, message: "Invalid request data", errors: validation.error.format() }, { status: 400 });
         }
         const { name, domain } = validation.data;
+        console.log(`[POST /api/admin/organizations] Validation succeeded. Name: ${name}, Domain: ${domain}`);
 
-        // Check if organization name already exists
+        console.log(`[POST /api/admin/organizations] Checking for existing organization with name: ${name}`);
         const existingOrg = await db.select({ id: organizations.id }).from(organizations).where(eq(organizations.name, name)).limit(1);
         if (existingOrg.length > 0) {
+             console.warn(`[POST /api/admin/organizations] Conflict: Organization name '${name}' already exists.`);
             return NextResponse.json({ success: false, message: `Organization name '${name}' already exists.` }, { status: 409 }); // 409 Conflict
         }
+        console.log(`[POST /api/admin/organizations] No existing organization found. Proceeding with insert...`);
 
-        // 3. Insert into Database
         const newOrg = await db.insert(organizations).values({
             name: name,
             domain: domain || null, // Ensure null is inserted if domain is empty/undefined
         }).returning();
 
-        // Note: revalidatePath does not work reliably in API Routes.
-        // Frontend relies on optimistic update or full refresh.
+        if (newOrg.length === 0) {
+             console.error('[POST /api/admin/organizations] CRITICAL: Insert seemed successful but returned no record.');
+            throw new Error("Failed to create organization record after insert.")
+        }
+        console.log(`[POST /api/admin/organizations] SUCCESS: Organization created with ID: ${newOrg[0].id}`);
 
-        return NextResponse.json({ success: true, data: newOrg[0], message: "Organization added successfully." }, { status: 201 });
+        return NextResponse.json({ success: true, data: newOrg[0], message: "Organization created successfully." }, { status: 201 });
 
     } catch (error) {
-        console.error(`[API /admin/organizations POST] Error:`, error);
+        console.error(`[POST /api/admin/organizations] CRITICAL ERROR in handler:`, error);
         const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
         const status = message === "User is not authenticated." ? 401 : message === "User is not authorized." ? 403 : message.includes('already exists') ? 409 : 500;
-        return NextResponse.json({ success: false, message: `Failed to add organization: ${message}` }, { status });
+        console.log(`[POST /api/admin/organizations] Returning error response. Status: ${status}, Message: ${message}`);
+        return NextResponse.json({ success: false, message: `Failed to create organization: ${message}` }, { status });
     }
 }
+console.log('[route.ts] >>> MODULE LOAD COMPLETE <<<');
 
 // You can add other methods like GET if needed
 // export async function GET(request: NextRequest) {
