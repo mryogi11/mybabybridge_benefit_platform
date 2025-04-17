@@ -53,6 +53,7 @@ async function authorizeAdmin(request: NextRequest) {
     console.log(`[authorizeAdmin] Checking user role in DB for user: ${user.id}`);
     let userRecord;
     try {
+        console.log(`[authorizeAdmin] Attempting db.select for user ${user.id}...`); 
         userRecord = await db.select({ role: users.role }).from(users).where(eq(users.id, user.id)).limit(1);
         console.log(`[authorizeAdmin] DB check completed. Records found: ${userRecord.length}`);
     } catch (dbError) {
