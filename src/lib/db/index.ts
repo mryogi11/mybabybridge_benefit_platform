@@ -6,12 +6,12 @@ import * as schema from './schema'; // Import all exports from schema.ts
 
 console.log('[db/index.ts] Imports completed.');
 
-// --- TEMPORARY HARDCODING TEST --- 
+// --- REVERTING HARDCODING TEST --- 
 // Ensure DATABASE_URL is set in your environment variables
-// const connectionString = process.env.DATABASE_URL; // <-- Comment out original line
-const connectionString = "postgresql://postgres:Mybabybridge12%23@db.uenmvvraiamjzzgxsybf.supabase.co:5432/postgres"; // <-- Hardcode the CORRECT string here
-console.log('[db/index.ts] Using HARDCODED connection string for testing.');
-// --- END TEMPORARY HARDCODING TEST ---
+const connectionString = process.env.DATABASE_URL; // <-- Uncomment original line
+// const connectionString = "postgresql://postgres:Mybabybridge12%23@db.uenmvvraiamjzzgxsybf.supabase.co:5432/postgres"; // <-- Comment out hardcoded string
+// console.log('[db/index.ts] Using HARDCODED connection string for testing.'); // <-- Remove temporary log
+// --- END REVERTING HARDCODING TEST ---
 
 console.log(`[db/index.ts] Retrieved ConnectionString. Found: ${connectionString ? 'Yes' : 'No'}`);
 console.log(`[db/index.ts] Connection String Length: ${connectionString?.length ?? 0}`);
