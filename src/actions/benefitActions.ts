@@ -2,24 +2,61 @@
 
 import { z } from 'zod';
 import { eq, ilike } from 'drizzle-orm';
-import { createServerActionClient } from '@supabase/auth-helpers-nextjs';
+import { createServerClient, type CookieOptions } from '@supabase/ssr'; // Correct import and CookieOptions type
 import { cookies } from 'next/headers';
 
 import { db } from '@/lib/db'; // Adjust path as needed
 import { users, organizations, packages, user_benefit_verification_attempts, benefitSourceEnum, benefitStatusEnum, organization_approved_emails } from '@/lib/db/schema'; // Adjust path as needed
+import type { Database } from '@/types/supabase';
 
-// --- Helper to get authenticated user (Reverted to auth-helpers) ---
+// --- Helper to get authenticated user (Using @supabase/ssr) ---
 async function getAuthenticatedUser() {
-    const supabase = createServerActionClient({ cookies }); // Use auth-helpers client
-    // Use getSession() as getUser() isn't available on this client type
-    const { data: { session }, error } = await supabase.auth.getSession(); 
-    if (error || !session?.user) {
+    // Await the cookie store first
+    const cookieStore = await cookies(); 
+    
+    const supabase = createServerClient<Database>(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                get(name: string) {
+                    // Use the resolved cookieStore
+                    return cookieStore.get(name)?.value;
+                },
+                set(name: string, value: string, options: CookieOptions) {
+                    // Use the resolved cookieStore
+                    try {
+                        cookieStore.set({ name, value, ...options });
+                    } catch (error) {
+                        // Handle potential errors during set operation
+                        console.error("[getAuthenticatedUser Cookie Set Error]", error);
+                    }
+                },
+                remove(name: string, options: CookieOptions) {
+                    // Use the resolved cookieStore
+                     try {
+                        cookieStore.set({ name, value: '', ...options });
+                    } catch (error) {
+                        // Handle potential errors during remove operation
+                        console.error("[getAuthenticatedUser Cookie Remove Error]", error);
+                    }
+                },
+            },
+        }
+    );
+    
+    // Use getUser() from the new client
+    const { data: { user }, error } = await supabase.auth.getUser(); 
+
+    if (error || !user) {
         console.error("[getAuthenticatedUser BenefitActions] Auth Error:", error);
+        if (error?.message.includes('JWT')) {
+             console.error("[getAuthenticatedUser BenefitActions] Potential JWT/Cookie parsing issue.");
+        }
         throw new Error("User is not authenticated.");
     }
     
-    // NOTE: This returns the session user, not the DB user record directly
-    return session.user; 
+    return user; 
 }
 
 // --- Type Definitions (using Zod for validation where applicable) --- //
@@ -33,8 +70,15 @@ const VerificationInfoSchema = z.object({
     firstName: z.string().min(1),
     lastName: z.string().min(1),
     dateOfBirth: z.string().date(), // Expecting YYYY-MM-DD format
-    phoneNumber: z.string().min(5), 
+    phoneNumber: z.string().min(5),
     workEmail: z.string().email().optional().or(z.literal('')),
+    // Add address fields to schema
+    addressLine1: z.string().min(3),
+    addressLine2: z.string().optional(),
+    addressCity: z.string().min(2),
+    addressState: z.string().min(2),
+    addressPostalCode: z.string().min(3),
+    addressCountry: z.string().min(2),
 });
 type VerificationInfo = z.infer<typeof VerificationInfoSchema>;
 
@@ -142,6 +186,24 @@ export async function submitVerificationInfo(data: VerificationInfo) {
             throw new Error("Failed to create verification attempt record.");
         }
 
+        // --- Intermediate Step: Update User Profile Info --- 
+        // Update the main users table with the name and address info
+        // regardless of verification outcome, as this is user-provided profile data.
+        console.log(`[Verification] Updating user profile for user ${user.id} with submitted name/address.`);
+        await db.update(users)
+            .set({
+                first_name: validatedData.firstName,
+                last_name: validatedData.lastName,
+                address_line1: validatedData.addressLine1,
+                address_line2: validatedData.addressLine2 || null,
+                address_city: validatedData.addressCity,
+                address_state: validatedData.addressState,
+                address_postal_code: validatedData.addressPostalCode,
+                address_country: validatedData.addressCountry,
+                updated_at: new Date(),
+            })
+            .where(eq(users.id, user.id));
+
         // --- 2. Perform Verification Logic --- 
         console.log(`[Verification] Attempting verification for user ${user.id}, attempt ${verificationAttemptId}`);
         
@@ -198,7 +260,6 @@ export async function submitVerificationInfo(data: VerificationInfo) {
         await db.update(users)
             .set({
                 benefit_status: finalUserBenefitStatus,
-                updated_at: new Date()
             })
             .where(eq(users.id, user.id));
 
@@ -289,6 +350,7 @@ export async function updateSelectedPackage(formData: FormData) {
 export async function completeBenefitSetup() {
     try {
         const user = await getAuthenticatedUser();
+        console.log(`[CompleteSetup] Authenticated user ID: ${user.id}`);
 
         // Check current status - maybe only allow completion if already verified or pending?
         // const currentUserData = await db.select({ status: users.benefit_status }).from(users).where(eq(users.id, user.id)).limit(1);
@@ -299,13 +361,22 @@ export async function completeBenefitSetup() {
         // }
 
         // Update status to 'verified' to confirm completion
-        console.log(`[CompleteSetup] Setting benefit_status to 'verified' for user: ${user.id}`);
-        await db.update(users)
+        console.log(`[CompleteSetup] Attempting to set benefit_status to 'verified' for user: ${user.id}`);
+        const updateResult = await db.update(users)
             .set({ 
                 benefit_status: 'verified',
                 updated_at: new Date()
             })
-            .where(eq(users.id, user.id));
+            .where(eq(users.id, user.id))
+            .returning({ updatedId: users.id, status: users.benefit_status }); // Return ID and status
+
+        console.log(`[CompleteSetup] DB update result for user ${user.id}:`, updateResult);
+
+        if (!updateResult || updateResult.length === 0 || updateResult[0].status !== 'verified') {
+             console.error(`[CompleteSetup] Failed to verify status update in DB for user ${user.id}. Update result:`, updateResult);
+             // Optional: throw an error or return failure if update didn't seem to work
+             // throw new Error("Database update for benefit status failed verification.");
+        }
 
         console.log("Benefit setup completed for user:", user.id);
 
@@ -372,7 +443,7 @@ export async function getBenefitPackages(): Promise<FrontendPackage[]> {
                 name: packages.name,
                 monthly_cost_str: packages.monthly_cost, // Select as string
                 description: packages.description,
-                key_benefits: packages.key_benefits, // Select the text array directly
+                key_benefits: packages.key_benefits, // CORRECT COLUMN NAME
                 is_base_employer_package: packages.is_base_employer_package // Use the correct boolean flag
             })
             .from(packages)
@@ -453,5 +524,102 @@ export async function getUserWithSelectedPackage(): Promise<{ success: boolean; 
              return { success: false, user: null, message: errorMessage };
         }
         return { success: false, user: null, message: `Failed to fetch user data: ${errorMessage}` };
+    }
+}
+
+// --- NEW: Action for Dashboard Data ---
+
+// Define the structure for a package to be returned
+interface DashboardPackageInfo {
+    id: string;
+    name: string;
+    monthly_cost: number;
+    description: string | null;
+    key_benefits: string[] | null;
+    is_base_employer_package: boolean;
+}
+
+// Define the structure for the dashboard data
+interface UserDashboardData {
+    userId: string;
+    userEmail: string | null;
+    currentPackage: DashboardPackageInfo | null;
+    allPackages: DashboardPackageInfo[];
+}
+
+/**
+ * Fetches data needed for the user dashboard (current package, all packages).
+ */
+export async function getUserDashboardData(): Promise<{
+    success: boolean;
+    data: UserDashboardData | null;
+    message: string;
+}> {
+    try {
+        const authUser = await getAuthenticatedUser();
+
+        // 1. Fetch user's current selected package ID
+        const currentUser = await db.select({
+            id: users.id,
+            email: users.email,
+            selectedPackageId: users.selected_package_id
+        })
+        .from(users)
+        .where(eq(users.id, authUser.id))
+        .limit(1);
+
+        if (!currentUser || currentUser.length === 0) {
+            throw new Error("Current user data not found.");
+        }
+        const user = currentUser[0];
+
+        // 2. Fetch all available packages
+        const allDbPackages = await db.select({
+            id: packages.id,
+            name: packages.name,
+            monthly_cost_str: packages.monthly_cost,
+            description: packages.description,
+            key_benefits: packages.key_benefits,
+            is_base_employer_package: packages.is_base_employer_package
+        })
+        .from(packages)
+        .orderBy(packages.monthly_cost);
+
+        // Process all packages into the desired format
+        const allPackagesInfo: DashboardPackageInfo[] = allDbPackages.map(pkg => ({
+            id: pkg.id,
+            name: pkg.name,
+            monthly_cost: parseFloat(pkg.monthly_cost_str || '0'),
+            description: pkg.description,
+            key_benefits: pkg.key_benefits,
+            is_base_employer_package: pkg.is_base_employer_package
+        }));
+
+        // 3. Find the user's currently selected package from the fetched list
+        const currentPackageInfo = user.selectedPackageId
+            ? allPackagesInfo.find(pkg => pkg.id === user.selectedPackageId) || null
+            : null;
+
+        // 4. Assemble the final data structure
+        const dashboardData: UserDashboardData = {
+            userId: user.id,
+            userEmail: user.email,
+            currentPackage: currentPackageInfo,
+            allPackages: allPackagesInfo
+        };
+
+        return {
+            success: true,
+            data: dashboardData,
+            message: "Dashboard data fetched successfully."
+        };
+
+    } catch (error) {
+        console.error("Error fetching user dashboard data:", error);
+        const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
+         if (errorMessage === "User is not authenticated.") {
+             return { success: false, data: null, message: errorMessage };
+        }
+        return { success: false, data: null, message: `Failed to fetch dashboard data: ${errorMessage}` };
     }
 } 

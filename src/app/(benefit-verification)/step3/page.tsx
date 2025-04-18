@@ -36,6 +36,15 @@ const personalInfoSchema = z.object({
     // Basic phone validation - could be enhanced
     countryCode: z.string().min(1, 'Country code required'), 
     phoneNumber: z.string().min(5, 'Phone number is required').regex(/^[\d\s\-\(\)]+$/, 'Invalid phone number'),
+    // Add workEmail - optional, but must be valid email if provided
+    workEmail: z.string().email('Invalid email address').optional().or(z.literal('')),
+    // Add address fields
+    addressLine1: z.string().min(3, 'Street address is required'),
+    addressLine2: z.string().optional(), // Optional field
+    addressCity: z.string().min(2, 'City is required'),
+    addressState: z.string().min(2, 'State / Province is required'), // State/Province
+    addressPostalCode: z.string().min(3, 'Postal code is required'), // Zip/Postal Code
+    addressCountry: z.string().min(2, 'Country is required'), // E.g., 'US', 'CA'
 });
 
 type PersonalInfoFormData = z.infer<typeof personalInfoSchema>;
@@ -74,6 +83,14 @@ export default function PersonalInfoScreen() {
             dobYear: undefined,
             countryCode: '+1', // Default to +1
             phoneNumber: '',
+            workEmail: '', // Add default value
+            // Add address defaults
+            addressLine1: '',
+            addressLine2: '',
+            addressCity: '',
+            addressState: '',
+            addressPostalCode: '',
+            addressCountry: 'US', // Default to US
         },
     });
 
@@ -88,14 +105,15 @@ export default function PersonalInfoScreen() {
             const dateOfBirth = `${data.dobYear}-${data.dobMonth}-${String(data.dobDay).padStart(2, '0')}`;
             const fullPhoneNumber = `${data.countryCode}${data.phoneNumber.replace(/\D/g, '')}`; // Clean phone number
 
-            // Prepare data for server action
+            // Prepare data for server action (includes address fields now)
             const verificationData = {
                 sponsoringOrganizationId: sponsoringOrganizationId, // Use context value
-                firstName: data.firstName,
-                lastName: data.lastName,
-                dateOfBirth: dateOfBirth, 
+                // Pass all form data including name and address
+                ...data,
+                // Overwrite specific fields that need formatting
+                dateOfBirth: dateOfBirth,
                 phoneNumber: fullPhoneNumber,
-                workEmail: '' // Work email collected in next step, pass empty for now
+                workEmail: data.workEmail || '' // Ensure workEmail is empty string if not provided
             };
 
             // Call server action
@@ -104,18 +122,9 @@ export default function PersonalInfoScreen() {
             if (result.success) {
                 // Update context with the final status from the action
                 setBenefitStatus(result.verificationStatus || 'declined'); 
-
-                // Navigate based on the returned status
-                if (result.verificationStatus === 'verified') {
-                    // Verification successful, proceed to optional work email step
-                    router.push('/step4'); 
-                } else { 
-                    // Verification failed ('declined') or other status
-                    // Navigate to package selection (Step 5), potentially passing status info
-                    // TODO: Decide if we need to pass status via query param or if step 5 should check context
-                    console.log("Verification not successful (", result.verificationStatus,"). Navigating to package options.");
-                    router.push('/step5'); 
-                }
+                console.log("Verification action successful (", result.verificationStatus,"). Navigating to package options (Step 5).");
+                // Always navigate to Step 5 - it will display content based on the status set in context
+                router.push('/step5'); 
             } else {
                 // Action itself failed (e.g., database error)
                 setError(result.message || 'Failed to submit verification information.');
@@ -298,6 +307,148 @@ export default function PersonalInfoScreen() {
                                         autoComplete="tel-national"
                                         error={!!errors.phoneNumber}
                                         helperText={errors.phoneNumber?.message}
+                                        disabled={isPending || isOrgIdMissing}
+                                    />
+                                )}
+                            />
+                        </Grid>
+
+                        {/* Add Work Email Field */}
+                        <Grid item xs={12}>
+                             <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>Work Email (Optional)</Typography>
+                            <Controller
+                                name="workEmail"
+                                control={control}
+                                render={({ field }) => (
+                                    <TextField
+                                        {...field}
+                                        fullWidth
+                                        id="workEmail"
+                                        label="Work Email Address"
+                                        type="email"
+                                        autoComplete="email"
+                                        error={!!errors.workEmail}
+                                        helperText={errors.workEmail?.message || "Used for verification with some employers."}
+                                        disabled={isPending || isOrgIdMissing}
+                                    />
+                                )}
+                            />
+                            {/* TODO: Add "I don't have a work email" functionality if needed */}
+                        </Grid>
+
+                        {/* Address Fields */}
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>Address</Typography>
+                        </Grid>
+                        <Grid item xs={12}>
+                            <Controller
+                                name="addressLine1"
+                                control={control}
+                                render={({ field }) => (
+                                    <TextField
+                                        {...field}
+                                        required
+                                        fullWidth
+                                        id="addressLine1"
+                                        label="Street Address"
+                                        autoComplete="address-line1"
+                                        error={!!errors.addressLine1}
+                                        helperText={errors.addressLine1?.message}
+                                        disabled={isPending || isOrgIdMissing}
+                                    />
+                                )}
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <Controller
+                                name="addressLine2"
+                                control={control}
+                                render={({ field }) => (
+                                    <TextField
+                                        {...field}
+                                        fullWidth
+                                        id="addressLine2"
+                                        label="Apartment, suite, etc. (Optional)"
+                                        autoComplete="address-line2"
+                                        error={!!errors.addressLine2}
+                                        helperText={errors.addressLine2?.message}
+                                        disabled={isPending || isOrgIdMissing}
+                                    />
+                                )}
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <Controller
+                                name="addressCity"
+                                control={control}
+                                render={({ field }) => (
+                                    <TextField
+                                        {...field}
+                                        required
+                                        fullWidth
+                                        id="addressCity"
+                                        label="City"
+                                        autoComplete="address-level2"
+                                        error={!!errors.addressCity}
+                                        helperText={errors.addressCity?.message}
+                                        disabled={isPending || isOrgIdMissing}
+                                    />
+                                )}
+                            />
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                            <Controller
+                                name="addressState"
+                                control={control}
+                                render={({ field }) => (
+                                    <TextField
+                                        {...field}
+                                        required
+                                        fullWidth
+                                        id="addressState"
+                                        label="State / Province"
+                                        autoComplete="address-level1"
+                                        error={!!errors.addressState}
+                                        helperText={errors.addressState?.message}
+                                        disabled={isPending || isOrgIdMissing}
+                                    />
+                                )}
+                            />
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                            <Controller
+                                name="addressPostalCode"
+                                control={control}
+                                render={({ field }) => (
+                                    <TextField
+                                        {...field}
+                                        required
+                                        fullWidth
+                                        id="addressPostalCode"
+                                        label="Postal Code"
+                                        autoComplete="postal-code"
+                                        error={!!errors.addressPostalCode}
+                                        helperText={errors.addressPostalCode?.message}
+                                        disabled={isPending || isOrgIdMissing}
+                                    />
+                                )}
+                            />
+                        </Grid>
+                         <Grid item xs={12}>
+                            <Controller
+                                name="addressCountry"
+                                control={control}
+                                render={({ field }) => (
+                                    // TODO: Consider replacing with a Select dropdown for countries
+                                    <TextField
+                                        {...field}
+                                        required
+                                        fullWidth
+                                        id="addressCountry"
+                                        label="Country"
+                                        autoComplete="country"
+                                        error={!!errors.addressCountry}
+                                        helperText={errors.addressCountry?.message}
                                         disabled={isPending || isOrgIdMissing}
                                     />
                                 )}

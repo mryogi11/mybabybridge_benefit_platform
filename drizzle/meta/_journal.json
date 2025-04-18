@@ -29,6 +29,13 @@
       "when": 1744702324168,
       "tag": "0003_nervous_the_hunter",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1744967300440,
+      "tag": "0004_add_user_address_and_name",
+      "breakpoints": true
     }
   ]
 }

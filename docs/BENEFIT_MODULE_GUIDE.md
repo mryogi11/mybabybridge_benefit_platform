@@ -198,4 +198,37 @@ This column tracks the user's current stage and outcome in the verification proc
     *   `src/app/(benefit-verification)/step3/page.tsx` (Simulates verification and sets status, uses status for navigation).
     *   `src/app/(benefit-verification)/step5/page.tsx` (Displays outcome based on status).
 
-Understanding `benefit_status` is key to tracing the user's journey through the benefit verification module and how different components react to their progress. 
+Understanding `benefit_status` is key to tracing the user's journey through the benefit verification module and how different components react to their progress.
+
+## Upcoming Refactoring & Features
+
+### Middleware Simplification
+
+**Goal:** Address runtime errors and improve separation of concerns.
+
+*   **Problem:** Current middleware (`src/middleware.ts`) attempts database queries to check `benefit_status`, causing runtime errors because the required Node.js modules (`net`) are unavailable in the default Edge Runtime.
+*   **Solution:** The middleware will be simplified to **only** handle authentication checks (verifying a valid user session). It will no longer query the database or make routing decisions based on `benefit_status`.
+*   **Reasoning:** This fixes the runtime errors and delegates status-based routing to components better suited for database access (Server Component Layouts).
+
+### Admin Package Management
+
+**Goal:** Allow administrators to manage benefit packages via the UI.
+
+*   **Problem:** Benefit packages currently need to be added directly to the database via SQL, which is not user-friendly for administrators.
+*   **Solution:** Implement new UI sections and API endpoints within the `/admin` area:
+    *   A page to list existing packages (`packages` table).
+    *   Functionality to create new packages (with fields like name, cost, description, benefits, tier, is_base_employer_package).
+    *   Functionality to edit existing packages.
+    *   Functionality to delete packages (consider implications for users already assigned).
+    *   Associated API routes (e.g., `POST`, `PUT`, `DELETE` under `/api/admin/packages`) with appropriate validation and admin authorization.
+*   **Reasoning:** Provides a necessary administrative interface for managing benefit offerings.
+
+### Layout-Based Benefit Status Checks
+
+**Goal:** Implement robust routing based on user benefit status after middleware simplification.
+
+*   **Problem:** With the middleware only checking authentication, logged-in users aren't automatically routed based on their benefit setup progress (e.g., verified users can still access step pages).
+*   **Solution:** Implement status checks within Server Component Layouts:
+    *   **Dashboard Layout (`src/app/(dashboard)/layout.tsx`):** Fetch user's `benefit_status`. If status is *not* `'verified'`, redirect to `/step1` or `/benefit-status-error` as appropriate. Otherwise, render children.
+    *   **Benefit Steps Layout (`src/app/(benefit-verification)/layout.tsx`):** Fetch user's `benefit_status`. If status *is* `'verified'`, redirect to `/dashboard`. If status requires error handling (e.g. `'declined'`), redirect to `/benefit-status-error`. Otherwise, render children (step pages).
+*   **Reasoning:** Correctly enforces application flow based on user state using Server Components capable of database access, compensating for the simplified middleware. 

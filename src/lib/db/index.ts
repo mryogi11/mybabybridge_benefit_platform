@@ -24,15 +24,14 @@ if (!connectionString) {
 let client;
 try {
   console.log('[db/index.ts] Attempting to initialize postgres client...');
-  // For Serverless environments recommend using `max: 1`
+  // --- REVERTING IP ADDRESS TEST --- 
+  // Rely solely on the connectionString, remove explicit host option
   client = postgres(connectionString, { 
-    prepare: false, 
-    // Add connection logging if supported by postgres library
-    // debug: (connection, query, parameters) => {
-    //   console.log('[db/index.ts] PG Debug:', { connection: connection?.id, query, parameters });
-    // }
+    prepare: false 
+    // host: resolvedHost // <-- REMOVE this line
   });
-  console.log('[db/index.ts] SUCCESS: Postgres client initialized.');
+  // --- END REVERTING IP ADDRESS TEST ---
+  console.log('[db/index.ts] SUCCESS: Postgres client initialized (using connectionString only).');
 } catch (error) {
   console.error('[db/index.ts] CRITICAL: Failed to initialize Postgres client:', error);
   // Log details of the error, including code and hostname if available

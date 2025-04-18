@@ -195,6 +195,7 @@ function ConfirmationForm({ packageDetails, requiresPayment }: ConfirmationFormP
                 elements,
                 confirmParams: {
                     // return_url: `${window.location.origin}/order/complete`, 
+                    // Description should be added during Payment Intent creation on server
                 },
                  redirect: "if_required" 
             });

@@ -72,8 +72,18 @@ export const organization_approved_emails = pgTable('organization_approved_email
 export const users = pgTable('users', {
   id: uuid('id').primaryKey(), // References auth.users(id)
   email: text('email').notNull().unique(),
+  // Add real name fields (collected during verification)
+  first_name: text('first_name'), // Made nullable for existing users
+  last_name: text('last_name'),   // Made nullable for existing users
+  // Add address fields (collected during verification)
+  address_line1: text('address_line1'),
+  address_line2: text('address_line2'), // Optional
+  address_city: text('address_city'),
+  address_state: text('address_state'), // Or province
+  address_postal_code: text('address_postal_code'),
+  address_country: text('address_country'), // Use ISO codes ideally
+
   // Add other columns if they exist in your public.users table from migrations
-  // Assuming first_name/last_name are primarily on profile tables
   role: userRoleEnum('role').notNull().default('patient'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

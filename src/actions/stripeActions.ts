@@ -68,9 +68,34 @@ export async function createPaymentIntent(payload: z.infer<typeof PaymentIntentP
         if (!stripeCustomerId) {
             console.log(`[Stripe] No Stripe Customer ID found for user ${user.id}. Creating one.`);
             try {
+                // Construct name from DB user record.
+                // Use email as fallback if name fields are somehow null/empty in DB.
+                const customerName = (user.first_name && user.last_name)
+                    ? `${user.first_name} ${user.last_name}`
+                    : user.email;
+
+                // Construct address object from user record.
+                // Ensure required fields have fallbacks or handle potential nulls.
+                const customerAddress = {
+                    line1: user.address_line1 || 'N/A', // Required by Stripe
+                    line2: user.address_line2 || undefined,
+                    city: user.address_city || 'N/A', // Required by Stripe
+                    state: user.address_state || 'N/A', // Required by Stripe
+                    postal_code: user.address_postal_code || '00000', // Required by Stripe
+                    country: user.address_country || 'US', // Required by Stripe (ISO code)
+                };
+
+                // Check if essential address components are missing (beyond N/A)
+                if (!user.address_line1 || !user.address_city || !user.address_state || !user.address_postal_code || !user.address_country) {
+                    console.warn(`[Stripe] User ${user.id} is missing some required address details in the database. Using fallbacks for Stripe Customer creation.`);
+                    // Consider if you should throw an error here instead of proceeding with potentially incomplete data
+                    // throw new Error("User address details are incomplete.");
+                }
+
                 const customer = await stripe.customers.create({
-                    email: user.email, // Use email from DB user record
-                    name: `${user.email}`, // Optional: Set a name
+                    email: user.email,
+                    name: customerName,
+                    address: customerAddress, // Use address from user record
                     metadata: {
                         supabase_user_id: user.id, // Link back to your user ID
                     },
@@ -89,18 +114,59 @@ export async function createPaymentIntent(payload: z.infer<typeof PaymentIntentP
             }
         } else {
             console.log(`[Stripe] Using existing Stripe Customer ID ${stripeCustomerId} for user ${user.id}`);
+            // --- UPDATE EXISTING CUSTOMER --- 
+            // Ensure the existing Stripe customer has the latest name/address from our DB
+            try {
+                console.log(`[Stripe] Updating existing customer ${stripeCustomerId} with latest name/address from DB.`);
+                const customerName = (user.first_name && user.last_name)
+                    ? `${user.first_name} ${user.last_name}`
+                    : user.email; // Fallback
+                
+                const customerAddress = {
+                    line1: user.address_line1 || 'N/A',
+                    line2: user.address_line2 || undefined,
+                    city: user.address_city || 'N/A',
+                    state: user.address_state || 'N/A',
+                    postal_code: user.address_postal_code || '00000',
+                    country: user.address_country || 'US',
+                };
+
+                 // Check if essential address components are missing before updating
+                 if (!user.address_line1 || !user.address_city || !user.address_state || !user.address_postal_code || !user.address_country) {
+                    console.warn(`[Stripe] User ${user.id} is missing some required address details in the database. Using fallbacks for Stripe Customer update.`);
+                    // Consider if you should throw an error here instead of proceeding with potentially incomplete data
+                }
+
+                await stripe.customers.update(stripeCustomerId, {
+                    name: customerName,
+                    address: customerAddress,
+                    // We could also update email if it changed, but less likely needed
+                    // email: user.email 
+                });
+                console.log(`[Stripe] Successfully updated customer ${stripeCustomerId}.`);
+            } catch (updateError) {
+                console.error(`[Stripe] Failed to update existing Stripe customer ${stripeCustomerId}:`, updateError);
+                // Decide how to handle this - maybe proceed without update, or throw an error?
+                // For now, we'll log the error and proceed, but the Payment Intent might still fail.
+                // throw new Error("Failed to update payment customer details.");
+            }
+            // --- END UPDATE --- 
         }
 
         // 2. Optional: Verify packageId and amount match package price
-        // (Add this logic if necessary, fetching package details from DB)
+        // AND fetch package name for description
+        let packageName = 'Benefit Plan Purchase'; // Default description
         if (packageId) {
-            // Example: Fetch package and compare amount
-             const pkg = await db.select({ cost: packages.monthly_cost }).from(packages).where(eq(packages.id, packageId)).limit(1);
-             if (!pkg.length) {
+            // Example: Fetch package and compare amount, get name
+             const pkgResult = await db.select({ cost: packages.monthly_cost, name: packages.name }).from(packages).where(eq(packages.id, packageId)).limit(1);
+             if (!pkgResult.length) {
                  throw new Error(`Package with ID ${packageId} not found.`);
              }
+             const pkg = pkgResult[0];
+             packageName = pkg.name || packageName; // Use fetched name if available
+
              // Explicitly parse the decimal string cost and type it as number
-             const costAsString: string = pkg[0].cost;
+             const costAsString: string = pkg.cost;
              const costAsNumber: number = parseFloat(costAsString);
 
              // Add a check to ensure parsing was successful
@@ -120,11 +186,12 @@ export async function createPaymentIntent(payload: z.infer<typeof PaymentIntentP
 
         console.log(`[Stripe] Creating payment intent for user ${user.id}, customer ${stripeCustomerId}, amount ${amount} ${currency}`);
 
-        // 3. Create the Payment Intent with the Customer ID
+        // 3. Create the Payment Intent with the Customer ID and Description
         const paymentIntent = await stripe.paymentIntents.create({
             amount: amount,
             currency: currency,
             customer: stripeCustomerId, // Associate with the Stripe Customer
+            description: packageName,  // Add the description here
             metadata: {
                  user_id: user.id,
                  package_id: packageId || 'N/A',

@@ -1,6 +1,6 @@
-'use client';
+// Remove 'use client' - This will be a Server Component
 
-import React, { useState, useEffect } from 'react';
+import React from 'react'; // No need for useState, useEffect etc. here
 import {
   Box,
   Container,
@@ -12,13 +12,22 @@ import {
   ListItemSecondaryAction,
   Button,
   Chip,
-  CircularProgress,
+  CircularProgress, // Keep for potential client component loading state
   Alert,
+  Card, // Use Card for better structure
+  CardContent,
+  Divider
 } from '@mui/material';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase/client';
-import { Assignment, ErrorOutline } from '@mui/icons-material';
+// Remove client-side imports no longer needed at page level
+// import { useRouter } from 'next/navigation';
+// import { supabase } from '@/lib/supabase/client';
+import { Assignment, ErrorOutline, WorkspacePremium, Upgrade } from '@mui/icons-material';
 
+// Import the server action to fetch data
+import { getUserDashboardData } from '@/actions/benefitActions';
+import UpgradeOptions from './_components/UpgradeOptions'; // Assume we create this client component later
+
+// Define types directly or import if defined elsewhere
 interface Provider {
   first_name: string;
   last_name: string;
@@ -40,177 +49,66 @@ interface TreatmentPlan {
   provider?: Provider | null;
 }
 
-export default function TreatmentPlansPage() {
-  const [plans, setPlans] = useState<TreatmentPlan[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
-
-  useEffect(() => {
-    const fetchTreatmentPlans = async () => {
-      try {
-        // Get the current user
-        const { data: userData, error: userError } = await supabase.auth.getUser();
-        
-        if (userError) {
-          console.error('Error fetching user:', userError);
-          setError('Error fetching user data. Please try again later.');
-          setLoading(false);
-          return;
-        }
-        
-        if (!userData.user) {
-          console.error('No user data available');
-          setError('User data not available. Try refreshing the page.');
-          setLoading(false);
-          return;
-        }
-
-        // Attempt to fetch profile
-        const { data: profile, error: profileError } = await supabase
-          .from('patient_profiles')
-          .select('id')
-          .eq('user_id', userData.user.id)
-          .single();
-
-        // If the profiles table doesn't exist or there's another error, use the user's ID directly
-        let patientId;
-        if (profileError) {
-          console.warn('Profile fetch error:', profileError.message);
-          if (profileError.message.includes('relation "public.profiles" does not exist')) {
-            console.log('Using mock patient ID for development');
-            // Use mock data for development
-            patientId = '1'; // Mock patient ID
-            setError(null); // Clear any previous errors
-          } else {
-            setError(`Error fetching profile: ${profileError.message}`);
-            setLoading(false);
-            return;
-          }
-        } else {
-          patientId = profile.id;
-        }
-
-        // Mock treatment plan data for development
-        if (profileError && profileError.message.includes('relation "public.profiles" does not exist')) {
-          const mockPlans: TreatmentPlan[] = [
-            {
-              id: '1',
-              patient_id: '1',
-              provider_id: '101',
-              type: 'Speech Therapy',
-              title: 'Speech Development Plan',
-              description: 'Comprehensive speech therapy plan focusing on articulation and language development.',
-              status: 'active',
-              start_date: new Date().toISOString(),
-              end_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 90 days later
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              provider: {
-                first_name: 'Jane',
-                last_name: 'Smith',
-                specialization: 'Speech Therapy'
-              }
-            } as TreatmentPlan,
-            {
-              id: '2',
-              patient_id: '1',
-              provider_id: '102',
-              type: 'Physical Therapy',
-              title: 'Motor Skills Development',
-              description: 'Physical therapy plan to improve motor skills and coordination.',
-              status: 'active',
-              start_date: new Date().toISOString(),
-              end_date: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(), // 60 days later
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              provider: {
-                first_name: 'Robert',
-                last_name: 'Johnson',
-                specialization: 'Physical Therapy'
-              }
-            } as TreatmentPlan
-          ];
-          setPlans(mockPlans);
-          setLoading(false);
-          return;
-        }
-
-        // Only attempt to fetch from database if the table exists
-        const { data, error: plansError } = await supabase
-          .from('treatment_plans')
-          .select(`
-            *,
-            provider:provider_id (
-              first_name,
-              last_name,
-              specialization
-            )
-          `)
-          .eq('patient_id', patientId)
-          .order('created_at', { ascending: false });
-
-        if (plansError) {
-          // If treatment_plans table doesn't exist, use mock data
-          if (plansError.message.includes('relation "public.treatment_plans" does not exist')) {
-            console.log('Using mock treatment plan data for development');
-            const mockPlans: TreatmentPlan[] = [
-              {
-                id: '1',
-                patient_id: '1',
-                provider_id: '101',
-                type: 'Speech Therapy',
-                title: 'Speech Development Plan',
-                description: 'Comprehensive speech therapy plan focusing on articulation and language development.',
-                status: 'active',
-                start_date: new Date().toISOString(),
-                end_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 90 days later
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                provider: {
-                  first_name: 'Jane',
-                  last_name: 'Smith',
-                  specialization: 'Speech Therapy'
-                }
-              } as TreatmentPlan,
-              {
-                id: '2',
-                patient_id: '1',
-                provider_id: '102',
-                type: 'Physical Therapy',
-                title: 'Motor Skills Development',
-                description: 'Physical therapy plan to improve motor skills and coordination.',
-                status: 'active',
-                start_date: new Date().toISOString(),
-                end_date: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(), // 60 days later
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                provider: {
-                  first_name: 'Robert',
-                  last_name: 'Johnson',
-                  specialization: 'Physical Therapy'
-                }
-              } as TreatmentPlan
-            ];
-            setPlans(mockPlans);
-            setError(null);
-          } else {
-            setError(`Error fetching treatment plans: ${plansError.message}`);
-          }
-        } else {
-          setPlans((data || []) as unknown as TreatmentPlan[]);
-          setError(null);
-        }
-      } catch (err) {
-        console.error('Error in fetchTreatmentPlans:', err);
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
+// TODO: Fetch actual treatment plans from DB using a server action
+// For now, keeping mock data logic
+const getMockTreatmentPlans = (): TreatmentPlan[] => [
+   {
+      id: '1',
+      patient_id: '1',
+      provider_id: '101',
+      type: 'Speech Therapy',
+      title: 'Speech Development Plan',
+      description: 'Comprehensive speech therapy plan focusing on articulation and language development.',
+      status: 'active',
+      start_date: new Date().toISOString(),
+      end_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 90 days later
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      provider: {
+        first_name: 'Jane',
+        last_name: 'Smith',
+        specialization: 'Speech Therapy'
       }
-    };
+    } as TreatmentPlan,
+    {
+      id: '2',
+      patient_id: '1',
+      provider_id: '102',
+      type: 'Physical Therapy',
+      title: 'Motor Skills Development',
+      description: 'Physical therapy plan to improve motor skills and coordination.',
+      status: 'active',
+      start_date: new Date().toISOString(),
+      end_date: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(), // 60 days later
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      provider: {
+        first_name: 'Robert',
+        last_name: 'Johnson',
+        specialization: 'Physical Therapy'
+      }
+    } as TreatmentPlan
+];
 
-    fetchTreatmentPlans();
-  }, []);
+// Make the component async to use await for data fetching
+export default async function TreatmentPlansPage() {
+  // Fetch dashboard data (packages etc.) using the server action
+  const { success: dataSuccess, data: dashboardData, message: dataMessage } = await getUserDashboardData();
+
+  // Fetch actual treatment plans (using mock for now)
+  // TODO: Replace mock data with actual data fetching, potentially combining with getUserDashboardData or a separate action
+  const plans: TreatmentPlan[] = getMockTreatmentPlans();
+  let error: string | null = null;
+
+  if (!dataSuccess) {
+    // Handle error fetching dashboard data - show message but maybe still render page?
+    console.error("Failed to fetch dashboard data:", dataMessage);
+    error = `Could not load benefit plan details: ${dataMessage}. Treatment plans may still be visible.`;
+    // Depending on requirements, you might want to return early or show a specific error state
+  }
+
+  const currentPackage = dashboardData?.currentPackage;
+  const allPackages = dashboardData?.allPackages || [];
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -225,14 +123,7 @@ export default function TreatmentPlansPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
-        <CircularProgress />
-      </Box>
-    );
-  }
-
+  // Error handling for benefit data fetch
   if (error) {
     return (
       <Container maxWidth="lg">
@@ -240,12 +131,11 @@ export default function TreatmentPlansPage() {
           <Typography variant="h4" gutterBottom>
             Treatment Plans
           </Typography>
-          <Alert severity="error" sx={{ mb: 3 }} icon={<ErrorOutline />}>
-            {error}
+          <Alert severity="warning" sx={{ mb: 3 }} icon={<ErrorOutline />}>
+            {error} 
           </Alert>
-          <Button variant="contained" onClick={() => window.location.reload()}>
-            Try Again
-          </Button>
+           {/* Display treatment plans even if package info failed? Or hide? */}
+           {/* Current implementation will show error and then plans */} 
         </Box>
       </Container>
     );
@@ -255,81 +145,107 @@ export default function TreatmentPlansPage() {
     <Container maxWidth="lg">
       <Box sx={{ py: 4 }}>
         <Typography variant="h4" gutterBottom>
-          Treatment Plans
+          Treatment Plans & Benefits
         </Typography>
 
-        <List>
-          {plans.length === 0 ? (
-            <Paper sx={{ p: 4, textAlign: 'center' }}>
-              <Assignment sx={{ fontSize: 50, color: 'primary.light', mb: 2 }} />
-              <Typography variant="h6" gutterBottom>
-                No treatment plans found
+        {/* Current Benefit Plan Section */} 
+        <Card variant="outlined" sx={{ mb: 4 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+               <WorkspacePremium sx={{ mr: 1 }} color="primary" /> Your Current Benefit Plan
+            </Typography>
+            {currentPackage ? (
+              <Box>
+                <Typography variant="h5" component="div" gutterBottom>
+                  {currentPackage.name}
+                </Typography>
+                <Chip 
+                    label={currentPackage.monthly_cost > 0 ? `$${currentPackage.monthly_cost.toFixed(2)}/month` : 'Included / Sponsored'}
+                    color={currentPackage.monthly_cost > 0 ? 'default' : 'success'} 
+                    size="small" 
+                    sx={{ mb: 1 }}
+                />
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  {currentPackage.description || 'No description available.'}
+                </Typography>
+                {currentPackage.key_benefits && currentPackage.key_benefits.length > 0 && (
+                   <Box>
+                        <Typography variant="subtitle2">Key Benefits:</Typography>
+                        <List dense>
+                            {currentPackage.key_benefits.map((benefit, index) => (
+                                <ListItem key={index} sx={{ py: 0.5 }}>
+                                    <ListItemText primary={`- ${benefit}`} />
+                                </ListItem>
+                            ))}
+                        </List>
+                   </Box>
+                )}
+              </Box>
+            ) : (
+              <Typography variant="body1" color="text.secondary">
+                No benefit package currently selected or active.
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                You don't have any treatment plans yet. Your healthcare provider will 
-                create a treatment plan during or after your initial consultation.
-              </Typography>
-              <Button 
-                variant="contained" 
-                onClick={() => router.push('/dashboard/appointments')}
-              >
-                Book Appointment
-              </Button>
-            </Paper>
-          ) : (
-            plans.map((plan) => (
-              <Paper key={plan.id} sx={{ 
-                mb: 2, 
-                transition: 'transform 0.2s, box-shadow 0.2s',
-                '&:hover': {
-                  transform: 'translateY(-2px)',
-                  boxShadow: 2,
-                }
-              }}>
-                <ListItem
-                  button
-                  onClick={() => router.push(`/dashboard/treatment-plans/${plan.id}`)}
-                >
-                  <ListItemText
-                    primary={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                        <Typography variant="h6" component="span">
-                          {plan.type}
-                        </Typography>
-                        <Chip
-                          label={plan.status.charAt(0).toUpperCase() + plan.status.slice(1)}
-                          color={getStatusColor(plan.status)}
-                          size="small"
-                        />
-                      </Box>
-                    }
-                    secondary={
-                      <>
-                        <Typography variant="body2" color="text.secondary" gutterBottom>
-                          Provider: Dr. {plan.provider?.first_name} {plan.provider?.last_name}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {plan.description}
-                        </Typography>
-                      </>
-                    }
-                  />
-                  <ListItemSecondaryAction>
-                    <Button
-                      variant="outlined"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/dashboard/treatment-plans/${plan.id}`);
-                      }}
-                    >
-                      View Details
-                    </Button>
-                  </ListItemSecondaryAction>
-                </ListItem>
-              </Paper>
-            ))
-          )}
-        </List>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Upgrade Options Section (Client Component) */} 
+        {currentPackage && (
+             <UpgradeOptions currentPackage={currentPackage} allPackages={allPackages} />
+        )}
+       
+        <Divider sx={{ my: 4 }} />
+
+        {/* Existing Treatment Plans List */}
+        <Typography variant="h5" gutterBottom sx={{ mb: 2 }}>
+          Your Treatment Plans
+        </Typography>
+        {plans.length > 0 ? (
+          <Paper elevation={2}>
+            <List disablePadding>
+              {plans.map((plan, index) => (
+                <React.Fragment key={plan.id}>
+                  <ListItem alignItems="flex-start">
+                    <ListItemText
+                      primary={plan.title || `Plan ID: ${plan.id}`}
+                      secondary={
+                        <React.Fragment>
+                          <Typography
+                            sx={{ display: 'inline' }}
+                            component="span"
+                            variant="body2"
+                            color="text.primary"
+                          >
+                            {plan.type} {plan.provider ? `- Dr. ${plan.provider.last_name} (${plan.provider.specialization})` : ''}
+                          </Typography>
+                          {` — ${plan.description || 'No description provided.'}`}
+                          <br />
+                          <Chip label={plan.status} color={getStatusColor(plan.status)} size="small" sx={{ mt: 1 }} />
+                        </React.Fragment>
+                      }
+                    />
+                    <ListItemSecondaryAction>
+                      {/* TODO: Implement navigation to detailed plan view */}
+                      <Button 
+                        variant="outlined" 
+                        size="small" 
+                        // onClick={() => router.push(`/dashboard/treatment-plans/${plan.id}`)}
+                        disabled // Disable for now until detail page exists
+                      >
+                        View Details
+                      </Button>
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                  {index < plans.length - 1 && <Divider variant="inset" component="li" />}
+                </React.Fragment>
+              ))}
+            </List>
+          </Paper>
+        ) : (
+          <Typography variant="body1" color="text.secondary">
+            You currently have no active treatment plans.
+          </Typography>
+        )}
       </Box>
     </Container>
   );

@@ -3,6 +3,14 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type { Database } from '@/types/supabase';
 
+// DB imports are no longer needed here
+// import { db } from '@/lib/db';
+// import { users } from '@/lib/db/schema';
+// import { eq } from 'drizzle-orm';
+
+// No longer needed as DB access is removed
+// export const runtime = 'nodejs';
+
 // Helper function to create Supabase client
 // This ensures cookie operations are attached to the response `res`
 const createClient = (req: NextRequest, res: NextResponse) => {
@@ -31,15 +39,13 @@ export async function middleware(req: NextRequest) {
 
   try {
     const path = req.nextUrl.pathname;
-    console.log(`[Middleware] Handling path: ${path}`);
+    console.log(`[Middleware - Simplified] Handling path: ${path}`);
 
     // Define public routes
-    const publicRoutes = ['/', '/login', '/register', '/forgot-password', '/reset-password'];
+    const publicRoutes = ['/', '/login', '/register', '/forgot-password', '/reset-password', '/benefit-status-error']; // Add error page here
 
     if (publicRoutes.includes(path)) {
-      console.log('[Middleware] Public route, proceeding.');
-      // Explicitly get session even for public routes to handle potential cookie refresh?
-      // This might not be necessary but trying it for debugging.
+      console.log('[Middleware - Simplified] Public route, proceeding.');
       await supabase.auth.getSession(); 
       return res;
     }
@@ -48,12 +54,10 @@ export async function middleware(req: NextRequest) {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
     if (sessionError) {
-        console.error('[Middleware] Error getting session:', sessionError);
-        // Potentially redirect to login on session error?
-        // return NextResponse.redirect(new URL('/login', req.url));
-        return res; // For now, allow access but log error
+        console.error('[Middleware - Simplified] Error getting session:', sessionError);
+        return res; // Allow access but log error
     }
-    console.log(`[Middleware] Session check result: ${session ? 'Has session' : 'No session'}`);
+    console.log(`[Middleware - Simplified] Session check result: ${session ? 'Has session' : 'No session'}`);
 
     // Routes requiring authentication
     const protectedRoutes = ['/dashboard', '/admin', '/provider', '/step1', '/step2', '/step3', '/step4', '/step5', '/step6']; 
@@ -61,10 +65,12 @@ export async function middleware(req: NextRequest) {
 
     if (requiresAuth) {
       if (session) {
-        console.log('[Middleware] Valid session found for protected route, allowing access');
+        // User has session, allow access (layout will handle status checks)
+        console.log('[Middleware - Simplified] Valid session found, allowing access. Layout will check status.');
         return res; 
       } else {
-        console.log('[Middleware] No valid session for protected route, redirecting to login');
+        // No valid session, redirect to login
+        console.log('[Middleware - Simplified] No valid session for protected route, redirecting to login');
         const redirectUrl = req.nextUrl.clone();
         redirectUrl.pathname = '/login';
         redirectUrl.searchParams.set('redirectedFrom', path);
@@ -72,21 +78,18 @@ export async function middleware(req: NextRequest) {
       }
     }
 
-    console.log('[Middleware] Path not explicitly public or protected, allowing access.');
+    console.log('[Middleware - Simplified] Path not explicitly public or protected, allowing access.');
     return res;
 
   } catch (error) {
-    console.error('[Middleware] Unexpected Error:', error);
-    return NextResponse.redirect(new URL('/', req.url));
+    console.error('[Middleware - Simplified] Unexpected Error:', error);
+    // Redirect to home on unexpected error
+    return NextResponse.redirect(new URL('/', req.url)); 
   }
 }
 
 export const config = {
-  // Matcher includes API routes and excludes static assets
-  // Adjusted to potentially include Server Action paths if they follow a convention
   matcher: [
     '/((?!_next/static|_next/image|fonts|images|favicon.ico|sw.js).*)',
-    // If server actions are handled via specific API routes, adjust matcher accordingly
-    // Example: '/api/actions/:path*',
   ],
 }; 
