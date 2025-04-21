@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-// Test import
-import ThemeRegistry from '@/components/ThemeRegistry/ThemeRegistry'; 
-// Corrected Supabase import
-import { supabase } from '@/lib/supabase/client'; 
-import { cookies } from 'next/headers';
-// Correct import path for db (from directory index)
+// Removed test import
+// import ThemeRegistry from '@/components/ThemeRegistry/ThemeRegistry'; 
+// Import the new server client function
+import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
+import { cookies } from 'next/headers'; // Keep cookies import for authorizeAdmin potentially
 import { db } from '@/lib/db'; 
 import { users } from '@/lib/db/schema'; // Schema comes from schema.ts directly
 import { eq } from 'drizzle-orm';
 import { authorizeAdmin } from '@/lib/auth/authorizeAdmin';
 import { userRoleEnum } from '@/lib/db/schema'; // Schema enum comes from schema.ts directly
+// Correct Database type import
+import type { Database } from '@/types/supabase'; 
 // Removed Database type import as it's not found in @/lib/types
 // We need to find the correct location or generate Supabase types
 // import type { Database } from '@/lib/types'; 
@@ -29,13 +30,19 @@ const UpdateUserSchema = z.object({
   // name: z.string().min(1).optional(), 
 });
 
+// Make handlers async as createSupabaseRouteHandlerClient is async
 export async function PUT(req: NextRequest, { params }: { params: { userId: string } }) {
-  console.log(`PUT /api/admin/users/${params.userId} request received`);
-  const cookieStore = cookies();
-  // Note: Using the imported 'supabase' client directly.
-  // This is the BROWSER client and likely incorrect for server-side auth.
-  // Needs replacement with a proper server client setup.
-  // const supabase = createServerClient(cookieStore); 
+  // Access userId from params once at the beginning
+  const userIdToUpdate = params.userId;
+  console.log(`PUT /api/admin/users/${userIdToUpdate} request received`);
+
+  if (!userIdToUpdate) {
+    // This check might be redundant if params.userId is guaranteed, but safe to keep
+    return NextResponse.json({ error: 'User ID is required from route parameters' }, { status: 400 });
+  }
+
+  // Use the server client function
+  const supabase = await createSupabaseRouteHandlerClient();
 
   // Authorize admin
   const { authorized, user: adminUser, error: authError } = await authorizeAdmin(req);
@@ -44,12 +51,8 @@ export async function PUT(req: NextRequest, { params }: { params: { userId: stri
     const status = authError === 'User not authenticated' ? 401 : 403;
     return NextResponse.json({ error: authError || 'Forbidden' }, { status });
   }
-  console.log(`Admin user ${adminUser.email} authorized to update user ${params.userId}`);
-
-  const userIdToUpdate = params.userId;
-  if (!userIdToUpdate) {
-    return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
-  }
+  // Use the local variable
+  console.log(`Admin user ${adminUser.email} authorized to update user ${userIdToUpdate}`);
 
   let updatedData;
   try {
@@ -107,12 +110,17 @@ export async function PUT(req: NextRequest, { params }: { params: { userId: stri
 
 // Optional: Implement DELETE handler
 export async function DELETE(req: NextRequest, { params }: { params: { userId: string } }) {
-  console.log(`DELETE /api/admin/users/${params.userId} request received`);
-  const cookieStore = cookies();
-   // Note: Using the imported 'supabase' client directly.
-  // This is the BROWSER client and likely incorrect for server-side auth.
-   // Needs replacement with a proper server client setup.
-  // const supabase = createServerClient(cookieStore);
+  // Access userId from params once at the beginning
+  const userIdToDelete = params.userId;
+  console.log(`DELETE /api/admin/users/${userIdToDelete} request received`);
+
+  if (!userIdToDelete) {
+    // This check might be redundant if params.userId is guaranteed, but safe to keep
+    return NextResponse.json({ error: 'User ID is required from route parameters' }, { status: 400 });
+  }
+
+   // Use the server client function
+  const supabase = await createSupabaseRouteHandlerClient();
 
   // Authorize admin
   const { authorized, user: adminUser, error: authError } = await authorizeAdmin(req);
@@ -121,13 +129,11 @@ export async function DELETE(req: NextRequest, { params }: { params: { userId: s
     const status = authError === 'User not authenticated' ? 401 : 403;
     return NextResponse.json({ error: authError || 'Forbidden' }, { status });
   }
-   console.log(`Admin user ${adminUser.email} authorized to delete user ${params.userId}`);
+   // Use the local variable
+   console.log(`Admin user ${adminUser.email} authorized to delete user ${userIdToDelete}`);
 
-
-  const userIdToDelete = params.userId;
-  if (!userIdToDelete) {
-    return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
-  }
+   // const userIdToDelete = params.userId; // Remove repeated access
+   // if (!userIdToDelete) { ... } // Remove repeated check
 
   // Prevent admin from deleting themselves? Optional check.
   // if (adminUser.id === userIdToDelete) {
@@ -135,30 +141,56 @@ export async function DELETE(req: NextRequest, { params }: { params: { userId: s
   // }
 
   try {
+    // Use the local variable
     console.log(`Attempting to delete user ${userIdToDelete}`);
-    const deletedUsers = await db
+    // Execute the delete command, but ignore the potentially misleading .returning() result for success check
+    await db
       .delete(users)
+      .where(eq(users.id, userIdToDelete));
+      // .returning({ id: users.id }); // Remove or ignore .returning() for success check
+
+    // --- Verification Step --- 
+    console.log(`Verifying deletion for user ${userIdToDelete}...`);
+    const verifyUser = await db
+      .select({ id: users.id })
+      .from(users)
       .where(eq(users.id, userIdToDelete))
-      .returning({ id: users.id }); // Return the ID of the deleted user
+      .limit(1);
+    
+    console.log(`Verification query result: ${JSON.stringify(verifyUser)} (Length: ${verifyUser.length})`);
 
-    if (deletedUsers.length === 0) {
-      console.warn(`User ${userIdToDelete} not found for deletion, might have been already deleted.`);
-      // Still return success or 404? Depends on idempotency requirements. Let's return 404.
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    // Check if the verification query found the user
+    if (verifyUser.length > 0) {
+      // If user still exists, the delete failed despite no error from the delete command
+      console.error(`CRITICAL: Delete command executed for user ${userIdToDelete} but user still found in DB. Delete failed.`);
+      return NextResponse.json({ error: 'Internal server error: Failed to verify user deletion.' }, { status: 500 });
     }
+    // --- End Verification Step ---
 
-    console.log(`User ${userIdToDelete} deleted successfully by admin ${adminUser.email}.`);
-    // Also consider deleting related data in Supabase Auth if necessary
-    // const { error: authError } = await supabase.auth.admin.deleteUser(userIdToDelete);
-    // if (authError) {
-    //   console.error(`Failed to delete user ${userIdToDelete} from Supabase Auth:`, authError);
-    //   // Handle this error - maybe log it but still return success for DB deletion?
-    // }
+    // If verification passed (user not found), proceed with success logic
+    console.log(`User ${userIdToDelete} deletion verified successfully.`);
 
-    return NextResponse.json({ message: 'User deleted successfully' }, { status: 200 }); // Use 200 or 204
+    // --- Delete user from Supabase Auth as well --- 
+    console.log(`Attempting to delete user ${userIdToDelete} from Supabase Auth...`);
+    const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userIdToDelete);
+    
+    if (authDeleteError) {
+         // Log the error but potentially still return success for the DB deletion?
+         // Or return a specific error indicating partial failure?
+         // For now, log warning and continue to return success as DB delete worked.
+         console.warn(`DB user ${userIdToDelete} deleted, but failed to delete from Supabase Auth:`, authDeleteError);
+         // Optionally, return a different response or status code here
+         // return NextResponse.json({ message: 'User deleted from DB but failed to delete from Auth.', error: authDeleteError.message }, { status: 207 }); // 207 Multi-Status
+    } else {
+        console.log(`User ${userIdToDelete} successfully deleted from Supabase Auth.`);
+    }
+    // --- End Supabase Auth Deletion ---
+
+    return NextResponse.json({ message: 'User deleted successfully' }, { status: 200 }); 
 
   } catch (error: any) {
-    console.error(`Error deleting user ${userIdToDelete}:`, error);
+    // Use the local variable
+    console.error(`Error during user deletion process for ${userIdToDelete}:`, error);
     return NextResponse.json({ error: 'Internal server error during user deletion.', details: error.message }, { status: 500 });
   }
 } 

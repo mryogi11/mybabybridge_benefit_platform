@@ -112,6 +112,8 @@ npm start
 - **Payments**: Integration with payment processing
 - **Benefit Verification**: Employer/health plan benefit verification and package management (replaces previous Treatment Plans concept)
     - Includes an admin UI at `/admin/packages` for managing benefit packages.
+- **User Management (Admin)**: Interface for administrators to add, view, edit (name, role), and delete users.
+    - Admin UI located at `/admin/users`.
 
 ## Prerequisites
 
@@ -187,6 +189,9 @@ All admin routes require the user to be authenticated and have the 'admin' role.
 *   **Users**
     *   `POST /api/admin/create-user`: Creates a new user (requires careful handling).
     *   `PUT /api/admin/update-role`: Updates a user's role.
+    *   `PUT /api/admin/users/[userId]`: Updates a specific user's details (e.g., first name, last name, role).
+        * Body: `{ first_name?: string, last_name?: string, role?: UserRole }`
+    *   `DELETE /api/admin/users/[userId]`: Deletes a specific user from both the database and Supabase Auth.
 
 ### Authentication
 

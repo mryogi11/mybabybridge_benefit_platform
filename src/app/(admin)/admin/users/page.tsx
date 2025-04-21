@@ -406,6 +406,37 @@ function EditUserDialog({ open, onClose, user, onUpdateUser, error }: EditUserDi
     );
 }
 
+// --- Add DeleteConfirmationDialog Component ---
+interface DeleteConfirmationDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => Promise<void>; // Make it async
+  userName: string; // Show user name/email for confirmation
+  loading: boolean;
+  error: string | null;
+}
+
+function DeleteConfirmationDialog({ open, onClose, onConfirm, userName, loading, error }: DeleteConfirmationDialogProps) {
+  return (
+    <Dialog open={open} onClose={onClose}>
+      <DialogTitle>Confirm Deletion</DialogTitle>
+      <DialogContent>
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        <Typography>
+          Are you sure you want to delete the user <strong>{userName}</strong>? This action cannot be undone.
+        </Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={loading}>Cancel</Button>
+        <Button onClick={onConfirm} disabled={loading} color="error" variant="contained">
+          {loading ? <LinearProgress color="inherit" sx={{ width: '80px' }} /> : 'Delete'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+// --- End Add DeleteConfirmationDialog ---
+
 // --- UsersManagementPage Component ---
 export default function UsersManagementPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -422,6 +453,13 @@ export default function UsersManagementPage() {
   const [userToEdit, setUserToEdit] = useState<User | null>(null);
   const [editUserError, setEditUserError] = useState<string | null>(null);
   // --- End State for Edit Dialog ---
+
+  // --- Add State for Delete Dialog ---
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  // selectedUserId will hold the ID of the user to delete while the dialog is open
+  // --- End Add State ---
 
   // Define the Custom Toolbar Component *inside* UsersManagementPage
   // It now accepts GridToolbarProps and accesses setAddUserDialogOpen from the outer scope
@@ -467,49 +505,110 @@ export default function UsersManagementPage() {
             setEditUserDialogOpen(true);
         } else {
             console.error("User not found for editing:", selectedUserId);
-            setError("Could not find the selected user to edit."); // Show a general error
+            setError("Could not find the selected user to edit."); 
         }
      }
-     handleMenuClose(); // Close the menu after action
    };
 
-   // Revert handleDeleteClick to placeholder
+   // Update handleDeleteClick to open confirmation
    const handleDeleteClick = () => {
-     // Placeholder implementation
-     console.log("Delete clicked for user:", selectedUserId);
-     handleMenuClose(); // Close the menu after action
+     if (selectedUserId) {
+        console.log("Opening delete confirmation for user:", selectedUserId);
+        setDeleteError(null); // Clear previous delete errors
+        setDeleteConfirmOpen(true);
+     }
    };
+
+  // --- Add Handler for Confirming Deletion ---
+  const handleConfirmDelete = async () => {
+    // Add log to check if function is called
+    console.log("handleConfirmDelete function triggered for user:", selectedUserId);
+
+    if (!selectedUserId) {
+        console.error("handleConfirmDelete called but selectedUserId is null!");
+        return;
+    }
+
+    console.log(`Attempting to delete user ${selectedUserId}`);
+    setDeleteLoading(true);
+    setDeleteError(null);
+
+    // Actual API call logic:
+    try {
+      const response = await fetch(`/api/admin/users/${selectedUserId}`, {
+          method: 'DELETE',
+          headers: {
+              'Accept': 'application/json',
+          },
+      });
+
+      if (!response.ok) {
+          let errorData;
+          try {
+              errorData = await response.json();
+          } catch {
+              throw new Error(response.statusText || `Failed to delete user. Status: ${response.status}`);
+          }
+          throw new Error(errorData.error || errorData.message || `Failed to delete user. Status: ${response.status}`);
+      }
+
+      // Success
+      console.log(`User ${selectedUserId} deleted successfully.`);
+      
+      // --- Update UI by modifying local state instead of refetching ---
+      setUsers(currentUsers => currentUsers.filter(user => user.id !== selectedUserId));
+      // --- End UI Update ---
+
+      setDeleteConfirmOpen(false);
+      setSelectedUserId(null); // Clear selection after successful deletion
+      setAnchorEl(null); // Explicitly clear the menu anchor state
+      // await fetchUsers(); // Remove fetchUsers call
+
+    } catch (err: any) {
+      console.error("Error deleting user:", err);
+      const errorMessage = err.message || "An unexpected error occurred during deletion.";
+      setDeleteError(errorMessage);
+      // Keep the dialog open so the user sees the error
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+  // --- End Add Handler ---
 
   const fetchUsers = useCallback(async () => {
-    // Keep loading true until fetch completes or fails critically
     setLoading(true);
     setError(null);
     try {
-      // Sync users first - non-critical failure
+      // Attempt to refresh session/auth state potentially invalidating cache
+      await supabase.auth.refreshSession(); 
+      console.log("Supabase session refreshed before fetching users.");
+
+      // Sync users first (non-critical)
       const syncResponse = await fetch('/api/auth/sync-users');
       if (!syncResponse.ok) {
            console.warn("User sync failed (non-critical):", await syncResponse.text());
       }
 
       // Fetch from the users table
+      console.log("Fetching users list from Supabase...");
       const { data, error: fetchError } = await supabase
         .from('users')
-        .select('*')
-        // Use snake_case for ordering
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
 
       if (fetchError) {
-        throw fetchError; // Throw error to be caught below
+        throw fetchError; 
       }
-      setUsers(data || []);
+      console.log("Data received by fetchUsers:", data);
+      setUsers(data || []); 
     } catch (err: any) {
       console.error("Error fetching users:", err);
       setError(err.message || 'Failed to load users.');
       setUsers([]); // Clear users on critical error
     } finally {
-      setLoading(false); // Set loading false after fetch attempt
+      setLoading(false);
     }
-  }, []);
+  }, []); // Dependency array is empty, relies on the singleton supabase instance
 
   // Initial fetch
   useEffect(() => {
@@ -748,6 +847,20 @@ export default function UsersManagementPage() {
             onUpdateUser={handleUpdateUser}
             error={editUserError}
        />
+
+       {/* Add Delete Confirmation Dialog instance */}
+        <DeleteConfirmationDialog
+            open={deleteConfirmOpen}
+            onClose={() => {
+                setDeleteConfirmOpen(false);
+                setDeleteError(null); // Clear error on manual close
+            }}
+            onConfirm={handleConfirmDelete}
+            userName={users.find(u => u.id === selectedUserId)?.email || selectedUserId || 'this user'}
+            loading={deleteLoading}
+            error={deleteError}
+        />
+       {/* End Add Dialog Instance */}
 
     </Box>
   );
