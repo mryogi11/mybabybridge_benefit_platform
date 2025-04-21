@@ -269,6 +269,143 @@ function AddUserDialog({ open, onClose, onAddUser, error }: AddUserDialogProps) 
     );
 }
 
+// --- EditUserDialog Component ---
+interface EditUserDialogProps {
+  open: boolean;
+  onClose: () => void;
+  user: User | null;
+  onUpdateUser: (userId: string, updatedData: Partial<Pick<User, 'first_name' | 'last_name' | 'role'>>) => Promise<void>;
+  error: string | null;
+}
+
+function EditUserDialog({ open, onClose, user, onUpdateUser, error }: EditUserDialogProps) {
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
+    const [role, setRole] = useState<UserRole>('patient');
+    const [dialogError, setDialogError] = useState<string | null>(null); // Internal validation error
+    const [loading, setLoading] = useState(false);
+
+    // Initialize form state when user prop changes or dialog opens
+    useEffect(() => {
+        if (open && user) {
+            setFirstName(user.first_name || '');
+            setLastName(user.last_name || '');
+            setRole(user.role || 'patient');
+            setDialogError(null); // Clear internal error
+            // We rely on the external `error` prop for API errors
+            setLoading(false);
+        } else if (!open) {
+             setDialogError(null); // Clear errors when closing
+        }
+    }, [open, user]);
+
+    const handleUpdateClick = async () => {
+        if (!user) return; // Should not happen if dialog is open with a user
+
+        // Simple validation
+        if (!firstName.trim() && !lastName.trim()) {
+            setDialogError('At least First Name or Last Name must be provided.');
+            return;
+        }
+
+        setDialogError(null); // Clear validation error
+        setLoading(true);
+
+        const updatedData: Partial<Pick<User, 'first_name' | 'last_name' | 'role'>> = {};
+        let hasChanges = false;
+
+        // Only include fields that have actually changed
+        if (firstName.trim() !== (user.first_name || '')) {
+            updatedData.first_name = firstName.trim();
+            hasChanges = true;
+        }
+        if (lastName.trim() !== (user.last_name || '')) {
+            updatedData.last_name = lastName.trim();
+             hasChanges = true;
+        }
+        if (role !== (user.role || 'patient')) {
+            updatedData.role = role;
+             hasChanges = true;
+        }
+
+        if (!hasChanges) {
+             setDialogError("No changes detected.");
+             setLoading(false);
+             return;
+        }
+
+        try {
+            // Call the parent handler to perform the API update
+            await onUpdateUser(user.id, updatedData);
+            // Parent handles closing the dialog on success
+        } catch (err) {
+            // Error is handled by the parent via the `error` prop passed to this dialog
+            // No need to setDialogError here unless it's a purely client-side issue before calling onUpdateUser
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (!user) return null;
+
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+            <DialogTitle>Edit User: {user.first_name || ''} {user.last_name || ''}</DialogTitle>
+            <DialogContent>
+                 {/* Display API error from parent */}
+                 {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+                 {/* Display internal validation error */}
+                 {dialogError && !error && <Alert severity="warning" sx={{ mb: 2 }}>{dialogError}</Alert>}
+
+                <TextField
+                    autoFocus // Focus the first field
+                    margin="dense"
+                    id="editFirstName"
+                    label="First Name"
+                    type="text"
+                    fullWidth
+                    variant="outlined"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    disabled={loading}
+                />
+                 <TextField
+                    margin="dense"
+                    id="editLastName"
+                    label="Last Name"
+                    type="text"
+                    fullWidth
+                    variant="outlined"
+                    value={lastName}
+                     onChange={(e) => setLastName(e.target.value)}
+                    disabled={loading}
+                />
+                <FormControl fullWidth margin="dense" disabled={loading}>
+                    <InputLabel id="edit-role-label">Role</InputLabel>
+                    <Select
+                        labelId="edit-role-label"
+                        id="editRole"
+                        value={role}
+                        onChange={(e) => setRole(e.target.value as UserRole)}
+                        label="Role"
+                    >
+                        <MenuItem value="admin">Admin</MenuItem>
+                        <MenuItem value="provider">Provider</MenuItem>
+                        <MenuItem value="patient">Patient</MenuItem>
+                         {/* <MenuItem value="staff">Staff</MenuItem> */}
+                    </Select>
+                </FormControl>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose} disabled={loading}>Cancel</Button>
+                <Button onClick={handleUpdateClick} disabled={loading} variant="contained">
+                    {loading ? <LinearProgress sx={{ width: '100px' }} /> : 'Save Changes'}
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+}
+
 // --- UsersManagementPage Component ---
 export default function UsersManagementPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -279,6 +416,12 @@ export default function UsersManagementPage() {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const menuOpen = Boolean(anchorEl);
+
+  // --- State for Edit Dialog ---
+  const [editUserDialogOpen, setEditUserDialogOpen] = useState(false);
+  const [userToEdit, setUserToEdit] = useState<User | null>(null);
+  const [editUserError, setEditUserError] = useState<string | null>(null);
+  // --- End State for Edit Dialog ---
 
   // Define the Custom Toolbar Component *inside* UsersManagementPage
   // It now accepts GridToolbarProps and accesses setAddUserDialogOpen from the outer scope
@@ -312,6 +455,29 @@ export default function UsersManagementPage() {
    const handleMenuClose = () => {
      setAnchorEl(null);
      setSelectedUserId(null);
+   };
+
+   const handleEditClick = () => {
+     if (selectedUserId) {
+        const user = users.find(u => u.id === selectedUserId);
+        if (user) {
+            console.log("Opening edit dialog for user:", user);
+            setUserToEdit(user);
+            setEditUserError(null); // Clear previous edit errors
+            setEditUserDialogOpen(true);
+        } else {
+            console.error("User not found for editing:", selectedUserId);
+            setError("Could not find the selected user to edit."); // Show a general error
+        }
+     }
+     handleMenuClose(); // Close the menu after action
+   };
+
+   // Revert handleDeleteClick to placeholder
+   const handleDeleteClick = () => {
+     // Placeholder implementation
+     console.log("Delete clicked for user:", selectedUserId);
+     handleMenuClose(); // Close the menu after action
    };
 
   const fetchUsers = useCallback(async () => {
@@ -369,6 +535,50 @@ export default function UsersManagementPage() {
       // Keep the dialog open so the user sees the error
     }
   };
+
+  // --- Update User Handler ---
+  const handleUpdateUser = async (userId: string, updatedData: Partial<Pick<User, 'first_name' | 'last_name' | 'role'>>) => {
+      console.log(`Attempting to update user ${userId} with data:`, updatedData);
+      setEditUserError(null); // Clear previous errors
+
+      // The actual API call logic:
+      try {
+          const response = await fetch(`/api/admin/users/${userId}`, {
+              method: 'PUT',
+              headers: {
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(updatedData),
+          });
+
+          if (!response.ok) {
+               let errorData;
+               try {
+                   errorData = await response.json();
+               } catch {
+                   // If response is not JSON, use status text
+                   throw new Error(response.statusText || `Failed to update user. Status: ${response.status}`);
+               }
+                // Use the error message from the API response
+                throw new Error(errorData.error || errorData.message || `Failed to update user. Status: ${response.status}`);
+          }
+
+          // Success
+          console.log(`User ${userId} updated successfully.`);
+          setEditUserDialogOpen(false);
+          setUserToEdit(null);
+          await fetchUsers(); // Refresh the user list to show changes
+
+      } catch (err: any) {
+           console.error("Error updating user:", err);
+           const errorMessage = err.message || "An unexpected error occurred.";
+           setEditUserError(errorMessage);
+           // Keep the dialog open so the user sees the error
+           // Throw the error again so the dialog knows the operation failed
+           throw err;
+      }
+  };
+  // --- End Update User Handler ---
 
     // --- Column Definitions ---
     const columns: GridColDef<User>[] = [
@@ -496,28 +706,47 @@ export default function UsersManagementPage() {
       {/* Action Menu */}
       <Menu
         anchorEl={anchorEl}
-            open={menuOpen}
+        open={menuOpen}
         onClose={handleMenuClose}
-            // TODO: Add PaperProps for styling consistency if needed
-        >
-            {/* TODO: Implement Edit/Delete functionality */}
-            <MenuItem onClick={handleMenuClose}>
-                <ListItemIcon><EditIcon fontSize="small"/></ListItemIcon>
-                Edit
+        MenuListProps={{
+          'aria-labelledby': 'basic-button',
+        }}
+      >
+        {/* MenuItems for Edit and Delete */}
+        <MenuItem onClick={handleEditClick}>
+            <ListItemIcon>
+                <EditIcon fontSize="small" />
+            </ListItemIcon>
+            Edit
         </MenuItem>
-            <MenuItem onClick={handleMenuClose} sx={{ color: 'error.main' }}>
-                 <ListItemIcon sx={{ color: 'error.main' }}><DeleteIcon fontSize="small"/></ListItemIcon>
-                 Delete
+        {/* Keep the menu item, but it now points to the placeholder handler */}
+        <MenuItem onClick={handleDeleteClick} sx={{ color: 'error.main' }}>
+             <ListItemIcon>
+                <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
+            </ListItemIcon>
+            Delete
         </MenuItem>
-            {/* TODO: Implement Role Change if needed */}
       </Menu>
 
       {/* Add User Dialog */}
       <AddUserDialog
-         open={addUserDialogOpen}
-         onClose={() => { setAddUserDialogOpen(false); setAddUserError(null); }}
-         onAddUser={handleAddUser} 
-         error={addUserError} 
+          open={addUserDialogOpen}
+          onClose={() => setAddUserDialogOpen(false)}
+          onAddUser={handleAddUser}
+          error={addUserError} // Pass the specific error state for add user
+      />
+
+      {/* Edit User Dialog */}
+       <EditUserDialog
+            open={editUserDialogOpen}
+            onClose={() => {
+                setEditUserDialogOpen(false);
+                setUserToEdit(null);
+                setEditUserError(null); // Also clear error on explicit close
+            }}
+            user={userToEdit}
+            onUpdateUser={handleUpdateUser}
+            error={editUserError}
        />
 
     </Box>

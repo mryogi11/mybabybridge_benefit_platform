@@ -23,7 +23,7 @@ import { useBenefitVerification } from '@/contexts/BenefitVerificationContext';
 const steps = ['Benefit Verification', 'Organization Search', 'Personal Information', 'Package Selection'];
 
 export default function OrganizationSearchScreen() {
-    const { sponsoringOrganizationId, sponsoringOrganizationName, setSponsoringOrganization } = useBenefitVerification();
+    const { benefitSource, sponsoringOrganizationId, sponsoringOrganizationName, setSponsoringOrganization } = useBenefitVerification();
     const [selectedOption, setSelectedOption] = useState<{ label: string; id: string } | null>( sponsoringOrganizationId ? { label: sponsoringOrganizationName || '', id: sponsoringOrganizationId} : null );
     const [inputValue, setInputValue] = useState(sponsoringOrganizationName || '');
     const [options, setOptions] = useState<{ label: string; id: string }[]>([]);
@@ -31,6 +31,17 @@ export default function OrganizationSearchScreen() {
     const [error, setError] = useState<string | null>(null);
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
+    const [isVerifyingStep, setIsVerifyingStep] = useState(true);
+
+    useEffect(() => {
+        console.log('[Step 2] Checking prerequisite state...', { benefitSource });
+        if (!benefitSource || benefitSource !== 'employer_or_plan') {
+            console.log(`[Step 2] Invalid prerequisite state (${benefitSource}). Redirecting to Step 1.`);
+            router.replace('/step1');
+        } else {
+            setIsVerifyingStep(false);
+        }
+    }, [benefitSource, router]);
 
     useEffect(() => {
         if (selectedOption && selectedOption.label === inputValue) {
@@ -85,6 +96,16 @@ export default function OrganizationSearchScreen() {
         // TODO: Decide navigation for unsure users
         // router.push('/step5'); // Maybe go straight to non-sponsored packages?
     };
+
+    if (isVerifyingStep) {
+        return (
+            <Container maxWidth="sm">
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+                    <CircularProgress />
+                </Box>
+            </Container>
+        );
+    }
 
     return (
         <Container maxWidth="sm">

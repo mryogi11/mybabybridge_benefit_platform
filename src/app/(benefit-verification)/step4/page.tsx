@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useTransition } from 'react';
+import React, { useTransition, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,6 +18,7 @@ import {
     CircularProgress,
     Alert
 } from '@mui/material';
+import { useBenefitVerification } from '@/contexts/BenefitVerificationContext';
 
 // Zod schema for validation
 const workEmailSchema = z.object({
@@ -33,6 +34,8 @@ export default function WorkEmailScreen() {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [error, setError] = React.useState<string | null>(null);
+    const { sponsoringOrganizationId, personalInfo } = useBenefitVerification();
+    const [isVerifyingStep, setIsVerifyingStep] = useState(true);
     
     // TODO: Get the verification attempt ID from the previous step (Step 3)
     // This might require passing it via state, context, or URL param
@@ -52,6 +55,21 @@ export default function WorkEmailScreen() {
     });
 
     const workEmailValue = watch('workEmail'); // Watch the value for button logic
+
+    // Check prerequisite data from context
+    useEffect(() => {
+        console.log('[Step 4] Checking prerequisite state...', { sponsoringOrganizationId, hasPersonalInfo: !!personalInfo });
+        // Step 4 requires an organization ID from Step 2 and personal info from Step 3
+        // Check for sponsoringOrganizationId (implicitly means Step 2 completed)
+        // Check for personalInfo (or specific fields like firstName) to ensure Step 3 was completed
+        if (!sponsoringOrganizationId || !personalInfo?.firstName) { // Example check
+            console.log(`[Step 4] Prerequisite state missing (OrgID: ${!!sponsoringOrganizationId}, Info: ${!!personalInfo?.firstName}). Redirecting.`);
+            // Redirect to Step 3 if info missing, Step 2 if org missing (though Step 3 check should catch that)
+            router.replace(!sponsoringOrganizationId ? '/step2' : '/step3'); 
+        } else {
+            setIsVerifyingStep(false); // Prerequisites met
+        }
+    }, [sponsoringOrganizationId, personalInfo, router]);
 
     const onSubmit = (data: WorkEmailFormData) => {
         setError(null);
@@ -86,6 +104,17 @@ export default function WorkEmailScreen() {
             router.push('/step5');
          });
     };
+
+    // Show loading indicator while verifying step access
+    if (isVerifyingStep) {
+        return (
+            <Container maxWidth="sm">
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+                    <CircularProgress />
+                </Box>
+            </Container>
+        );
+    }
 
     return (
         <Container maxWidth="sm">
@@ -124,13 +153,13 @@ export default function WorkEmailScreen() {
                                 error={!!errors.workEmail}
                                 helperText={errors.workEmail?.message}
                                 sx={{ mb: 2 }}
-                                disabled={isPending}
+                                disabled={isPending || isVerifyingStep}
                             />
                         )}
                     />
 
                     <Box sx={{ textAlign: 'center', mb: 4 }}>
-                        <MuiLink component="button" type="button" variant="body2" onClick={handleNoWorkEmail} disabled={isPending} sx={{ cursor: 'pointer' }}>
+                        <MuiLink component="button" type="button" variant="body2" onClick={handleNoWorkEmail} disabled={isPending || isVerifyingStep} sx={{ cursor: 'pointer' }}>
                             I don't have a work email
                         </MuiLink>
                     </Box>
@@ -139,7 +168,7 @@ export default function WorkEmailScreen() {
                         <Button
                             type="submit"
                             variant="contained"
-                            disabled={isPending}
+                            disabled={isPending || isVerifyingStep}
                             sx={{ 
                                 bgcolor: '#e0f2f1', 
                                 color: '#004d40',

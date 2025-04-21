@@ -64,9 +64,22 @@ export default function PersonalInfoScreen() {
     const { sponsoringOrganizationId, setBenefitStatus } = useBenefitVerification();
     const [error, setError] = useState<string | null>(null);
     const [isPending, startTransition] = useTransition();
+    const [isVerifyingStep, setIsVerifyingStep] = useState(true); // Loading state
     
-    // Check if orgId is available from context
-    const isOrgIdMissing = !sponsoringOrganizationId;
+    // Check if orgId is available from context - Moved check to useEffect
+    // const isOrgIdMissing = !sponsoringOrganizationId;
+
+    // UseEffect for prerequisite check
+    useEffect(() => {
+        console.log('[Step 3] Checking prerequisite state...', { sponsoringOrganizationId });
+        // User should only be here if they selected an organization in Step 2
+        if (!sponsoringOrganizationId) {
+            console.log(`[Step 3] Sponsoring Organization ID missing. Redirecting to Step 2.`);
+            router.replace('/step2'); // Redirect if org ID is missing
+        } else {
+            setIsVerifyingStep(false); // Prerequisite met
+        }
+    }, [sponsoringOrganizationId, router]);
 
     const {
         control,
@@ -95,10 +108,15 @@ export default function PersonalInfoScreen() {
     });
 
     const onSubmit = (data: PersonalInfoFormData) => {
-        if (isOrgIdMissing) {
-            setError("Sponsoring organization not selected. Please go back.");
-            return;
+        // Remove check here, handled by useEffect
+        // if (isOrgIdMissing) { ... }
+        
+        // Ensure orgId is available before proceeding (belt-and-suspenders)
+        if (!sponsoringOrganizationId) {
+             setError("Cannot submit without a selected organization.");
+             return;
         }
+
         setError(null);
         startTransition(async () => {
             // Construct full DOB and phone
@@ -133,6 +151,18 @@ export default function PersonalInfoScreen() {
         });
     };
 
+    // Show loading indicator while verifying step access
+    if (isVerifyingStep) {
+        return (
+            <Container maxWidth="sm">
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+                    <CircularProgress />
+                </Box>
+            </Container>
+        );
+    }
+
+    // Original return logic
     return (
         <Container maxWidth="sm">
             <Box sx={{ width: '100%', my: 4 }}>
@@ -155,9 +185,10 @@ export default function PersonalInfoScreen() {
                     <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
                 )}
 
-                {isOrgIdMissing && (
-                     <Alert severity="warning" sx={{ mb: 2 }}>Could not determine sponsoring organization. Please go back.</Alert>
-                )}
+                {/* Warning if somehow rendered without orgId - maybe remove if useEffect handles it robustly */}
+                {/*!sponsoringOrganizationId && !isVerifyingStep && (
+                     <Alert severity="warning" sx={{ mb: 2 }}>Could not determine sponsoring organization. Please go back to Step 2.</Alert>
+                )*/}
 
                 <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate sx={{ mt: 1 }}>
                     <Grid container spacing={2}>
@@ -175,7 +206,7 @@ export default function PersonalInfoScreen() {
                                         autoComplete="given-name"
                                         error={!!errors.firstName}
                                         helperText={errors.firstName?.message}
-                                        disabled={isPending || isOrgIdMissing}
+                                        disabled={isPending || isVerifyingStep}
                                     />
                                 )}
                             />
@@ -194,7 +225,7 @@ export default function PersonalInfoScreen() {
                                         autoComplete="family-name"
                                         error={!!errors.lastName}
                                         helperText={errors.lastName?.message}
-                                        disabled={isPending || isOrgIdMissing}
+                                        disabled={isPending || isVerifyingStep}
                                     />
                                 )}
                             />
@@ -209,7 +240,7 @@ export default function PersonalInfoScreen() {
                                 name="dobMonth"
                                 control={control}
                                 render={({ field }) => (
-                                    <FormControl fullWidth error={!!errors.dobMonth} disabled={isPending || isOrgIdMissing}>
+                                    <FormControl fullWidth error={!!errors.dobMonth} disabled={isPending || isVerifyingStep}>
                                         <InputLabel id="dob-month-label">Month</InputLabel>
                                         <Select
                                             {...field}
@@ -241,7 +272,7 @@ export default function PersonalInfoScreen() {
                                         inputProps={{ maxLength: 2 }}
                                         error={!!errors.dobDay}
                                         helperText={errors.dobDay?.message}
-                                        disabled={isPending || isOrgIdMissing}
+                                        disabled={isPending || isVerifyingStep}
                                     />
                                 )}
                              />
@@ -261,7 +292,7 @@ export default function PersonalInfoScreen() {
                                         inputProps={{ maxLength: 4 }}
                                         error={!!errors.dobYear}
                                         helperText={errors.dobYear?.message}
-                                        disabled={isPending || isOrgIdMissing}
+                                        disabled={isPending || isVerifyingStep}
                                     />
                                 )}
                             />
@@ -276,7 +307,7 @@ export default function PersonalInfoScreen() {
                                 name="countryCode"
                                 control={control}
                                 render={({ field }) => (
-                                    <FormControl fullWidth error={!!errors.countryCode} disabled={isPending || isOrgIdMissing}>
+                                    <FormControl fullWidth error={!!errors.countryCode} disabled={isPending || isVerifyingStep}>
                                         <InputLabel id="country-code-label">Code</InputLabel>
                                         <Select
                                             {...field}
@@ -307,7 +338,7 @@ export default function PersonalInfoScreen() {
                                         autoComplete="tel-national"
                                         error={!!errors.phoneNumber}
                                         helperText={errors.phoneNumber?.message}
-                                        disabled={isPending || isOrgIdMissing}
+                                        disabled={isPending || isVerifyingStep}
                                     />
                                 )}
                             />
@@ -329,7 +360,7 @@ export default function PersonalInfoScreen() {
                                         autoComplete="email"
                                         error={!!errors.workEmail}
                                         helperText={errors.workEmail?.message || "Used for verification with some employers."}
-                                        disabled={isPending || isOrgIdMissing}
+                                        disabled={isPending || isVerifyingStep}
                                     />
                                 )}
                             />
@@ -354,7 +385,7 @@ export default function PersonalInfoScreen() {
                                         autoComplete="address-line1"
                                         error={!!errors.addressLine1}
                                         helperText={errors.addressLine1?.message}
-                                        disabled={isPending || isOrgIdMissing}
+                                        disabled={isPending || isVerifyingStep}
                                     />
                                 )}
                             />
@@ -372,7 +403,7 @@ export default function PersonalInfoScreen() {
                                         autoComplete="address-line2"
                                         error={!!errors.addressLine2}
                                         helperText={errors.addressLine2?.message}
-                                        disabled={isPending || isOrgIdMissing}
+                                        disabled={isPending || isVerifyingStep}
                                     />
                                 )}
                             />
@@ -391,7 +422,7 @@ export default function PersonalInfoScreen() {
                                         autoComplete="address-level2"
                                         error={!!errors.addressCity}
                                         helperText={errors.addressCity?.message}
-                                        disabled={isPending || isOrgIdMissing}
+                                        disabled={isPending || isVerifyingStep}
                                     />
                                 )}
                             />
@@ -410,7 +441,7 @@ export default function PersonalInfoScreen() {
                                         autoComplete="address-level1"
                                         error={!!errors.addressState}
                                         helperText={errors.addressState?.message}
-                                        disabled={isPending || isOrgIdMissing}
+                                        disabled={isPending || isVerifyingStep}
                                     />
                                 )}
                             />
@@ -429,7 +460,7 @@ export default function PersonalInfoScreen() {
                                         autoComplete="postal-code"
                                         error={!!errors.addressPostalCode}
                                         helperText={errors.addressPostalCode?.message}
-                                        disabled={isPending || isOrgIdMissing}
+                                        disabled={isPending || isVerifyingStep}
                                     />
                                 )}
                             />
@@ -449,7 +480,7 @@ export default function PersonalInfoScreen() {
                                         autoComplete="country"
                                         error={!!errors.addressCountry}
                                         helperText={errors.addressCountry?.message}
-                                        disabled={isPending || isOrgIdMissing}
+                                        disabled={isPending || isVerifyingStep}
                                     />
                                 )}
                             />
@@ -459,16 +490,12 @@ export default function PersonalInfoScreen() {
                     <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
                         <Button
                             type="submit"
+                            fullWidth
                             variant="contained"
-                            disabled={!isValid || isPending || isOrgIdMissing}
-                             sx={{ 
-                                py: 1.5, 
-                                px: 5,
-                                textTransform: 'none'
-                            }}
-                             startIcon={isPending ? <CircularProgress size={20} color="inherit" /> : null}
+                            sx={{ mt: 3, mb: 2, bgcolor: '#e0f2f1', color: '#004d40', '&:hover': { bgcolor: '#b2dfdb' } }}
+                            disabled={isPending || !isValid || isVerifyingStep} // Disable if verifying step
                         >
-                             {isPending ? 'Submitting...' : 'Next'}
+                            {isPending ? <CircularProgress size={24} color="inherit" /> : 'Continue'}
                         </Button>
                     </Box>
                 </Box>

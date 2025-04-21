@@ -24,18 +24,54 @@ import { useBenefitVerification } from '@/contexts/BenefitVerificationContext';
 const steps = ['Benefit Verification', 'Organization Search', 'Personal Information', 'Package Selection'];
 
 export default function PackageOptionsScreen() {
-    const { benefitStatus, benefitSource } = useBenefitVerification();
+    const { benefitStatus, benefitSource, sponsoringOrganizationId, firstName } = useBenefitVerification();
     const [packages, setPackages] = useState<any[]>([]);
     const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
+    const [isVerifyingStep, setIsVerifyingStep] = useState(true);
 
     const isVerified = benefitStatus === 'verified';
     const mightHaveSponsorship = benefitSource === 'employer_or_plan' || benefitStatus === 'verified';
 
     useEffect(() => {
+        console.log('[Step 5] Checking prerequisite state...', { benefitSource, sponsoringOrganizationId, benefitStatus });
+        let shouldRedirect = false;
+        let redirectPath = '/step1';
+
+        if (benefitSource === 'employer_or_plan') {
+            // If employer plan, status should NOT be 'not_started' (meaning Step 3/4 were attempted or completed)
+            // Also need the org ID from Step 2.
+            if (!sponsoringOrganizationId || benefitStatus === 'not_started') { 
+                console.log('[Step 5] Employer path prerequisites missing (OrgID or Status not ready). Redirecting.');
+                shouldRedirect = true;
+                 // If status is not_started, likely Step 1/2 issues, go to Step 1.
+                 // If orgId missing but status progressed, likely Step 2 issue, go to Step 2.
+                 // If status progressed AND orgId present, Step 3/4 likely issue, maybe redirect Step 3?
+                 // For simplicity, redirect based on what seems most likely missing:
+                 redirectPath = !sponsoringOrganizationId ? '/step2' : '/step1'; // Go back if OrgID missing or status indicates early stage
+            }
+        } else if (benefitSource === 'partner_or_parent' || benefitSource === 'none') {
+            // OK - These paths come directly from Step 1
+        } else {
+            // If benefitSource is missing or invalid
+            console.log('[Step 5] Invalid benefitSource. Redirecting to Step 1.');
+            shouldRedirect = true;
+            redirectPath = '/step1';
+        }
+
+        if (shouldRedirect) {
+            router.replace(redirectPath);
+        } else {
+            setIsVerifyingStep(false); // Prerequisites met
+        }
+    }, [benefitSource, sponsoringOrganizationId, benefitStatus, router]); // Add benefitStatus dependency
+
+    useEffect(() => {
+        if (isVerifyingStep) return; // Wait for prerequisite check
+        
         const loadData = async () => {
             setLoading(true);
             setError(null);
@@ -54,7 +90,7 @@ export default function PackageOptionsScreen() {
             }
         };
         loadData(); 
-    }, [benefitStatus]);
+    }, [isVerifyingStep]); // Remove benefitStatus dependency here, rely on step verification
 
     const handleSelectPackage = (packageId: string) => {
         setSelectedPackageId(packageId);
@@ -76,7 +112,7 @@ export default function PackageOptionsScreen() {
         });
     };
 
-    if (loading) {
+    if (isVerifyingStep || loading) {
         return (
             <Container maxWidth="lg">
                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>

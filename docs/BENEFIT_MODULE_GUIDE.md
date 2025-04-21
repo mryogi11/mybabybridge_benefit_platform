@@ -145,6 +145,20 @@
    - Prorated billing for mid-cycle changes
    - Grace period for package switches
 
+### Access Control & Sequence Enforcement
+
+To ensure users navigate the benefit verification flow correctly and prevent unauthorized access, the following logic is implemented in the `/src/app/(benefit-verification)/layout.tsx` layout component and individual step pages:
+
+*   **Layout Checks (`layout.tsx`):**
+    *   **Authentication:** Users must be logged in.
+    *   **Role:** Users must have the `'patient'` role.
+    *   **Benefit Status:** If the patient's `benefit_status` is already `'verified'`, they are automatically redirected to their main dashboard (`/dashboard`).
+    *   Users who fail authentication or role checks are redirected to `/login` or their respective dashboards (`/admin`, `/provider`).
+*   **Step Page Checks (`stepX/page.tsx`):**
+    *   Each step page (`/step2` onwards) uses the `BenefitVerificationContext` to check if the required data from the *previous* step has been set.
+    *   If prerequisite data is missing (e.g., accessing `/step3` without selecting an organization in `/step2`), the user is redirected back to the appropriate earlier step (`/step1` or `/step2`, etc.).
+*   **Result:** This combined approach ensures that only authenticated patients with a non-verified benefit status can access the flow, and they must proceed through the steps sequentially.
+
 This implementation provides a user-friendly approach to fertility benefit verification while offering clear upgrade paths for patients who want enhanced services beyond their employer-provided benefits.
 
 ## Current Implementation Status (As of April 15, 2025)
