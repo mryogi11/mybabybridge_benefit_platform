@@ -69,6 +69,12 @@ We've created several tools to make deployment easier:
 2. **Configure Stripe webhooks** to use your new Vercel URL
 3. **Test the application** thoroughly after deployment
 
+### Troubleshooting
+
+*   **`getaddrinfo ENOTFOUND db.<...>.supabase.co` Error:** If you encounter DNS resolution errors like this during deployment or runtime on Vercel, it usually means the API routes cannot connect to the database.
+    *   **Cause:** This often occurs when the `DATABASE_URL` environment variable in Vercel is set to the *direct* database connection string instead of the **Connection Pooling URI**.
+    *   **Solution:** Ensure the `DATABASE_URL` environment variable in your Vercel project settings uses the **Connection Pooling URI** found in your Supabase project settings (Project Settings -> Database -> Connection Pooling). Redeploy Vercel after updating the variable.
+
 ## Development
 
 ### Running Locally

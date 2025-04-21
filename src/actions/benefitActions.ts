@@ -372,10 +372,11 @@ export async function completeBenefitSetup() {
 
         console.log(`[CompleteSetup] DB update result for user ${user.id}:`, updateResult);
 
+        // Check if the update seemed successful based on returned data
         if (!updateResult || updateResult.length === 0 || updateResult[0].status !== 'verified') {
              console.error(`[CompleteSetup] Failed to verify status update in DB for user ${user.id}. Update result:`, updateResult);
-             // Optional: throw an error or return failure if update didn't seem to work
-             // throw new Error("Database update for benefit status failed verification.");
+             // Return failure if update didn't seem to work
+             return { success: false, message: "Failed to confirm benefit status update in database." }; 
         }
 
         console.log("Benefit setup completed for user:", user.id);
