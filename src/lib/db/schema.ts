@@ -52,6 +52,20 @@ export const packages = pgTable('packages', {
 // Alternatively, make it nullable or handle the relation logic in the application layer initially.
 // For now, let's keep it commented out in the organizations table definition.
 
+// --- NEW: Organization Packages Junction Table ---
+export const organization_packages = pgTable('organization_packages', {
+    organization_id: uuid('organization_id').references(() => organizations.id, { onDelete: 'cascade' }).notNull(),
+    package_id: uuid('package_id').references(() => packages.id, { onDelete: 'cascade' }).notNull(),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(), // Optional: track when link was made
+  },
+  (table) => {
+    return {
+      // Define composite primary key
+      pk: primaryKey({ columns: [table.organization_id, table.package_id] }),
+    };
+  }
+);
+
 // --- NEW: Organization Approved Emails Table ---
 export const organization_approved_emails = pgTable('organization_approved_emails', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -222,13 +236,27 @@ export const providerAvailabilities = pgTable('provider_availabilities', {
 // Define relations based on the corrected table names and foreign keys
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   sponsoredUsers: many(users),
-  approvedEmails: many(organization_approved_emails), // Add relation to approved emails
+  approvedEmails: many(organization_approved_emails),
+  organizationPackages: many(organization_packages), // Relation to junction table
   // relation to default package if FK is added later
 }));
 
 export const packagesRelations = relations(packages, ({ many }) => ({
   selectedByUsers: many(users),
+  organizationPackages: many(organization_packages), // Relation to junction table
   // relation from organizations default package if FK is added later
+}));
+
+// Add relations for the junction table
+export const organizationPackagesRelations = relations(organization_packages, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [organization_packages.organization_id],
+    references: [organizations.id],
+  }),
+  package: one(packages, {
+    fields: [organization_packages.package_id],
+    references: [packages.id],
+  }),
 }));
 
 export const usersRelations = relations(users, ({ one, many }) => ({

@@ -1,7 +1,7 @@
 console.log('[db/index.ts] >>> STARTING MODULE LOAD <<<');
 
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
 import * as schema from './schema'; // Import all exports from schema.ts
 
 console.log('[db/index.ts] Imports completed.');
@@ -26,9 +26,9 @@ try {
   console.log('[db/index.ts] Attempting to initialize postgres client...');
   // --- REVERTING IP ADDRESS TEST --- 
   // Rely solely on the connectionString, remove explicit host option
-  client = postgres(connectionString, { 
-    prepare: false 
-    // host: resolvedHost // <-- REMOVE this line
+  client = new Pool({
+    connectionString: connectionString,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false, // Adjusted SSL based on env
   });
   // --- END REVERTING IP ADDRESS TEST ---
   console.log('[db/index.ts] SUCCESS: Postgres client initialized (using connectionString only).');
@@ -44,7 +44,7 @@ try {
 
 console.log('[db/index.ts] Attempting to initialize Drizzle...');
 // Initialize Drizzle with the client and the imported schema
-export const db = drizzle(client, { schema });
+export const db = drizzle(client, { schema, logger: true });
 console.log('[db/index.ts] SUCCESS: Drizzle instance created.');
 
 // You might need separate clients for different connection types (e.g., pooling for server, direct for migrations)

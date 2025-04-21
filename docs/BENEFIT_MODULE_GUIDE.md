@@ -169,14 +169,18 @@ This implementation provides a user-friendly approach to fertility benefit verif
 
 ### Pending Items / Potential Enhancements:
 
-*   **Admin Edit/Delete Functionality (Organizations):** Temporarily removed due to persistent Next.js 15.x build errors related to PUT/DELETE handlers on dynamic API routes (`/api/admin/organizations/[orgId]`). Needs to be re-implemented, potentially by refactoring routes (e.g., using POST for updates/deletes) or waiting for a fix in Next.js.
-*   **Admin Edit/Delete Functionality (Approved Emails):** Frontend logic for deleting emails is implemented, but full Edit capability is pending.
-*   **Real Verification Logic:** Implement robust verification beyond the basic email check in `submitVerificationInfo`.
-*   **Dynamic Package Filtering:** Update `getBenefitPackages` to filter based on the user's *actual* verified organization and status.
-*   **Stripe Webhooks:** Implement webhook handler for reliable payment confirmation (e.g., `payment_intent.succeeded`).
-*   **User Profile Update:** Update `patient_profiles` table with verified info after successful setup.
-*   **UI/UX Refinements:** Improve loading states, error handling, and edge case management.
-*   **Thorough Testing:** Conduct end-to-end testing of all user paths.
+*   **Layout-Based Status Checks:** Implement the planned routing logic based on `benefit_status` within Server Component layouts (`/dashboard/layout.tsx`, `/benefit-verification/layout.tsx`) as outlined in "Upcoming Refactoring".
+*   **Admin Package Management:** Implement the planned UI and API for package management as outlined in "Upcoming Refactoring".
+*   **Re-implement Admin Org Edit/Delete:** Fix or refactor API routes and UI for editing/deleting organizations.
+*   **Implement Admin Email Edit:** Add UI and API functionality for editing approved emails.
+*   **Real Verification Logic:** Replace the basic email check with a robust verification process in `submitVerificationInfo`.
+*   **Dynamic Package Filtering:** Update `getBenefitPackages` to use actual user data for filtering.
+*   **Stripe Webhooks:** Implement webhook handler for reliable payment tracking.
+*   **User Profile Data:** Ensure correct handling/updating of user profile data (e.g., in `patient_profiles` or `users` table) after verification.
+*   **"No Work Email" Flow:** Implement the user flow for the "I don't have a work email" option on Step 4.
+*   **Input Validation Refinement:** Improve country code selection and phone number validation (Step 3).
+*   **UI/UX Refinements:** Continue improving loading states, error handling, and edge case management.
+*   **Thorough Testing:** Conduct end-to-end testing of all implemented features and user paths.
 
 ## Benefit Verification Status (`benefit_status`)
 

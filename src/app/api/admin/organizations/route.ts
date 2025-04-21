@@ -1,73 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
-
-console.log('[route.ts] >>> STARTING MODULE LOAD <<<');
-console.log('[route.ts] Attempting to import db...');
-import { db } from '@/lib/db'; // This should trigger logs in db/index.ts
-console.log('[route.ts] Successfully imported db.');
-
+import { db } from '@/lib/db';
 import { organizations, users, userRoleEnum } from '@/lib/db/schema';
-import type { Database } from '@/types/supabase'; // Assuming you have this type
-
-console.log('[route.ts] All imports completed.');
-
-// Helper to authorize admin
-async function authorizeAdmin(request: NextRequest) {
-    console.log('[authorizeAdmin] Starting authorization...');
-    let supabase;
-    try {
-        supabase = createServerClient<Database>(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            {
-                cookies: {
-                    get(name: string) {
-                        const cookieValue = request.cookies.get(name)?.value;
-                        // console.log(`[authorizeAdmin] Getting cookie: ${name}, Value found: ${!!cookieValue}`); // Potentially too verbose
-                        return cookieValue;
-                    },
-                },
-            }
-        );
-        console.log('[authorizeAdmin] Supabase client created.');
-    } catch(err) {
-        console.error('[authorizeAdmin] CRITICAL: Failed to create Supabase client:', err);
-        throw new Error('Failed to initialize auth client.');
-    }
-
-    console.log('[authorizeAdmin] Attempting to get user from Supabase...');
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError) {
-        console.error('[authorizeAdmin] Supabase getUser error:', userError);
-        throw new Error("Authentication error checking user.");
-    }
-     if (!user) {
-        console.warn('[authorizeAdmin] No authenticated user found.');
-        throw new Error("User is not authenticated.");
-    }
-    console.log(`[authorizeAdmin] User found: ${user.id}`);
-
-    console.log(`[authorizeAdmin] Checking user role in DB for user: ${user.id}`);
-    let userRecord;
-    try {
-        console.log(`[authorizeAdmin] Attempting db.select for user ${user.id}...`); 
-        userRecord = await db.select({ role: users.role }).from(users).where(eq(users.id, user.id)).limit(1);
-        console.log(`[authorizeAdmin] DB check completed. Records found: ${userRecord.length}`);
-    } catch (dbError) {
-        console.error(`[authorizeAdmin] CRITICAL: Database error checking user role for ${user.id}:`, dbError);
-        throw new Error("Database error during authorization.");
-    }
-
-    if (!userRecord.length || userRecord[0].role !== userRoleEnum.enumValues[0]) { // 'admin'
-        console.warn(`[authorizeAdmin] User ${user.id} is not an admin. Role found: ${userRecord[0]?.role}`);
-        throw new Error("User is not authorized.");
-    }
-    console.log(`[authorizeAdmin] SUCCESS: User ${user.id} authorized as admin.`);
-    return user;
-}
+import { NextRequest, NextResponse } from 'next/server';
+import type { Database } from '@/types/supabase';
+import { authorizeAdmin } from '@/lib/auth/authorizeAdmin';
 
 // Schema for POST request body (using Zod)
 const AddOrganizationSchema = z.object({
@@ -83,8 +21,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     try {
         console.log('[POST /api/admin/organizations] Calling authorizeAdmin...');
-        await authorizeAdmin(request);
-        console.log('[POST /api/admin/organizations] authorizeAdmin succeeded.');
+        // Call the imported helper and check the result
+        const { authorized, user, error: authError } = await authorizeAdmin(request);
+        if (!authorized) {
+            console.warn(`[POST /api/admin/organizations] Authorization failed: ${authError}`);
+            const status = authError === "User is not authenticated." ? 401 : 403;
+            return NextResponse.json({ success: false, message: authError || 'Unauthorized' }, { status });
+        }
+        console.log(`[POST /api/admin/organizations] authorizeAdmin succeeded for user ${user?.id}.`);
 
         console.log('[POST /api/admin/organizations] Parsing request body...');
         const reqBody = await request.json();
@@ -122,12 +66,34 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     } catch (error) {
         console.error(`[POST /api/admin/organizations] CRITICAL ERROR in handler:`, error);
         const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
-        const status = message === "User is not authenticated." ? 401 : message === "User is not authorized." ? 403 : message.includes('already exists') ? 409 : 500;
+        const status = message.includes('already exists') ? 409 : 500;
         console.log(`[POST /api/admin/organizations] Returning error response. Status: ${status}, Message: ${message}`);
         return NextResponse.json({ success: false, message: `Failed to create organization: ${message}` }, { status });
     }
 }
-console.log('[route.ts] >>> MODULE LOAD COMPLETE <<<');
+
+// GET handler for /api/admin/organizations
+export async function GET(request: NextRequest): Promise<NextResponse> {
+    console.log('[GET /api/admin/organizations] Handler invoked.');
+    try {
+        const { authorized, user, error: authError } = await authorizeAdmin(request);
+        if (!authorized) {
+            console.warn(`[GET /api/admin/organizations] Authorization failed: ${authError}`);
+            const status = authError === "User is not authenticated." ? 401 : 403;
+            return NextResponse.json({ success: false, message: authError || 'Unauthorized' }, { status });
+        }
+        console.log(`[GET /api/admin/organizations] User ${user?.id} authorized. Fetching organizations...`);
+
+        const orgs = await db.select().from(organizations).orderBy(organizations.name);
+        console.log(`[GET /api/admin/organizations] Found ${orgs.length} organizations.`);
+        return NextResponse.json({ success: true, data: orgs }, { status: 200 });
+
+    } catch (error) {
+        console.error(`[GET /api/admin/organizations] CRITICAL ERROR in handler:`, error);
+        const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+        return NextResponse.json({ success: false, message: `Failed to fetch organizations: ${message}` }, { status: 500 });
+    }
+}
 
 // You can add other methods like GET if needed
 // export async function GET(request: NextRequest) {

@@ -1,4 +1,3 @@
-
 # MyBabyBridge Fertility Care Platform
 
 A comprehensive fertility care platform for connecting patients with providers, tracking treatment plans, and providing educational resources.
@@ -106,6 +105,7 @@ npm start
 - **Analytics**: Treatment success metrics and insights
 - **Payments**: Integration with payment processing
 - **Benefit Verification**: Employer/health plan benefit verification and package management (replaces previous Treatment Plans concept)
+    - Includes an admin UI at `/admin/packages` for managing benefit packages.
 
 ## Prerequisites
 
@@ -154,6 +154,49 @@ src/
 ├── lib/                   # Utility functions and configurations
 └── types/                 # TypeScript type definitions
 ```
+
+## API Routes
+
+The following API routes are available (primarily for admin or server-side use):
+
+### Admin
+
+All admin routes require the user to be authenticated and have the 'admin' role.
+
+*   **Organizations**
+    *   `POST /api/admin/organizations`: Creates a new organization.
+    *   `GET /api/admin/organizations`: Retrieves all organizations.
+    *   `GET /api/admin/organizations/[orgId]`: Retrieves a specific organization.
+    *   `PUT /api/admin/organizations/[orgId]`: Updates a specific organization.
+    *   `DELETE /api/admin/organizations/[orgId]`: Deletes a specific organization.
+    *   `POST /api/admin/organizations/emails`: Adds an approved email address to an organization.
+    *   `DELETE /api/admin/organizations/emails`: Removes an approved email address from an organization.
+*   **Packages (Benefit)**
+    *   `POST /api/admin/packages`: Creates a new benefit package and links it to an organization.
+        *   Body: `{ name: string, tier: string, monthly_cost: number, organization_id: string, description?: string, key_benefits?: string[], is_base_employer_package?: boolean }`
+    *   `GET /api/admin/packages`: Retrieves all benefit packages, including linked organization ID and name.
+    *   `PUT /api/admin/packages/[packageId]`: Updates a specific benefit package and/or its organization link.
+        *   Body: (Partial of create body, `organization_id` is optional)
+    *   `DELETE /api/admin/packages/[packageId]`: Deletes a specific benefit package.
+*   **Users**
+    *   `POST /api/admin/create-user`: Creates a new user (requires careful handling).
+    *   `PUT /api/admin/update-role`: Updates a user's role.
+
+### Authentication
+
+*   `POST /api/auth/sync-users`: (Potentially for syncing Supabase auth users with the public users table).
+
+### Payments (Stripe)
+
+*   `GET /api/payment-methods`: Retrieves the user's saved payment methods.
+*   `POST /api/payment-methods/attach`: Attaches a new payment method.
+*   `POST /api/payment-methods/default`: Sets a default payment method.
+*   `POST /api/payment-methods/delete`: Deletes a payment method.
+*   `GET /api/subscriptions`: Retrieves the user's subscription status.
+
+### Other
+
+*   `GET /api/test-db`: A simple route for testing database connectivity.
 
 ## Contributing
 
