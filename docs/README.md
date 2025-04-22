@@ -110,8 +110,7 @@ npm start
 - **Educational Resources**: Curated content for fertility education
 - **Analytics**: Treatment success metrics and insights
 - **Payments**: Integration with payment processing
-- **Benefit Verification**: Employer/health plan benefit verification and package management (replaces previous Treatment Plans concept)
-    - Includes an admin UI at `/admin/packages` for managing benefit packages.
+- **Benefit Verification**: Employer/health plan benefit verification and package management. Includes full admin UI (`/admin/packages`) for package CRUD. The user-facing verification flow (Steps 4-6) is partially implemented; initial steps (1-3) are planned for a future release.
 - **User Management (Admin)**: Interface for administrators to add, view, edit (name, role), and delete users.
     - Admin UI located at `/admin/users`.
 
