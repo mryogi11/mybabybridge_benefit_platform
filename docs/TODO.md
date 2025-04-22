@@ -1,8 +1,75 @@
-# 📋Project TODO List 
+# 📋Project TODO List
 
 This document tracks the features and tasks for the MyBabyBridge platform.
+*Updated based on PRD/README review and recent debugging (April 2025).*
 
-## Feature Status
+## Pending Features / Implementation Status
+
+### Major Features (Pending / Incomplete)
+
+*   [ ] **Benefit Verification Module:**
+    *   [ ] Implement user-facing flow (Steps 1-3 mentioned as planned in README).
+    *   [ ] Complete partially implemented steps (Steps 4-6 mentioned in README).
+    *   [ ] Integrate verification status with package selection/dashboard.
+    *   [ ] Implement "No Work Email" alternative verification flow (Step 4).
+    *   [ ] *(Ref: `docs/BENEFIT_MODULE_GUIDE.md`)*
+*   [ ] **Secure Messaging:**
+    *   [ ] Implement UI for patient-provider communication.
+    *   [ ] Implement backend logic (Server Actions/API) for sending/receiving messages.
+    *   [ ] Handle message storage and retrieval.
+    *   [ ] Implement real-time updates (e.g., via Supabase Realtime).
+*   [ ] **Payments (Stripe Integration):**
+    *   [ ] Implement UI flow for package purchase/subscription.
+    *   [ ] Verify/complete Stripe Payment Intent creation logic.
+    *   [ ] Implement and test Stripe Webhook handler (`/api/payments/webhook` mentioned in PRD).
+    *   [ ] Handle subscription management (linking status to `PatientPackages` table).
+*   [ ] **Analytics Module:**
+    *   [ ] Design and implement Admin dashboard UI for analytics.
+    *   [ ] Implement data collection/aggregation for required metrics (Revenue, User, Treatment).
+    *   [ ] Develop backend logic/API endpoints for fetching analytics data.
+    *   [ ] Implement chart/visualization components.
+*   [ ] **Educational Resources:**
+    *   [ ] Determine content management strategy (e.g., CMS, markdown files, database table).
+    *   [ ] Implement UI for displaying curated content to patients.
+    *   [ ] Develop logic for fetching/serving content.
+*   [ ] **Notifications:**
+    *   [ ] Implement triggers for key events (appointments, benefits, messages etc.).
+    *   [ ] Set up mechanism for sending email notifications.
+    *   [ ] Develop in-app notification display system (beyond basic dashboard list).
+    *   [ ] Implement read/unread status management.
+
+### Module-Specific Tasks
+
+*   **Admin Module:**
+    *   [ ] **Provider Management:** Implement UI and APIs for Provider CRUD, credentials management, monitoring (as per PRD).
+    *   [ ] **User Activity Logs:** Implement mechanism for logging and viewing admin-relevant user actions.
+    *   [ ] **Platform Metrics Dashboard:** Implement dashboard UI described in PRD/Analytics section.
+*   **Provider Module:**
+    *   [ ] **Profile Management:** Implement UI for providers to manage professional details, visibility settings (as per PRD).
+    *   [ ] **Patient Communication:** Linked to Secure Messaging feature.
+*   **Patient Module:**
+    *   [ ] **Dashboard Refinement:** Enhance dashboard beyond upcoming appointments (e.g., treatment plan progress linked to benefits).
+    *   [ ] **Profile Management:** Implement UI for patients to view/edit their profile.
+
+### Authentication & Authorization
+
+*   [ ] **Social Login:** Implement Google/Facebook login integration (as per PRD).
+*   [ ] **Staff Role:** Define and implement permissions/access for the 'staff' role if distinct from 'admin'.
+*   [ ] **Security Review:** Conduct thorough review of RLS policies and API/Server Action authorization checks.
+
+## Technical Debt / Improvements
+
+*   [ ] **Refactor to Server Actions:** Convert remaining direct Supabase client calls (Provider Availability management, Provider Appointment complete/edit) to Server Actions.
+*   [ ] **Improve Data Fetching:** Enhance Server Actions (`getAppointmentsForUser`, etc.) to efficiently join related data (patient/provider names) needed by the UI.
+*   [ ] **Refine Type Safety:** Review usage of `as any` and ensure types (e.g., `ProviderDashboardAppointmentData`) accurately reflect fetched data, especially with complex joins.
+*   [ ] **Standardize Error Handling:** Improve consistency in Server Action error reporting and user-facing error messages.
+*   [ ] **Update Documentation:** Keep `README.md`, `PRD.md`, `HANDOVER.md`, `CODE_INDEX.md`, and this `TODO.md` updated as work progresses.
+*   [ ] **Testing:** Implement unit, integration, and end-to-end tests (Jest, Cypress mentioned in PRD).
+
+---
+*Previous content below might be outdated.*
+<!-- 
+OUTDATED CONTENT:
 
 **Completed Features ✅**
 
@@ -146,3 +213,5 @@ This document tracks the features and tasks for the MyBabyBridge platform.
 *   Patient ability to cancel/reschedule appointments.
 *   Notifications for appointment changes.
 *   More robust validation for availability/booking logic.
+
+-->

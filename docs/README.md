@@ -104,17 +104,32 @@ npm start
 
 ## Features
 
-- **User Dashboards**: Patient and provider dashboards with role-specific views
-- **Appointment Management**: Scheduling, history, and reminders
-- **Secure Messaging**: Communication between patients and providers
-- **Educational Resources**: Curated content for fertility education
-- **Analytics**: Treatment success metrics and insights
-- **Payments**: Integration with payment processing
-- **Benefit Verification**: Employer/health plan benefit verification and package management. Includes full admin UI (`/admin/packages`) for package CRUD. The user-facing verification flow (Steps 4-6) is partially implemented; initial steps (1-3) are planned for a future release.
-- **User Management (Admin)**: Interface for administrators to add, view, edit (name, role), and delete users.
-    - Admin UI located at `/admin/users`.
-- **Organization Management (Admin)**: Interface for administrators to add, view, edit, and delete organizations, including management of approved email domains for user registration.
-    - Admin UI located at `/admin/organizations` and `/admin/organizations/[orgId]`.
+*   **User Dashboards**: Implemented basic dashboards for Patients (`/dashboard`) and Providers (`/provider/dashboard`) with role-specific widgets (e.g., upcoming appointments). Further widget enhancements may be needed.
+*   **Authentication**: Implemented basic email/password login & registration via Supabase Auth. Role checks are used in RLS/APIs. Social login and specific 'staff' role implementation status needs verification.
+*   **Appointment Management**: Core functionality implemented.
+    *   Patients: Can book, view list/calendar, and cancel appointments (using Server Actions).
+    *   Providers: Can view list/calendar, cancel, complete, and edit appointments (edit/complete use direct Supabase client calls - *improvement needed*).
+*   **Provider Availability Management**: Implemented UI (`/provider/availability`) allowing providers to set weekly schedules and block specific times (uses direct Supabase client calls - *improvement needed*).
+*   **Admin - User Management**: Implemented UI (`/admin/users`) and APIs for viewing, editing (name, role), and deleting users.
+*   **Admin - Organization Management**: Implemented UI (`/admin/organizations`, `/admin/organizations/[orgId]`) and APIs for CRUD operations on organizations and managing approved email domains.
+*   **Admin - Benefit Package Management**: Implemented UI (`/admin/packages`) and APIs for CRUD operations on benefit packages linked to organizations.
+*   **Benefit Verification**: Partially implemented. Admin package management exists. README notes user-facing flow (Steps 4-6) partially done, initial steps (1-3) pending. Requires completion of the full user flow, including the alternative verification path for users without a work email.
+*   **Secure Messaging**: *Implementation status needs verification.* PRD outlines requirements.
+*   **Payments (Stripe)**: *Implementation status needs verification.* API routes exist (`/api/payment-methods`, `/api/subscriptions`), but UI flow and webhook handling require review.
+*   **Analytics**: *Implementation status needs verification.* PRD outlines detailed requirements for an admin analytics module.
+*   **Educational Resources**: *Implementation status needs verification.* PRD requires curated content.
+*   **Admin - Provider Management**: *Implementation status needs verification.* PRD requires admin functionality for provider CRUD, credentials, monitoring.
+*   **Admin - User Activity Logs / Metrics**: *Implementation status needs verification.* PRD requires viewing logs and a metrics dashboard.
+*   **Provider - Profile Management**: *Implementation status needs verification.* PRD requires UI for managing professional details, visibility.
+*   **Notifications**: *Implementation status needs verification.* `notifications` table exists, but triggers and dedicated UI likely needed.
+
+*(Note: See 'Recent Updates & Fixes (Appointments)' section below for details on recent appointment module work)*
+
+### Areas for Improvement / Technical Debt
+*   **Server Actions:** Refactor remaining direct Supabase client calls (e.g., provider availability management, provider appointment updates) to use Server Actions for consistency and security.
+*   **Data Fetching:** Enhance Server Actions (like `getAppointmentsForUser`) to efficiently join and return related data (e.g., provider/patient names) where needed by the UI.
+*   **Type Safety:** Review and refine TypeScript types, especially for data involving complex joins, to minimize `as any` usage and improve accuracy.
+*   **Error Handling:** Standardize error reporting from Server Actions and improve user-facing error messages.
 
 ## Prerequisites
 

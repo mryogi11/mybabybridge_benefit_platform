@@ -181,20 +181,25 @@ This implementation provides a user-friendly approach to fertility benefit verif
     *   Finalizes setup by setting `benefit_status` to `verified` (`completeBenefitSetup`).
 *   **Admin Management:** Basic UI and server actions for adding organizations and approved emails.
 
-### Pending Items / Potential Enhancements:
+### Pending Items / Potential Enhancements (Aligned with TODO as of April 2025):
 
-*   **Layout-Based Status Checks:** Implement the planned routing logic based on `benefit_status` within Server Component layouts (`/dashboard/layout.tsx`, `/benefit-verification/layout.tsx`) as outlined in "Upcoming Refactoring".
-*   **Admin Package Management:** Implement the planned UI and API for package management as outlined in "Upcoming Refactoring".
-*   **Re-implement Admin Org Edit/Delete:** Fix or refactor API routes and UI for editing/deleting organizations.
-*   **Implement Admin Email Edit:** Add UI and API functionality for editing approved emails.
-*   **Real Verification Logic:** Replace the basic email check with a robust verification process in `submitVerificationInfo`.
-*   **Dynamic Package Filtering:** Update `getBenefitPackages` to use actual user data for filtering.
-*   **Stripe Webhooks:** Implement webhook handler for reliable payment tracking.
-*   **User Profile Data:** Ensure correct handling/updating of user profile data (e.g., in `patient_profiles` or `users` table) after verification.
-*   **"No Work Email" Flow:** Implement the user flow for the "I don't have a work email" option on Step 4.
-*   **Input Validation Refinement:** Improve country code selection and phone number validation (Step 3).
-*   **UI/UX Refinements:** Continue improving loading states, error handling, and edge case management.
-*   **Thorough Testing:** Conduct end-to-end testing of all implemented features and user paths.
+*   [ ] **Benefit Verification Flow:**
+    *   [ ] Implement user-facing flow (Steps 1-3 mentioned as planned in README).
+    *   [ ] Complete partially implemented steps (Steps 4-6 mentioned in README).
+    *   [ ] Implement "No Work Email" alternative verification flow (Step 4).
+    *   [ ] Integrate verification status with package selection/dashboard.
+    *   [ ] Implement **Real Verification Logic** (replace basic email check in `submitVerificationInfo`).
+    *   [ ] Implement **Dynamic Package Filtering** (`getBenefitPackages` based on verified user).
+    *   [ ] Ensure correct **User Profile Data Handling** (saving info from Step 3).
+    *   [ ] Refine **Input Validation** (country code, phone on Step 3).
+*   [ ] **Layout-Based Status Checks:** Implement routing logic in Server Component layouts (`/dashboard/layout.tsx`, `/benefit-verification/layout.tsx`) based on `benefit_status`.
+*   [ ] **Admin Management:**
+    *   [ ] Verify/Complete **Admin Package Management** UI/API (README suggests implemented, Guide lists as upcoming).
+    *   [ ] Verify/Fix **Admin Organization Edit/Delete** UI/API (README suggests implemented, Guide lists as needing fixes).
+    *   [ ] Implement **Admin Email Edit** UI/API.
+*   [ ] **Stripe Webhooks:** Implement webhook handler (`/api/payments/webhook`) for reliable payment tracking.
+*   [ ] **UI/UX Refinements:** Continue improving loading states, error handling, and edge cases throughout the benefit flow.
+*   [ ] **Thorough Testing:** Conduct end-to-end testing of all implemented benefit features and user paths.
 
 ## Benefit Verification Status (`benefit_status`)
 
