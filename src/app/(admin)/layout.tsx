@@ -41,7 +41,7 @@ const adminNavItems = [
   { text: 'Users', icon: <PeopleIcon />, path: '/admin/users' },
   { text: 'Organizations', icon: <BusinessIcon />, path: '/admin/organizations' },
   { text: 'Packages', icon: <ShoppingCartIcon />, path: '/admin/packages' },
-  { text: 'Settings', icon: <SettingsIcon />, path: '/admin/settings' },
+  // { text: 'Settings', icon: <SettingsIcon />, path: '/admin/settings' }, // Temporarily hidden
 ];
 
 export default function AdminLayout({

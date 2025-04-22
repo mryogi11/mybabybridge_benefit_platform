@@ -113,6 +113,8 @@ npm start
 - **Benefit Verification**: Employer/health plan benefit verification and package management. Includes full admin UI (`/admin/packages`) for package CRUD. The user-facing verification flow (Steps 4-6) is partially implemented; initial steps (1-3) are planned for a future release.
 - **User Management (Admin)**: Interface for administrators to add, view, edit (name, role), and delete users.
     - Admin UI located at `/admin/users`.
+- **Organization Management (Admin)**: Interface for administrators to add, view, edit, and delete organizations, including management of approved email domains for user registration.
+    - Admin UI located at `/admin/organizations` and `/admin/organizations/[orgId]`.
 
 ## Prerequisites
 
@@ -172,12 +174,16 @@ All admin routes require the user to be authenticated and have the 'admin' role.
 
 *   **Organizations**
     *   `POST /api/admin/organizations`: Creates a new organization.
+        *   Body: `{ name: string, domain?: string | null, hr_contact_info?: string | null }`
     *   `GET /api/admin/organizations`: Retrieves all organizations.
     *   `GET /api/admin/organizations/[orgId]`: Retrieves a specific organization.
     *   `PUT /api/admin/organizations/[orgId]`: Updates a specific organization.
+        *   Body: `{ name?: string, domain?: string | null, hr_contact_info?: string | null }`
     *   `DELETE /api/admin/organizations/[orgId]`: Deletes a specific organization.
     *   `POST /api/admin/organizations/emails`: Adds an approved email address to an organization.
+        *   Body: `{ organizationId: string, email: string }`
     *   `DELETE /api/admin/organizations/emails`: Removes an approved email address from an organization.
+        *   Body: `{ organizationId: string, email: string }`
 *   **Packages (Benefit)**
     *   `POST /api/admin/packages`: Creates a new benefit package and links it to an organization.
         *   Body: `{ name: string, tier: string, monthly_cost: number, organization_id: string, description?: string, key_benefits?: string[], is_base_employer_package?: boolean }`

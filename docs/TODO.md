@@ -22,6 +22,13 @@ This document tracks the features and tasks for the MyBabyBridge platform.
 *   [x] **Provider Navigation:** Sidebar links setup.
 *   [x] **Patient Appointment History:** Page exists and fetches data.
 *   [x] **Provider Appointment History:** Page exists and fetches data.
+*   [x] **Admin Module - Organizations:**
+    *   [x] Display list of organizations (`/admin/organizations`).
+    *   [x] Create new organizations (UI + `POST /api/admin/organizations`).
+    *   [x] View/Edit organization details (`/admin/organizations/[orgId]`).
+    *   [x] Update organizations (UI + `PUT /api/admin/organizations/[orgId]`).
+    *   [x] Delete organizations (UI + `DELETE /api/admin/organizations/[orgId]`).
+    *   [x] Manage approved emails for an organization (UI + `POST/DELETE /api/admin/organizations/emails`).
 
 **Pending Features ⏳ / In Progress 🚧**
 

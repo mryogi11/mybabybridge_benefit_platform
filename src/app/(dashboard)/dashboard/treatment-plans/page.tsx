@@ -22,6 +22,7 @@ import {
 // import { useRouter } from 'next/navigation';
 // import { supabase } from '@/lib/supabase/client';
 import { Assignment, ErrorOutline, WorkspacePremium, Upgrade } from '@mui/icons-material';
+import { cookies } from 'next/headers'; // Keep this if you need cookies at request time
 
 // Import the server action to fetch data
 import { getUserDashboardData } from '@/actions/benefitActions';
@@ -89,6 +90,9 @@ const getMockTreatmentPlans = (): TreatmentPlan[] => [
       }
     } as TreatmentPlan
 ];
+
+// Force dynamic rendering because we use cookies or other dynamic data
+export const dynamic = 'force-dynamic';
 
 // Make the component async to use await for data fetching
 export default async function TreatmentPlansPage() {
