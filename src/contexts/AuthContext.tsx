@@ -231,21 +231,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       debugLog('Signing out...');
+
+      // Explicitly try to get session right before signing out
+      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        debugLog('Error fetching session before sign out:', sessionError);
+        // Decide if we should proceed or throw here? Let's proceed but log.
+      }
+
+      if (!currentSession) {
+          debugLog('Supabase client reports no active session before calling signOut.');
+          // If no session, maybe we don't even need to call signOut?
+          // Or we call it anyway and expect the AuthSessionMissingError?
+          // For now, let's just log and proceed to call signOut, mirroring current behavior.
+      } else {
+           debugLog('Supabase client confirms active session before calling signOut.');
+      }
+
+      // Proceed with the actual sign out call
       const { error } = await supabase.auth.signOut();
       
       if (error) {
-        debugLog('Sign out error:', error);
+        // Log the specific error from signOut
+        debugLog('Error returned from supabase.auth.signOut():', error); 
         setIsLoading(false);
-        throw error;
+        throw error; 
       }
       
-      debugLog('Sign out successful');
-      
+      debugLog('Sign out seems successful based on supabase.auth.signOut() return.');
       setIsLoading(false);
     } catch (error) {
-      debugLog('Error during sign out:', error);
+      // Catch any error from getSession or signOut
+      debugLog('Error during sign out process:', error); 
       setIsLoading(false);
-      throw error;
+      throw error; 
     }
   };
 

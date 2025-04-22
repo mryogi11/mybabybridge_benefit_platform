@@ -266,3 +266,21 @@ DATABASE_URL="postgres://<user>:<password>@<host>:<port>/postgres?pgbouncer=true
 **Important:** Do *not* use the standard Supabase CLI migration commands (`npx supabase db reset`, `npx supabase migration up`, `npx supabase link`, etc.) as they are incompatible with the Drizzle workflow used in this project and may cause issues.
 
 ## Learn More 
+
+### Recent Updates & Fixes (Appointments)
+
+*   **Database Schema & Constraints:** Resolved inconsistencies in the `appointments` table related to patient identification. Ensured the `patient_id` column correctly references the `users.id` (Auth User ID) and removed legacy/conflicting columns (`patient_profile_id`). Updated the foreign key constraint (`appointments_patient_id_fkey`) to reflect this correct relationship.
+*   **Row Level Security (RLS):** Corrected RLS policies on the `appointments` table for the `authenticated` role:
+    *   **SELECT:** Updated the `USING` expression for the `"Patients can view their own appointments"` policy to `(auth.uid() = patient_id)`.
+    *   **UPDATE:** Added a new policy `"Patients can update their own appointments"` with `USING (auth.uid() = patient_id)` and `WITH CHECK (auth.uid() = patient_id)` to allow patients to cancel their appointments.
+*   **Server Actions & Frontend Fetching:**
+    *   Refactored appointment fetching logic (`getAppointmentsForUser_Supabase`, `fetchAppointments` in patient dashboard/appointments pages) to consistently use the patient's **Auth User ID** instead of profile IDs.
+    *   Updated frontend components (`/dashboard/appointments/page.tsx`, `/dashboard/page.tsx`) to call the `getAppointmentsForUser` server action.
+    *   Refactored appointment cancellation (`handleCancelAppointment` in patient appointments page) to use the `updateAppointmentStatus` server action instead of direct client-side updates.
+*   **Provider Appointment Viewing:**
+    *   Resolved Supabase query errors ("Could not embed", "Could not find relationship") on provider pages (`/provider/appointments/page.tsx`, `/provider/dashboard/page.tsx`) by explicitly specifying the foreign key constraint name (`patient:users!appointments_patient_id_fkey(...)`) when joining `appointments` to `users` for fetching patient details.
+    *   Corrected nested join syntax for fetching `patient_profiles` data.
+*   **UI Fixes:**
+    *   Resolved React hydration error (`<div> cannot be a descendant of <p>`) in the appointment details dialog by setting `component="div"` on the relevant MUI `Typography` component.
+    *   Enabled clicking on dates with appointments in the provider calendar view by removing the `disabled` prop.
+    *   Made action menu items (Cancel, Complete) in the provider appointments page conditionally disabled based on the current appointment status. 

@@ -288,26 +288,36 @@ export async function bookAppointment_Supabase(
         if (!isValid(appointmentDate)) throw new Error('Invalid appointment date format provided.');
         const appointmentDateISO = appointmentDate.toISOString();
 
-        // Ensure select matches expected Appointment type or adjust transformation
-        const { data: newAppointmentData, error: insertError } = await supabase
-            .from('appointments')
-            .insert({ patient_id: patientProfileId, provider_id: providerId, appointment_date: appointmentDateISO, duration, type: appointmentType, notes, status: 'scheduled' })
-            .select('*').single(); // Selects all columns from the inserted row
+        // --- Insert the appointment using Drizzle --- 
+        const inserted = await db
+            .insert(appointments)
+            .values({
+                patient_id: patientAuthUserId, // Use the AUTH User ID (references users.id)
+                provider_id: providerId,
+                appointment_date: appointmentDate, // Drizzle often prefers Date objects
+                status: 'pending', // Start as pending, provider can confirm
+                duration: duration,
+                type: appointmentType,
+                notes: notes,
+                // created_at and updated_at should have database defaults
+            })
+            .returning(); // Get the inserted row back
 
-        if (insertError) throw insertError;
-
+        if (!inserted || inserted.length === 0) {
+            throw new Error("Failed to insert appointment into database.");
+        }
+        const newAppointment = inserted[0];
+        
         // Basic transformation - adjust based on actual data and Appointment type
         const finalAppointment: Appointment = {
-            id: newAppointmentData.id, 
-            patient_id: newAppointmentData.patient_id, 
-            provider_id: newAppointmentData.provider_id, 
-            appointment_date: newAppointmentData.appointment_date, 
-            status: ['scheduled', 'completed', 'cancelled', 'pending'].includes(newAppointmentData.status) 
-                    ? newAppointmentData.status as Appointment['status'] 
-                    : 'pending',
-            notes: newAppointmentData.notes ?? null, 
-            created_at: newAppointmentData.created_at, 
-            updated_at: newAppointmentData.updated_at,
+            id: newAppointment.id, 
+            patient_id: newAppointment.patient_id, 
+            provider_id: newAppointment.provider_id, 
+            appointment_date: newAppointment.appointment_date.toISOString(), // Convert Date back to string if needed for type
+            status: newAppointment.status as Appointment['status'], // Assume status is correct
+            notes: newAppointment.notes ?? null, 
+            created_at: newAppointment.created_at.toISOString(), // Convert Date back to string if needed for type
+            updated_at: newAppointment.updated_at.toISOString(), // Convert Date back to string if needed for type
             provider: undefined, 
             patient: undefined,
         };
@@ -322,10 +332,10 @@ export async function bookAppointment_Supabase(
 
 // --- Server Action to Get Appointments for a User (Supabase version - Kept for reference) ---
 export async function getAppointmentsForUser_Supabase(
-    userId: string, // This should be the PROFILE ID (patient_profiles.id or providers.id)
+    userId: string, // This is the Auth User ID (users.id) for both patients and providers
     userRole: 'patient' | 'provider'
 ): Promise<Appointment[]> { // Return type might need adjustment based on joins
-    console.log(`[Server Action] getAppointmentsForUser (Supabase) called for ${userRole} ID: ${userId}`);
+    console.log(`[Server Action] getAppointmentsForUser (Supabase) called for ${userRole} AUTH ID: ${userId}`);
 
     const cookieStore = await cookies();
     const supabase = createServerClient<Database>(
@@ -337,34 +347,79 @@ export async function getAppointmentsForUser_Supabase(
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) { console.error('Auth error'); return []; }
 
-    // Authorization check: Ensure the logged-in user owns the profile ID requested
-    let profileTable: 'patient_profiles' | 'providers' = userRole === 'patient' ? 'patient_profiles' : 'providers';
-    const { data: profileCheck, error: profileCheckError } = await supabase.from(profileTable).select('id').eq('user_id', user.id).eq('id', userId).maybeSingle();
-    if (profileCheckError || !profileCheck) { console.error('Authorization error'); return []; }
+    // Authorization check: Ensure the logged-in user is requesting their own appointments
+    if (user.id !== userId) {
+         console.error(`Authorization error: User ${user.id} attempting to fetch appointments for ${userId}`);
+         return [];
+    }
 
     try {
+        // Determine the correct column to filter on based on the role
+        // Note: We assume providerId in appointments table also refers to the providers.user_id (Auth ID)
+        // If provider_id refers to providers.id (Profile ID), this needs adjustment for the 'provider' role.
         let filterColumn: 'patient_id' | 'provider_id' = userRole === 'patient' ? 'patient_id' : 'provider_id';
-        // Adjust select query based on what Appointment type expects (joins?)
-        const { data, error } = await supabase.from('appointments').select('*').eq(filterColumn, userId).order('appointment_date', { ascending: true });
 
-        if (error) { console.error('Error fetching appointments:', error); return []; }
+        console.log(`Fetching appointments where ${filterColumn} = ${userId}`);
+
+        // Fetch appointments using the Auth User ID
+        const { data, error } = await supabase
+            .from('appointments')
+            .select('*') // Select all columns for now, refine if needed
+            .eq(filterColumn, userId) // Filter by the appropriate column using the Auth User ID
+            .order('appointment_date', { ascending: true });
+
+        if (error) {
+            // Log the specific Supabase error
+            console.error(`Error fetching appointments from Supabase for ${userRole} ${userId}:`, error.message, error.details);
+            return [];
+        }
+        if (!data) {
+             console.log(`No appointments found for ${userRole} ${userId}`);
+             return [];
+        }
+
+        console.log(`Found ${data.length} appointments for ${userRole} ${userId}`);
+
 
         // Basic transformation - adjust based on actual data and Appointment type
         const transformedAppointments: Appointment[] = (data || []).map((appt: any): Appointment | null => {
-             if (!appt || !appt.id || !appt.appointment_date || !appt.status) return null;
+             if (!appt || !appt.id || !appt.appointment_date || !appt.status) {
+                  console.warn('Skipping invalid appointment data:', appt);
+                  return null;
+             }
+            // Ensure appointment_date is parsed correctly if it's a string
+            const appointmentDate = typeof appt.appointment_date === 'string'
+                ? parseISO(appt.appointment_date)
+                : appt.appointment_date;
+            if (!isValid(appointmentDate)) {
+                 console.warn('Skipping appointment with invalid date:', appt);
+                 return null;
+            }
+
             return {
-                id: appt.id, patient_id: appt.patient_id, provider_id: appt.provider_id, appointment_date: appt.appointment_date, duration: appt.duration, type: appt.type,
-                status: ['scheduled', 'completed', 'cancelled', 'pending'].includes(appt.status) ? appt.status as Appointment['status'] : 'pending',
-                notes: appt.notes ?? null, created_at: appt.created_at, updated_at: appt.updated_at,
+                id: appt.id,
+                patient_id: appt.patient_id, // Keep original patient_id (Auth ID)
+                provider_id: appt.provider_id, // Keep original provider_id (assumed Auth ID for now)
+                appointment_date: appointmentDate.toISOString(), // Ensure consistent ISO string format
+                duration: appt.duration, // Assuming duration exists
+                type: appt.type, // Assuming type exists
+                status: ['scheduled', 'completed', 'cancelled', 'pending'].includes(appt.status)
+                        ? appt.status as Appointment['status']
+                        : 'pending', // Default to pending if status is invalid
+                notes: appt.notes ?? null,
+                created_at: typeof appt.created_at === 'string' ? appt.created_at : appt.created_at?.toISOString() ?? new Date().toISOString(), // Handle potential Date object or string
+                updated_at: typeof appt.updated_at === 'string' ? appt.updated_at : appt.updated_at?.toISOString() ?? new Date().toISOString(), // Handle potential Date object or string
                 // Provider/Patient details might need separate queries or joins in Supabase select
-                provider: undefined, patient: undefined,
+                provider: undefined, // Needs join or separate fetch
+                patient: undefined,  // Needs join or separate fetch
             };
         }).filter((appt): appt is Appointment => appt !== null);
 
+        console.log(`Returning ${transformedAppointments.length} transformed appointments for ${userRole} ${userId}`);
         return transformedAppointments;
 
     } catch (error: any) {
-        console.error(`Error fetching appointments for ${userRole} ${userId}:`, error?.message || error);
+        console.error(`Error transforming or processing appointments for ${userRole} ${userId}:`, error?.message || error);
         return [];
     }
 }
@@ -386,19 +441,42 @@ export async function updateAppointmentStatus_Supabase(
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return { success: false, error: 'Authentication failed.' };
 
-    // Fetch appointment to check ownership (assuming provider can update)
-    const { data: existingAppointment, error: fetchError } = await supabase.from('appointments').select('id, provider_id').eq('id', appointmentId).maybeSingle();
-     if (fetchError || !existingAppointment) return { success: false, error: 'Appointment not found or access denied.' };
+    // Fetch appointment details, including patient_id and provider_id
+    const { data: existingAppointment, error: fetchError } = await supabase
+        .from('appointments')
+        .select('id, patient_id, provider_id') // Select patient_id as well
+        .eq('id', appointmentId)
+        .maybeSingle();
 
-    // Authorization check (assuming providers.id matches the provider_id here)
-    // Adjust if providers.id is different from auth user id used in provider_id column
-    const { data: providerProfile, error: providerError } = await supabase.from('providers').select('id').eq('user_id', user.id).single();
-    if (providerError || !providerProfile || existingAppointment.provider_id !== providerProfile.id) {
+    if (fetchError) {
+         console.error("Error fetching appointment for status update auth:", fetchError);
+         return { success: false, error: 'Failed to retrieve appointment details.' };
+    }
+    if (!existingAppointment) {
+        return { success: false, error: 'Appointment not found.' };
+    }
+
+    // Authorization check: Allow update if the user is the patient OR the provider
+    // (Assuming provider_id stores the provider's Auth User ID)
+    const isPatient = existingAppointment.patient_id === user.id;
+    const isProvider = existingAppointment.provider_id === user.id;
+
+    if (!isPatient && !isProvider) {
+        console.warn(`Authorization failed: User ${user.id} is neither patient (${existingAppointment.patient_id}) nor provider (${existingAppointment.provider_id}) for appointment ${appointmentId}`);
         return { success: false, error: 'You are not authorized to update this appointment status.' };
     }
 
+    // Additional check: Maybe only patients can cancel?
+    if (!isPatient && newStatus === 'cancelled') {
+        // Optional: Prevent providers from cancelling via this action if needed
+        // console.warn(`Authorization failed: Provider ${user.id} attempted to cancel appointment ${appointmentId}`);
+        // return { success: false, error: 'Providers cannot cancel appointments via this action.' };
+    }
+    
+    console.log(`Authorization successful for user ${user.id} to update appointment ${appointmentId} (isPatient: ${isPatient}, isProvider: ${isProvider})`);
+
     try {
-        // Select only columns present in the table to avoid potential errors
+        // Proceed with the update
         const { data: updatedData, error: updateError } = await supabase
             .from('appointments')
             .update({ status: newStatus, updated_at: new Date().toISOString() })

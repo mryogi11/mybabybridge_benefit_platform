@@ -11,6 +11,8 @@ import { supabase } from '@/lib/supabase/client';
 import { Appointment } from '@/types';
 import { format, parseISO, isToday, isTomorrow } from 'date-fns';
 import { useRouter } from 'next/navigation';
+import { User } from '@supabase/supabase-js';
+import { getAppointmentsForUser } from '@/actions/appointmentActions';
 
 // Simple stat card component
 interface StatCardProps {
@@ -74,12 +76,35 @@ const getStatusColor = (status: string): ('success' | 'warning' | 'error' | 'def
 };
 // --- End Helper Functions ---
 
+// Define a specific type for the data structure fetched in this component
+interface ProviderDashboardAppointmentData {
+  id: string;
+  patient_id: string;
+  provider_id: string;
+  appointment_date: string;
+  duration?: number;
+  type?: string;
+  status: 'scheduled' | 'completed' | 'cancelled' | 'pending';
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+  patient: { // Joined users table data
+    id: string;
+    email: string;
+    // Use explicit name matching the select query alias
+    patient_profile: { // Joined patient_profiles table data via explicit FK
+      first_name: string | null;
+      last_name: string | null;
+    } | null;
+  } | null;
+}
+
 export default function ProviderDashboardPage() {
   const { user, profile, isLoading: isAuthLoading, isProfileLoading } = useAuth();
   const router = useRouter();
 
-  // State for appointments
-  const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([]);
+  // State for appointments - Use the specific type
+  const [upcomingAppointments, setUpcomingAppointments] = useState<ProviderDashboardAppointmentData[]>([]);
   const [loadingAppointments, setLoadingAppointments] = useState(true);
   const [errorAppointments, setErrorAppointments] = useState<string | null>(null);
 
@@ -114,17 +139,20 @@ export default function ProviderDashboardPage() {
         }
         const providerProfileId = providerData.id;
 
-        // 2. Fetch appointments
+        // 2. Fetch appointments with explicit FK for first join, inferred for nested
         const { data, error } = await supabase
           .from('appointments')
           .select(`
             *,
             duration,
             type,
-            patient:patient_profiles!appointments_patient_id_patient_profiles_id_fk (
+            patient:users!appointments_patient_id_fkey (
               id,
-              first_name,
-              last_name
+              email,
+              patient_profile:patient_profiles (
+                first_name,
+                last_name
+              )
             )
           `)
           .eq('provider_id', providerProfileId)
@@ -138,7 +166,35 @@ export default function ProviderDashboardPage() {
         }
         
         console.log('Provider Dashboard: Raw appointment data fetched:', data);
-        setUpcomingAppointments((data || []) as unknown as Appointment[]);
+        
+        // Explicitly map the raw data to the ProviderDashboardAppointmentData type
+        const mappedData: ProviderDashboardAppointmentData[] = (data || []).map((rawAppt: any) => {
+          // Access the nested data using the select query aliases
+          const patientProfileData = rawAppt.patient?.patient_profile;
+          return {
+            id: rawAppt.id,
+            patient_id: rawAppt.patient_id,
+            provider_id: rawAppt.provider_id,
+            appointment_date: rawAppt.appointment_date,
+            duration: rawAppt.duration,
+            type: rawAppt.type,
+            status: rawAppt.status ?? 'pending', 
+            notes: rawAppt.notes,
+            created_at: rawAppt.created_at,
+            updated_at: rawAppt.updated_at,
+            patient: rawAppt.patient ? { 
+              id: rawAppt.patient.id,
+              email: rawAppt.patient.email,
+              patient_profile: patientProfileData ? { // Use patient_profile alias
+                first_name: patientProfileData.first_name,
+                last_name: patientProfileData.last_name,
+              } : null,
+            } : null,
+          };
+        });
+        
+        // Set state with the explicitly mapped data
+        setUpcomingAppointments(mappedData);
 
       } catch (err: any) {
         console.error('Provider Dashboard: Error fetching appointments:', err);
@@ -225,7 +281,7 @@ export default function ProviderDashboardPage() {
                           }
                           secondary={
                             <Typography variant="body2" color="text.secondary" noWrap>
-                              Patient: {appointment.patient?.first_name} {appointment.patient?.last_name || 'N/A'}
+                              Patient: {appointment.patient?.patient_profile?.first_name ? `${appointment.patient.patient_profile.first_name} ${appointment.patient.patient_profile.last_name}` : 'N/A'}
                             </Typography>
                           }
                         />

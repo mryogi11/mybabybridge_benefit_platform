@@ -30,11 +30,16 @@ function DayWithIndicator(props: PickersDayProps<Date> & { appointments?: Fetche
   // Make appointments prop optional here and check for it
   const { day, outsideCurrentMonth, appointments = [], selected, ...other } = props; 
   const theme = useTheme();
+  // Log props received
+  console.log("DayWithIndicator - Day:", day, "Appointments prop:", appointments?.length); // Log length for brevity
   
   // Check appointments on this specific day
   const appointmentsOnDay = appointments.filter(appointment => 
     !outsideCurrentMonth && appointment && appointment.appointment_date && isSameDay(parseISO(appointment.appointment_date), day)
   );
+  // Log filtered results
+  console.log("DayWithIndicator - Day:", day, "Filtered appointmentsOnDay:", appointmentsOnDay);
+  
   const hasAppointment = appointmentsOnDay.length > 0;
   const hasOnlyCancelled = hasAppointment && appointmentsOnDay.every(appt => appt.status === 'cancelled');
   const hasActiveAppointment = hasAppointment && !hasOnlyCancelled;
@@ -81,7 +86,6 @@ function DayWithIndicator(props: PickersDayProps<Date> & { appointments?: Fetche
       outsideCurrentMonth={outsideCurrentMonth} 
       day={day} 
       selected={isSelected} // Pass selection state
-      disabled={hasAppointment} // Disable days with any appointment for provider view?
       sx={daySx}
     />
   );
@@ -96,19 +100,24 @@ export default function ProviderAppointmentsPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [menuTargetAppointment, setMenuTargetAppointment] = useState<FetchedAppointment | null>(null);
   const menuOpen = Boolean(anchorEl);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<FetchedAppointment | null>(null);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' } | null>(null);
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>, appointmentId: string) => {
+    const targetAppointment = appointments.find(a => a.id === appointmentId);
     setAnchorEl(event.currentTarget);
     setSelectedAppointmentId(appointmentId);
+    setMenuTargetAppointment(targetAppointment || null);
+    console.log("Menu opened for appointment:", targetAppointment);
   };
 
   const handleMenuClose = () => {
     setAnchorEl(null);
     setSelectedAppointmentId(null);
+    setMenuTargetAppointment(null);
   };
 
   const handleEdit = () => {
@@ -302,14 +311,19 @@ export default function ProviderAppointmentsPage() {
 
       const { data: appointmentsData, error: fetchError } = await supabase
           .from('appointments')
+          // Corrected nested join query syntax - Removed comment
           .select(`
             *,
-          patient:patient_profiles!appointments_patient_id_patient_profiles_id_fk ( 
-              first_name,
-            last_name
-          )
-        `)
-        .eq('provider_id', providerProfileId)
+            patient:users!appointments_patient_id_fkey ( 
+              id,
+              email,
+              patient_profiles ( 
+                first_name,
+                last_name
+              )
+            )
+          `)
+        .eq('provider_id', providerProfileId) // Keep filter by profile ID for now
         .order('appointment_date', { ascending: true });
 
       if (fetchError) {
@@ -328,11 +342,17 @@ export default function ProviderAppointmentsPage() {
         const typedAppointments: FetchedAppointment[] = (appointmentsData || []).map(apptInput => {
             const appt = apptInput as any; // Cast input to any to simplify
 
-            let patientProfileData: FetchedAppointment['patient_profiles'] = null;
-            
-            // Check if the joined patient data exists and has the expected shape
-            if (appt.patient && typeof appt.patient === 'object' && 'first_name' in appt.patient && 'last_name' in appt.patient) {
-                const validPatientProfile = appt.patient as { 
+            // Restore original logic for extracting nested patient profile data
+           let patientProfileData: FetchedAppointment['patient_profiles'] = null;
+           
+            // Check if the nested patient profile data exists and has the expected shape
+            if (appt.patient && 
+                appt.patient.patient_profile && 
+                typeof appt.patient.patient_profile === 'object' && 
+                'first_name' in appt.patient.patient_profile && 
+                'last_name' in appt.patient.patient_profile) {
+                
+                const validPatientProfile = appt.patient.patient_profile as { 
                     first_name: string | null;
                     last_name: string | null;
                 };
@@ -341,8 +361,9 @@ export default function ProviderAppointmentsPage() {
                     last_name: validPatientProfile.last_name,
                 };
             } else if (appt.patient) {
-                console.warn("Patient profile data received but has unexpected structure:", appt.patient);
+                console.warn("Patient/Profile data received but has unexpected structure:", appt.patient);
             }
+            
 
             // Validate status
             let validStatus: Appointment['status'] = 'pending'; // Default if invalid/missing
@@ -365,7 +386,7 @@ export default function ProviderAppointmentsPage() {
                  notes: appt.notes,
                  created_at: appt.created_at,
                  updated_at: appt.updated_at,
-                 patient_profiles: patientProfileData,
+                 patient_profiles: patientProfileData, // Assign the extracted/null data
             };
             return finalAppointment;
         }); // No final cast needed
@@ -430,9 +451,29 @@ export default function ProviderAppointmentsPage() {
     );
   }
   
-  const filteredAppointments = appointments.filter(appointment =>
-    selectedDate && isSameDay(parseISO(appointment.appointment_date), selectedDate)
-  );
+  const filteredAppointments = appointments.filter(appointment => {
+    // Add logging inside the filter
+    const isDateSelected = !!selectedDate;
+    let appointmentDateParsed: Date | null = null;
+    let datesMatch = false;
+    if (appointment?.appointment_date) {
+      try {
+        appointmentDateParsed = parseISO(appointment.appointment_date);
+      } catch (e) {
+        console.error('Error parsing appointment date in filter:', appointment.appointment_date, e);
+      }
+    }
+    if (isDateSelected && appointmentDateParsed && selectedDate) {
+        datesMatch = isSameDay(appointmentDateParsed, selectedDate);
+    }
+    // Log comparison details
+    console.log(`Filtering Appt ID: ${appointment?.id}, Appt Date: ${appointment?.appointment_date}, Parsed: ${appointmentDateParsed}, Selected: ${selectedDate}, Match: ${datesMatch}`);
+    
+    return selectedDate && appointmentDateParsed && datesMatch;
+  });
+
+  // Add log here to check final state before render
+  console.log("ProviderAppointmentsPage: Rendering with appointments state:", appointments);
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
@@ -525,9 +566,25 @@ export default function ProviderAppointmentsPage() {
               'aria-labelledby': 'actions-button',
             }}
           >
-            <MenuItem onClick={handleEdit}>Edit Details</MenuItem>
-            <MenuItem onClick={handleComplete}>Mark as Complete</MenuItem>
-            <MenuItem onClick={handleCancel} sx={{ color: 'error.main' }}>Cancel Appointment</MenuItem>
+            <MenuItem 
+              onClick={handleEdit} 
+              disabled={!menuTargetAppointment || menuTargetAppointment.status === 'cancelled' || menuTargetAppointment.status === 'completed'}
+            >
+              Edit Details
+            </MenuItem>
+            <MenuItem 
+              onClick={handleComplete} 
+              disabled={!menuTargetAppointment || menuTargetAppointment.status === 'completed' || menuTargetAppointment.status === 'cancelled'}
+            >
+              Mark as Complete
+            </MenuItem>
+            <MenuItem 
+              onClick={handleCancel} 
+              sx={{ color: 'error.main' }} 
+              disabled={!menuTargetAppointment || menuTargetAppointment.status === 'cancelled' || menuTargetAppointment.status === 'completed'}
+            >
+              Cancel Appointment
+            </MenuItem>
           </Menu>
 
         {/* Edit Modal */}

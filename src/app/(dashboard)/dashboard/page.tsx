@@ -33,6 +33,7 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { User } from '@supabase/supabase-js'; // Import User type if not already imported globally
+import { getAppointmentsForUser } from '@/actions/appointmentActions';
 
 // Define local interface for appointments if needed for clarity, matching expected structure
 interface DashboardAppointment extends Omit<Appointment, 'provider'> { // Omit base provider to redefine
@@ -259,113 +260,40 @@ export default function PatientDashboardPage() {
        return;
      }
 
-    console.log('Fetching appointments for user:', userId);
+    console.log('Fetching upcoming appointments for user:', userId);
 
     try {
-      // 1. Get the patient profile ID
-      const { data: patientData, error: patientError } = await supabase
-        .from('patient_profiles')
-        .select('id')
-        .eq('user_id', userId)
-        .single();
+      // --- REMOVED: Step 1: Get Patient Profile ID ---
+      // No longer needed, use Auth User ID directly.
 
-      if (patientError) {
-        console.error('Error fetching patient profile:', patientError);
-        if (patientError.code === 'PGRST116') {
-          console.warn(`No patient profile found for user ${userId}. Skipping appointment fetch.`);
-        } else {
-          console.error('Unhandled error fetching patient profile:', patientError);
-        }
-        setUpcomingAppointments([]);
-        return;
-      }
+      // --- REPLACED: Step 2: Fetch appointments using Server Action ---
+      console.log("Fetching appointments via server action...");
+      const fetchedAppointments = await getAppointmentsForUser(userId, 'patient');
 
-      if (!patientData) {
-        console.warn(`Patient profile data was unexpectedly null for user ${userId}. Skipping appointment fetch.`);
-        setUpcomingAppointments([]);
-        return;
-      }
+      // Filter for upcoming appointments (e.g., status is 'scheduled' or 'pending')
+      // Also, filter for dates that are today or in the future, though getAppointmentsForUser doesn't filter by date
+      // Consider adding date filtering to the server action or do it client-side
+      const upcoming = fetchedAppointments.filter(appt =>
+          ['scheduled', 'pending'].includes(appt.status)
+          // Optional: Add date filtering if needed
+          // && !isBefore(parseISO(appt.appointment_date), startOfDay(new Date()))
+      );
 
-      const patientProfileId = patientData.id;
-      console.log('Found patient profile ID:', patientProfileId);
+      console.log('Raw upcoming appointment data fetched via server action:', upcoming);
 
-      // 2. Fetch appointments using the patient profile ID
-      console.log("Fetching appointments without date filter for debugging..."); // Log change
-      const { data, error } = await supabase
-        .from('appointments')
-        .select(`
-          *,
-          provider:providers!appointments_provider_id_providers_id_fk (
-            id,
-            user_id,
-            first_name,
-            last_name,
-            specialization
-          )
-        `)
-        .eq('patient_id', patientProfileId)
-        // .gte('appointment_date', new Date().toISOString()) // Temporarily REMOVED date filter
-        .neq('status', 'cancelled') // Keep cancelled filter
-        .order('appointment_date', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching appointments:', error);
-        setUpcomingAppointments([]);
-        return;
-      }
-
-      console.log('Raw upcoming appointment data fetched:', data);
-      // Ensure type compatibility and handle potential join errors
-       const typedAppointments: DashboardAppointment[] = (data || []).map(apptInput => {
-           // Cast the input to any to simplify type handling for this complex case
-           const appt = apptInput as any; 
-           
-           let providerData: DashboardAppointment['provider'] = undefined;
-
-           // Check if appt.provider exists and looks like a valid provider object
-           if (appt.provider && typeof appt.provider === 'object' && 'id' in appt.provider && 'user_id' in appt.provider) {
-               // Cast *after* checks pass, within this block
-               const validProvider = appt.provider as {
-                   id: string;
-                   user_id: string;
-                   first_name: string | null;
-                   last_name: string | null;
-                   specialization: string | null;
-               };
-               providerData = {
-                   id: validProvider.id,
-                   user_id: validProvider.user_id,
-                   first_name: validProvider.first_name,
-                   last_name: validProvider.last_name,
-                   specialization: validProvider.specialization,
-               };
-           } else if (appt.provider) {
-               console.warn("Provider data received but has unexpected structure:", appt.provider);
-           }
-
-           // Construct the final object conforming to DashboardAppointment
-           // Access properties directly from 'appt' (cast to any)
-           const finalAppointment: DashboardAppointment = {
-               id: appt.id,
-               patient_id: appt.patient_id,
-               provider_id: appt.provider_id,
-               appointment_date: appt.appointment_date,
-               duration: appt.duration, // Should exist on the base appt object from '*'
-               type: appt.type,       // Should exist on the base appt object from '*'
-               status: appt.status,
-               notes: appt.notes,
-               created_at: appt.created_at,
-               updated_at: appt.updated_at,
-               // Assign the processed provider data
-               provider: providerData,
-           };
-           return finalAppointment; // Ensure the map returns the correct type
-       }); // No final 'as' cast needed
+       // Map the result from the server action.
+       // The server action should already return data in the correct Appointment[] format.
+       // Provider details are not included by the server action currently.
+       const typedAppointments: DashboardAppointment[] = upcoming.map(appt => ({
+           ...appt,
+           // Explicitly set provider to null/undefined if not included by server action
+           provider: appt.provider || undefined, // Provider details missing from server action
+       }));
 
        console.log("Dashboard: Mapped upcoming appointments:", typedAppointments);
        setUpcomingAppointments(typedAppointments);
     } catch (err) {
-      console.error('Unexpected error in fetchUpcomingAppointments:', err);
+      console.error('Unexpected error in fetchUpcomingAppointments (calling server action):', err);
       setUpcomingAppointments([]);
     }
   };

@@ -33,7 +33,12 @@ import { supabase } from '@/lib/supabase/client';
 import { EventNote } from '@mui/icons-material';
 import BookAppointmentModal from '@/components/appointments/BookAppointmentModal';
 import { useAuth } from '@/contexts/AuthContext';
-import { getAvailableSlots, bookAppointment } from '../../../../actions/appointmentActions';
+import {
+  getAvailableSlots,
+  bookAppointment,
+  getAppointmentsForUser,
+  updateAppointmentStatus
+} from '../../../../actions/appointmentActions';
 import { Alert as MuiAlert } from '@mui/material';
 
 interface ProviderInfo {
@@ -100,90 +105,43 @@ export default function AppointmentsPage() {
       }
       console.log("Fetching appointments for user ID:", user.id); // Auth User ID
 
-      // 1. Get the Patient Profile ID using the Auth User ID
-      const { data: patientData, error: profileError } = await supabase
-        .from('patient_profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
+      // Call the server action instead of direct Supabase client call
+      const fetchedAppointments = await getAppointmentsForUser(user.id, 'patient');
 
-      if (profileError || !patientData) {
-        console.error("Error fetching patient profile ID for appointments page:", profileError);
-        setError("Could not fetch patient profile information.");
-        setAppointments([]);
-        setLoading(false);
-        return;
-      }
-      
-      const patientProfileId = patientData.id;
-      console.log("Found patient profile ID for appointments page:", patientProfileId);
-
-      // 2. Fetch appointments using the Patient Profile ID
-      const { data, error: appointmentsError } = await supabase
-        .from('appointments')
-        .select(`
-          id,
-          patient_id,
-          provider_id,
-          appointment_date,
-          status,
-          notes,
-          created_at,
-          provider:providers!appointments_provider_id_providers_id_fk (
-            id,
-            user_id,
-            first_name,
-            last_name,
-            specialization
-          )
-        `)
-        .eq('patient_id', patientProfileId)
-        .order('appointment_date');
-
-      if (appointmentsError) {
-        console.error("Error fetching appointments:", appointmentsError);
-        setError(`Error fetching appointments: ${appointmentsError.message}`);
-        setAppointments([]);
+      // Check if the server action returned an error (though it returns empty array on error currently)
+      // You might want to enhance getAppointmentsForUser to return an error object for better handling
+      if (!Array.isArray(fetchedAppointments)) {
+          // Handle cases where the action might return something unexpected
+          // For now, assuming it returns [] on error based on its implementation
+          console.error("Error fetching appointments: Server action did not return an array.");
+          setError("Failed to fetch appointments.");
+          setAppointments([]);
       } else {
-        console.log("Fetched appointments data:", data);
+           console.log("Fetched appointments data via server action:", fetchedAppointments);
 
-        // Correctly map the fetched data, handling the possibility of providers being an array
-        const typedAppointments: Appointment[] = (data || []).map(appt => {
-          // Ensure we are accessing the aliased 'provider' field from the fetched data
-          const providerRelation = appt.provider as unknown as ProviderInfo | null;
-          // The check for array is likely no longer needed with the alias, but keeping for safety
-          const providerData = Array.isArray(providerRelation) ? providerRelation[0] : providerRelation;
-          
-          return {
-            id: appt.id,
-            patient_id: patientProfileId,
-            provider_id: appt.provider_id,
-            appointment_date: appt.appointment_date,
-            status: appt.status,
-            notes: appt.notes, // Directly assign notes (already string | null)
-            created_at: appt.created_at,
-            // Assign to the 'provider' field (singular) in the typed object
-            provider: providerData ? { 
-              id: providerData.id,
-              user_id: providerData.user_id,
-              first_name: providerData.first_name,
-              last_name: providerData.last_name,
-              specialization: providerData.specialization
-            } : null
-          };
-        });
+           // Map the result from the server action.
+           // The server action should already return data in the correct Appointment[] format.
+           // However, the server action currently doesn't join provider details.
+           // If provider details are needed here, the server action needs enhancement,
+           // or a separate fetch for provider details based on provider_id is required.
+           const typedAppointments: Appointment[] = fetchedAppointments.map(appt => ({
+               ...appt,
+               // Explicitly set provider to null/undefined if not included by server action
+               provider: appt.provider || undefined, // Or fetch separately if needed
+            }));
 
-        setAppointments(typedAppointments);
-        setError(null);
+           setAppointments(typedAppointments);
+           setError(null);
       }
+
     } catch (err) {
-      console.error('Error in fetchAppointments:', err);
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred during appointment fetch');
+      console.error('Error in fetchAppointments (calling server action):', err);
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred calling the appointment fetch action');
       setAppointments([]);
     } finally {
       setLoading(false);
     }
-  }, [user, supabase]); // Add supabase to dependency array
+  }, [user]);
 
   useEffect(() => {
     console.log("Appointments Page: useEffect for fetch triggered. User:", user);
@@ -203,20 +161,27 @@ export default function AppointmentsPage() {
   }, [appointments]);
 
   const handleCancelAppointment = async (appointmentId: string) => {
+    console.log(`Attempting to cancel appointment ID: ${appointmentId}`);
     try {
-      const { error } = await supabase
-        .from('appointments')
-        .update({ status: 'cancelled' })
-        .eq('id', appointmentId);
+      // Call the server action to update the status
+      const result = await updateAppointmentStatus(appointmentId, 'cancelled');
 
-      if (error) throw error;
-
-      setAppointments(prevAppointments =>
-        prevAppointments.filter(appointment => appointment.id !== appointmentId)
-      );
-      setDialogOpen(false);
+      if (result.success) {
+        console.log(`Successfully cancelled appointment ID: ${appointmentId}`);
+        // Refetch appointments to get the updated list including the cancelled one
+        await fetchAppointments(); 
+        setSnackbar({ open: true, message: 'Appointment cancelled.', severity: 'success' });
+        setDialogOpen(false); // Close the dialog
+      } else {
+        console.error(`Failed to cancel appointment: ${result.error}`);
+        setError(result.error || 'Failed to cancel appointment. Please try again.');
+        setSnackbar({ open: true, message: `Error: ${result.error || 'Could not cancel appointment.'}`, severity: 'error' });
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred while cancelling appointment');
+      console.error('Unexpected error during cancellation:', err);
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred while cancelling the appointment';
+      setError(message);
+      setSnackbar({ open: true, message: `Error: ${message}`, severity: 'error' });
     }
   };
 
@@ -287,17 +252,22 @@ export default function AppointmentsPage() {
     const isSelected = selected;
 
     let daySx = {};
+    // Apply warning (orange) style if the day only has cancelled appointments
     if (hasOnlyCancelled) {
       daySx = {
-        backgroundColor: theme.palette.warning.main + ' !important',
+        backgroundColor: theme.palette.warning.main + ' !important', // Use warning color
         color: theme.palette.warning.contrastText + ' !important',
         borderRadius: '50%',
         border: 'none',
         '&:hover': {
           backgroundColor: theme.palette.warning.dark + ' !important', 
         }
+        // Retain selection styles if needed, could override based on priority
+        // '&.Mui-selected': { ... },
+        // '&.Mui-selected:hover': { ... }
       };
     } else if (hasActiveAppointment) {
+      // Existing styles for active appointments
       daySx = {
         backgroundColor: theme.palette.primary.main + ' !important',
         color: theme.palette.primary.contrastText + ' !important',
@@ -478,12 +448,12 @@ export default function AppointmentsPage() {
                  <Typography gutterBottom><b>Provider:</b> Dr. {selectedAppointment.provider.first_name} {selectedAppointment.provider.last_name} ({selectedAppointment.provider.specialization})</Typography>
               )}
               <Typography gutterBottom><b>Date & Time:</b> {format(parseISO(selectedAppointment.appointment_date), 'PPP p')}</Typography>
-              <Typography gutterBottom><b>Status:</b> <Chip label={selectedAppointment.status} size="small" color={selectedAppointment.status === 'scheduled' ? 'primary' : 'default'} /></Typography>
+              <Typography gutterBottom component="div"><b>Status:</b> <Chip label={selectedAppointment.status} size="small" color={selectedAppointment.status === 'scheduled' ? 'primary' : 'default'} /></Typography>
               {selectedAppointment.notes && <Typography gutterBottom><b>Notes:</b> {selectedAppointment.notes}</Typography>}
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setDialogOpen(false)}>Close</Button>
-              {selectedAppointment.status === 'scheduled' && (
+              {(selectedAppointment.status === 'scheduled' || selectedAppointment.status === 'pending') && (
                 <Button onClick={() => handleCancelAppointment(selectedAppointment.id)} color="error">
                   Cancel Appointment
                 </Button>
