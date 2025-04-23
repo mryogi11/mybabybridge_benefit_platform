@@ -1,17 +1,6 @@
 import { loadStripe, Stripe as StripeJs } from '@stripe/stripe-js';
-import Stripe from 'stripe';
 
 let stripeJsPromise: Promise<StripeJs | null>;
-
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY is missing in environment variables');
-}
-
-// Backend Stripe Client Instance
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2023-10-16', // Use API version expected by installed library types
-  typescript: true,
-});
 
 // Frontend Stripe Client Loader
 export const getStripe = (): Promise<StripeJs | null> => {

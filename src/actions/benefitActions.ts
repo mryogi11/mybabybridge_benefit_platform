@@ -517,20 +517,21 @@ export async function getUserDashboardData(): Promise<{
     data: UserDashboardData | null;
     message: string;
 }> {
+    console.log("[Action] getUserDashboardData started...");
     try {
-        const authUser = await getAuthenticatedUser();
+        const user = await getAuthenticatedUser();
         const currentUser = await db.select({
             id: users.id,
             email: users.email,
             selectedPackageId: users.selected_package_id
         })
         .from(users)
-        .where(eq(users.id, authUser.id))
+        .where(eq(users.id, user.id))
         .limit(1);
         if (!currentUser || currentUser.length === 0) {
             throw new Error("Current user data not found.");
         }
-        const user = currentUser[0];
+        const userRecord = currentUser[0];
         const allDbPackages = await db.select({
             id: packages.id,
             name: packages.name,
@@ -549,26 +550,27 @@ export async function getUserDashboardData(): Promise<{
             key_benefits: pkg.key_benefits,
             is_base_employer_package: pkg.is_base_employer_package
         }));
-        const currentPackageInfo = user.selectedPackageId
-            ? allPackagesInfo.find(pkg => pkg.id === user.selectedPackageId) || null
+        const currentPackageInfo = userRecord.selectedPackageId
+            ? allPackagesInfo.find(pkg => pkg.id === userRecord.selectedPackageId) || null
             : null;
-        const dashboardData: UserDashboardData = {
+        const resultData: UserDashboardData = {
             userId: user.id,
-            userEmail: user.email,
+            userEmail: userRecord.email || null,
             currentPackage: currentPackageInfo,
             allPackages: allPackagesInfo
         };
+        console.log("[Action] getUserDashboardData finishing successfully.");
         return {
             success: true,
-            data: dashboardData,
-            message: "Dashboard data fetched successfully."
+            data: resultData,
+            message: 'User dashboard data fetched successfully.'
         };
-    } catch (error) {
-        console.error("Error fetching user dashboard data:", error);
-        const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
-         if (errorMessage === "User is not authenticated.") {
-             return { success: false, data: null, message: errorMessage };
-        }
-        return { success: false, data: null, message: `Failed to fetch dashboard data: ${errorMessage}` };
+    } catch (error: any) {
+        console.error("[Action] Error in getUserDashboardData:", error);
+        return {
+            success: false,
+            data: null,
+            message: error.message || 'An unexpected error occurred fetching dashboard data.'
+        };
     }
 } 

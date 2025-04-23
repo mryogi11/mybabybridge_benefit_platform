@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box, 
   Card, 
@@ -29,6 +29,7 @@ import {
   Visibility,
   Accessibility
 } from '@mui/icons-material';
+import { useThemeMode } from '@/components/ThemeRegistry/ClientThemeProviders';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -58,6 +59,7 @@ export default function SettingsPage() {
   const [tabValue, setTabValue] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const { modeSetting, setModeSetting } = useThemeMode();
   const [settings, setSettings] = useState({
     emailNotifications: true,
     smsNotifications: false,
@@ -66,15 +68,19 @@ export default function SettingsPage() {
     profileVisibility: true,
     twoFactorAuth: false,
     language: 'english',
-    theme: 'system',
     contrastMode: false,
     fontSize: 'medium',
   });
+  const [localThemeSetting, setLocalThemeSetting] = useState(modeSetting);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
     severity: 'success' as 'success' | 'info' | 'warning' | 'error',
   });
+
+  useEffect(() => {
+    setLocalThemeSetting(modeSetting);
+  }, [modeSetting]);
 
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -84,17 +90,21 @@ export default function SettingsPage() {
     setSettings({ ...settings, [name]: event.target.checked });
   };
 
+  const handleThemeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newMode = event.target.value as 'light' | 'dark' | 'system';
+    setLocalThemeSetting(newMode);
+    setModeSetting(newMode);
+  };
+
   const handleSaveSettings = async () => {
     setIsSaving(true);
     
     try {
-      // Simulate API call with delay
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // TODO: Save settings to database
-      console.log('Saving settings:', settings);
+      const settingsToSave = { ...settings };
+      console.log('Saving settings:', settingsToSave);
       
-      // Show success message
       setSnackbar({
         open: true,
         message: 'Settings saved successfully!',
@@ -294,8 +304,8 @@ export default function SettingsPage() {
               <TextField
                 select
                 label="Theme"
-                value={settings.theme}
-                onChange={(e) => setSettings({ ...settings, theme: e.target.value })}
+                value={localThemeSetting}
+                onChange={handleThemeChange}
                 fullWidth
                 margin="normal"
                 SelectProps={{

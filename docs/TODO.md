@@ -7,11 +7,9 @@ This document tracks the features and tasks for the MyBabyBridge platform.
 
 ### Major Features (Pending / Incomplete)
 
-*   [ ] **Benefit Verification Module:**
-    *   [ ] Implement user-facing flow (Steps 1-3 mentioned as planned in README).
-    *   [ ] Complete partially implemented steps (Steps 4-6 mentioned in README).
-    *   [ ] Integrate verification status with package selection/dashboard.
-    *   [ ] Implement "No Work Email" alternative verification flow (Step 4).
+*   [✅] **Benefit Verification Module:** *(Steps 1-6 Completed)*
+    *   [ ] Implement "No Work Email" alternative verification flow (Step 4) - *(Need to clarify if this is still required)*.
+    *   [ ] Review/Refine Stripe Integration for package purchase in Step 6.
     *   [ ] *(Ref: `docs/BENEFIT_MODULE_GUIDE.md`)*
 *   [ ] **Secure Messaging:**
     *   [ ] Implement UI for patient-provider communication.
@@ -19,13 +17,12 @@ This document tracks the features and tasks for the MyBabyBridge platform.
     *   [ ] Handle message storage and retrieval.
     *   [ ] Implement real-time updates (e.g., via Supabase Realtime).
 *   [ ] **Payments (Stripe Integration):**
-    *   [ ] Implement UI flow for package purchase/subscription.
-    *   [ ] Verify/complete Stripe Payment Intent creation logic.
+    *   [ ] Verify/complete Stripe Payment Intent creation logic (used in Benefit Step 6).
     *   [ ] Implement and test Stripe Webhook handler (`/api/payments/webhook` mentioned in PRD).
-    *   [ ] Handle subscription management (linking status to `PatientPackages` table).
+    *   [ ] Handle subscription management (linking status to `PatientPackages` table or user profile).
 *   [ ] **Analytics Module:**
     *   [ ] Design and implement Admin dashboard UI for analytics.
-    *   [ ] Implement data collection/aggregation for required metrics (Revenue, User, Treatment).
+    *   [ ] Implement data collection/aggregation for required metrics (e.g., Revenue, User Activity, Package Selection).
     *   [ ] Develop backend logic/API endpoints for fetching analytics data.
     *   [ ] Implement chart/visualization components.
 *   [ ] **Educational Resources:**
@@ -48,7 +45,7 @@ This document tracks the features and tasks for the MyBabyBridge platform.
     *   [ ] **Profile Management:** Implement UI for providers to manage professional details, visibility settings (as per PRD).
     *   [ ] **Patient Communication:** Linked to Secure Messaging feature.
 *   **Patient Module:**
-    *   [ ] **Dashboard Refinement:** Enhance dashboard beyond upcoming appointments (e.g., treatment plan progress linked to benefits).
+    *   [ ] **Dashboard Refinement:** Enhance dashboard beyond upcoming appointments (e.g., displaying current benefit package status/details).
     *   [ ] **Profile Management:** Implement UI for patients to view/edit their profile.
 
 ### Authentication & Authorization

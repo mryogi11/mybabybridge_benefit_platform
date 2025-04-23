@@ -9,6 +9,14 @@ import { UserRole } from '@/types';
 import type { Database } from '@/types/supabase'; // Assuming Database type
 // Removed Database import temporarily - Please provide correct path later
 // import { Database } from '@/lib/supabase/database.types'; 
+import { z } from 'zod';
+// Remove incorrect auth import
+// import { auth } from '@/lib/auth/auth'; 
+import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
+import { ThemeModeSetting } from '@/components/ThemeRegistry/ClientThemeProviders'; // Import the type
 
 // Reuse the NewUserData interface definition or redefine if needed
 // It's better to import it if possible to avoid duplication
@@ -200,4 +208,66 @@ export async function createUserAction(userData: NewUserData): Promise<{ success
         console.error("[Server Action] Error during user creation/update:", error);
         return { success: false, error: error.message || "An unexpected server error occurred." };
     }
+}
+
+// Zod schema for validation
+const ThemePreferenceSchema = z.object({
+  preference: z.enum(['light', 'dark', 'system']),
+});
+
+export async function updateThemePreference(preference: ThemeModeSetting) {
+  // Create Supabase client for Server Actions
+  const cookieStore = cookies();
+  const supabase = createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set(name: string, value: string, options: any) {
+          cookieStore.set({ name, value, ...options });
+        },
+        remove(name: string, options: any) {
+          cookieStore.set({ name, value: '', ...options });
+        },
+      },
+    }
+  );
+
+  // Get user session
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    console.error('Error getting user or user not authenticated:', userError);
+    return { success: false, error: 'User not authenticated' };
+  }
+
+  const userId = user.id;
+
+  const validation = ThemePreferenceSchema.safeParse({ preference });
+
+  if (!validation.success) {
+    console.error("Validation Error:", validation.error.errors);
+    return { success: false, error: 'Invalid theme preference value.' };
+  }
+
+  try {
+    await db
+      .update(users)
+      .set({ theme_preference: validation.data.preference })
+      .where(eq(users.id, userId)); // Use userId from getUser()
+
+    // Optionally revalidate paths if theme affects server-rendered components 
+    // dependent on this data, though unlikely needed for just theme.
+    // revalidatePath('/', 'layout'); 
+
+    console.log(`Theme preference updated for user ${userId} to ${validation.data.preference}`);
+    return { success: true };
+
+  } catch (error) {
+    console.error("Database Error: Failed to update theme preference", error);
+    return { success: false, error: 'Database error: Failed to update theme preference.' };
+  }
 } 

@@ -22,9 +22,9 @@ The application follows the Next.js 14 App Router structure with route groups an
 
 - `src/app/`: Main application code
   - `(auth)/`: Authentication-related pages (login, register)
-  - `(dashboard)/`: User dashboard pages
-  - `(provider)/`: Provider-specific pages
-  - `(admin)/`: Admin portal pages
+  - `(dashboard)/`: User dashboard pages (Uses a side-drawer layout defined in `layout.tsx`)
+  - `(provider)/`: Provider-specific pages (Uses a side-drawer layout defined in `layout.tsx`)
+  - `(admin)/`: Admin portal pages (Uses a side-drawer layout defined in `layout.tsx`)
   - `api/`: API routes
 - `src/components/`: Reusable UI components
 - `src/contexts/`: React context providers
@@ -53,13 +53,14 @@ The application uses Supabase for authentication with the following key componen
 
 ## Key Features
 
-1. **User Dashboards**: Patient and provider dashboards with role-specific views
+1. **User Dashboards**: Patient, Provider, and Admin dashboards with role-specific views and a consistent side-drawer navigation layout.
 2. **Appointment Management**: Scheduling, history, and reminders
 3. **Secure Messaging**: Communication between patients and providers
 4. **Educational Resources**: Curated content for fertility education
 5. **Analytics**: Treatment success metrics and insights
 6. **Payments**: Integration with payment processing (Status: In Development / Partially Implemented)
 7. **Benefit Verification**: Employer/health plan benefit verification and package management (Replaces previous Treatment Plans concept. Status: Planning / Implementation guide in `docs/BENEFIT_MODULE_GUIDE.md`)
+8. **Dynamic Theme Switching**: User-selectable themes (Light, Dark, System) with preference persisted in the database.
 
 ## Development Work Completed
 
@@ -83,6 +84,10 @@ The application uses Supabase for authentication with the following key componen
 18. ✅ Enhanced welcome page with family imagery and testimonials
 19. ✅ Improved profile page with better emergency contacts and medical history sections
 20. ✅ Implemented skeleton loaders for improved perceived performance
+21. ✅ Refactored dashboard layout to use a side-drawer navigation
+22. ✅ Implemented dynamic theme switching (Light/Dark/System) with persistence
+23. ✅ Refactored Stripe client initialization to separate server/client logic
+24. ✅ Added loading overlay for smoother logout experience
 
 ## Recent UI/UX Improvements
 
@@ -112,6 +117,17 @@ The application uses Supabase for authentication with the following key componen
 - **Improved Medical History**: Enhanced the display and management of medical information
 - **Emergency Contact Management**: Better UI for viewing and editing emergency contacts
 
+### Dashboard and Themeing
+- **Side-Drawer Layout**: The main dashboard layout for patients, providers, and admins now uses a persistent side-drawer for navigation, replacing the previous top app bar menu. This is managed in `src/app/(dashboard)/layout.tsx` (and similar provider/admin layouts).
+- **Dynamic Theme Management**:
+    - Implemented using React Context (`src/components/ThemeRegistry/ClientThemeProviders.tsx`) and the `useThemeMode` hook.
+    - Supports 'light', 'dark', and 'system' modes.
+    - User preference is saved to the `theme_preference` column in the `users` table via the `updateThemePreference` server action (`src/actions/userActions.ts`).
+    - Defaults to 'dark' mode if no preference is set or for logged-out users.
+    - System preference dynamically adapts based on OS settings (`useMediaQuery`).
+    - Theme settings UI is available on the user's Settings page.
+- **Logout Experience**: Added a full-screen loading overlay (`Backdrop` with `CircularProgress`) triggered immediately on logout click in the dashboard layout to provide feedback while the sign-out process completes.
+
 ## Known Issues and Challenges
 
 1. **Database Schema Synchronization (Drizzle):** If manual SQL changes are made to the Supabase database without updating the Drizzle schema (`src/lib/db/schema.ts`), or vice-versa, `drizzle-kit generate` might produce incorrect migration scripts (e.g., trying to create tables/columns that already exist, or drop things unexpectedly). Careful review of generated SQL is essential before application. The migration file `drizzle/0001_ambitious_blur.sql` required significant manual commenting-out due to initial sync issues.
@@ -123,6 +139,7 @@ The application uses Supabase for authentication with the following key componen
 7. **Missing Routes**: New pages must be added with both the correct directory structure and authentication handling.
 8. **Image Handling**: Ensure proper configuration for Next.js Image component when adding new images.
 9. **Session Management**: Occasional session expiration requires additional handling in some edge cases.
+10. **Stripe Client Initialization**: The Stripe backend client (`getServerStripeClient`) requires the `STRIPE_SECRET_KEY`. Initial implementation caused errors on client-side dashboard load because the client initialization logic (which checked for the key) was bundled with client-side code. This was resolved by separating the server-side Stripe initialization into `src/lib/stripe/server.ts` (marked with `'use server';`) and ensuring client-side components only import from `src/lib/stripe/client.ts` or actions that use the server client indirectly.
 
 ## Code Patterns and Best Practices
 
@@ -160,7 +177,7 @@ The database schema is managed exclusively via **Drizzle ORM**. The previous wor
 
 **Key Tables (Defined in `src/lib/db/schema.ts`):**
 
-*   `users`: Mirrors essential user data from `auth.users`.
+*   `users`: Mirrors essential user data from `auth.users`, including `id`, `email`, `role`, `selected_package_id`, and `theme_preference`.
 *   `providers`: Provider-specific details.
 *   `patient_profiles`: Patient-specific profile details.
 *   `appointments`: Links providers and patients, stores appointment details.

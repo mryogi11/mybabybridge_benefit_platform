@@ -20,6 +20,7 @@ export const benefitSourceEnum = pgEnum('benefit_source', ['employer_or_plan', '
 export const benefitStatusEnum = pgEnum('benefit_status', ['not_started', 'pending_verification', 'verified', 'declined', 'no_benefit']);
 export const packageTierEnum = pgEnum('package_tier', ['basic', 'silver', 'gold', 'platinum']); // Based on BENEFIT_MODULE_GUIDE
 export const appointmentStatusEnum = pgEnum('appointment_status', ['scheduled', 'completed', 'cancelled', 'pending', 'confirmed']); // Defined based on existing appointments table
+export const themeModeEnum = pgEnum('theme_mode', ['light', 'dark', 'system']); // Added
 // REMOVED: treatmentPlanStatusEnum
 
 // --- Organizations Table ---
@@ -95,6 +96,8 @@ export const users = pgTable('users', {
   selected_package_id: uuid('selected_package_id').references(() => packages.id, { onDelete: 'set null' }),
   // Stripe Customer ID
   stripe_customer_id: text('stripe_customer_id').unique(),
+  // Added Theme Preference
+  theme_preference: themeModeEnum('theme_preference').default('dark'),
 });
 
 // --- User Benefit Verification Attempts Table ---

@@ -5,7 +5,8 @@ import { createServerClient } from '@supabase/ssr'; // Use ssr
 import type { Database } from '@/types/supabase'; // Assuming Database type
 import { z } from 'zod';
 
-import { stripe } from '@/lib/stripe/client'; // Import backend stripe instance
+// Import the getter function from the new server-only file
+import { getServerStripeClient } from '@/lib/stripe/server'; 
 import { db } from '@/lib/db';
 import { users, packages } from '@/lib/db/schema'; // Assuming you might need user/package info
 import { eq } from 'drizzle-orm';
@@ -56,6 +57,9 @@ const PaymentIntentPayloadSchema = z.object({
 
 export async function createPaymentIntent(payload: z.infer<typeof PaymentIntentPayloadSchema>): Promise<{ success: boolean; clientSecret?: string | null; message: string; }> {
     try {
+        // Get the stripe client instance when needed
+        const stripe = getServerStripeClient();
+
         // Validate payload first
         const validatedPayload = PaymentIntentPayloadSchema.parse(payload);
         const { amount, currency, packageId } = validatedPayload;
@@ -211,7 +215,7 @@ export async function createPaymentIntent(payload: z.infer<typeof PaymentIntentP
             message: 'Payment Intent created successfully.'
         };
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("[Stripe] Error creating Payment Intent:", error);
         const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
          if (error instanceof z.ZodError) {

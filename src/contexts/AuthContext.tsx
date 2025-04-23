@@ -10,6 +10,7 @@ interface Profile {
   first_name?: string;
   last_name?: string;
   role?: string;
+  theme_preference?: 'light' | 'dark' | 'system' | null; // Added optional theme preference
   // Add other profile fields as needed
 }
 
@@ -64,19 +65,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     debugLog('Fetching profile (from users table) for user ID:', userId);
     setIsProfileLoading(true);
     try {
-      // Corrected table name to 'users'
+      // Select specific columns including the new one, or keep '*'. Using '*' for now.
       const { data, error } = await supabase
         .from('users') 
-        .select('*') // Select all relevant user/profile fields
+        .select('id, first_name, last_name, role, theme_preference') // Explicitly select needed fields including theme
         .eq('id', userId)
         .single();
       if (error) {
         debugLog('Error fetching user profile:', error);
         setProfile(null);
-      } else {
+      } else if (data) {
         debugLog('User profile fetched successfully:', data);
-        // Ensure the fetched data conforms to the Profile interface
+        // Now the type assertion is safer
         setProfile(data as Profile); 
+      } else {
+        // Handle case where query succeeded but no user found (data is null)
+        debugLog('User profile not found for ID:', userId);
+        setProfile(null);
       }
     } catch (err) {
       debugLog('Caught exception during user profile fetch:', err);

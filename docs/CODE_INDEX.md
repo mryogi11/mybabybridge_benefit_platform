@@ -11,7 +11,8 @@ src/
 │   ├── (auth)/             # Authentication-related pages
 │   │   ├── login/          # Login page
 │   │   └── register/       # Registration page
-│   ├── (dashboard)/        # User dashboard pages
+│   ├── (benefit-verification)/ # Benefit Verification flow steps
+│   ├── (dashboard)/        # User dashboard pages (Uses side-drawer layout)
 │   │   └── dashboard/      # Dashboard content pages
 │   │       ├── analytics/         # Analytics dashboards
 │   │       ├── appointments/      # Appointment management
@@ -26,27 +27,35 @@ src/
 │   │       ├── profile/           # User profile
 │   │       ├── provider/          # Provider information
 │   │       ├── settings/          # User settings
-│   │       └── treatments/        # Treatment information
-│   ├── (provider)/         # Provider-specific pages
+│   │       └── treatments/        # (Deprecated) Treatment information -> see packages
+│   ├── (provider)/         # Provider-specific pages (Uses side-drawer layout)
 │   └── api/                # API routes
 ├── components/             # Reusable UI components
 │   ├── auth/               # Authentication-related components
 │   ├── AppointmentCard.tsx # Appointment display component
+│   ├── BenefitPackageCard.tsx # Benefit Package display component
 │   ├── LoadingProvider.tsx # Loading state manager
 │   ├── Logo.tsx            # Logo component
-│   ├── MilestoneNotes.tsx  # Treatment milestone notes
-│   ├── Navigation.tsx      # Navigation component
+│   ├── MilestoneNotes.tsx  # (Review/Remove if unused) Treatment milestone notes
+│   ├── Navigation.tsx      # Side-drawer navigation component
 │   ├── Notifications.tsx   # Notifications component
 │   ├── SkeletonLoader.tsx  # Loading skeleton component
-│   └── TreatmentPlanCard.tsx # Treatment plan card
+│   └── ThemeRegistry/      # MUI v5 theme and Emotion cache setup
+│       ├── ClientThemeProviders.tsx # Context provider for theme mode (light/dark/system)
+│       └── ThemeRegistry.tsx      # Main wrapper component for theme context + cache
 ├── contexts/               # React context providers
-│   └── AuthContext.tsx     # Authentication context
+│   └── AuthContext.tsx     # Authentication context (includes user profile, role, theme preference)
 ├── lib/                    # Utility libraries
+│   ├── db/                 # Drizzle ORM client and schema
+│   │   ├── index.ts        # Drizzle client initialization
+│   │   └── schema.ts       # Database schema definitions
 │   ├── stripe/             # Stripe payment integration
+│   │   ├── client.ts       # Stripe client-side utilities (e.g., loading Stripe.js)
+│   │   └── server.ts       # Stripe server-side client initialization ('use server')
 │   ├── supabase/           # Supabase client utilities
 │   │   ├── authSync.ts     # Auth synchronization
-│   │   └── client.ts       # Supabase client
-│   └── supabase.ts         # Supabase initialization
+│   │   └── client.ts       # Supabase client (primarily for Auth)
+│   └── supabase.ts         # (Deprecated?) Supabase initialization
 ├── styles/                 # Global styles and theme configuration
 └── types/                  # TypeScript type definitions
 ```
@@ -55,19 +64,20 @@ src/
 
 ### Authentication
 
-- **AuthContext.tsx**: Authentication state provider with login, logout, and registration methods
+- **AuthContext.tsx**: Authentication state provider with login, logout, registration methods, and user profile data (including role and theme preference).
 - **Login/Register Pages**: User authentication interfaces
 - **Authentication Components**: Reusable login/registration form components
 
 ### UI Components
 
 - **Logo.tsx**: Brand logo component used throughout the application
-- **Navigation.tsx**: Main navigation component for dashboard and provider sections
+- **Navigation.tsx**: Main side-drawer navigation component for dashboard sections
+- **ThemeRegistry/ClientThemeProviders.tsx**: Manages the theme mode (light/dark/system) via React Context.
+- **ThemeRegistry/ThemeRegistry.tsx**: Sets up Emotion cache and applies the selected MUI theme.
 - **SkeletonLoader.tsx**: Loading skeleton for improved user experience during data loading
 - **Notifications.tsx**: Notification display and management component
 - **AppointmentCard.tsx**: Reusable card for displaying appointment information
-- **TreatmentPlanCard.tsx**: Card component for displaying treatment plan information
-- **MilestoneNotes.tsx**: Component for displaying and managing treatment milestone notes
+- **BenefitPackageCard.tsx**: Card component for displaying benefit package information
 - **LoadingProvider.tsx**: Global loading state provider
 
 ## Data Flow and State Management
@@ -157,6 +167,14 @@ For better user experience, the application uses optimistic updates for common o
 4. Use optimistic updates for responsive UI
 5. Implement proper loading and error states for all data operations
 
+### Theme Management
+
+1. **Theme Context:** `ClientThemeProviders` uses React Context to manage the current theme mode (`light`, `dark`, `system`).
+2. **Persistence:** The user's preferred theme is stored in the `users` table (`theme_preference` column) and loaded via `AuthContext`. Changes are saved using the `updateThemePreference` server action.
+3. **Default:** Defaults to `dark` mode if no preference is set or for logged-out users.
+4. **System Preference:** Uses `useMediaQuery` to detect OS preference when 'system' mode is selected.
+5. **UI:** `ThemeRegistry` applies the theme using MUI's `ThemeProvider`. Settings page allows user selection.
+
 ## Pages and Routes
 
 #### Public Pages
@@ -167,17 +185,16 @@ For better user experience, the application uses optimistic updates for common o
 
 #### Dashboard Pages
 
-- **Dashboard Home**: Main dashboard with overview and quick access to features
+- **Dashboard Home**: Main dashboard with overview and quick access via side-drawer navigation.
 - **Profile**: User profile information and management
 - **Appointments**: Appointment scheduling and history
-- **Treatments**: Available treatments and information
-- **Treatment Plans**: Active and historical treatment plans
-- **Packages**: Benefit/Treatment packages available for verification/purchase
+- **Benefit Verification**: Multi-step flow for benefit verification and package selection.
+- **Packages**: Available benefit/treatment packages.
 - **Messages**: Secure messaging between patients and providers
 - **Notifications**: User notifications center
 - **Education**: Educational resources for patients
 - **Documents**: Document management and sharing
-- **Settings**: User preferences and account settings
+- **Settings**: User preferences and account settings (including Theme Selection).
 
 #### Provider Pages
 
@@ -197,25 +214,27 @@ Below is a visual representation of the key component dependencies in the applic
 ```
 ┌─────────────────────────┐     ┌───────────────────┐
 │     AuthContext.tsx     │◄────┤ Login/Register    │
-└───────────┬─────────────┘     └───────────────────┘
+│ (includes theme pref)   │     └───────────────────┘
+└───────────┬─────────────┘
             │
-            ▼
-┌─────────────────────────┐     ┌───────────────────┐
-│    Dashboard Layout     │◄────┤  Navigation.tsx   │
-└───────────┬─────────────┘     └───────────────────┘
-            │
-    ┌───────┴────────┬───────────────┬───────────────┐
-    ▼                ▼               ▼               ▼
-┌─────────┐    ┌─────────┐    ┌─────────────┐  ┌─────────────┐
-│ Profile │    │ Package │    │Appointments │  │   Other     │
-│  Page   │    │  Pages  │    │    Page     │  │  Dashboard  │
-└────┬────┘    └────┬────┘    └──────┬──────┘  │    Pages    │
-     │              │                │         └─────────────┘
-     ▼              ▼                ▼
-┌─────────┐    ┌─────────┐    ┌─────────────┐
-│ Gravatar│    │ Package │    │Appointment  │
-│ Support │    │  Cards  │    │   Cards     │
-└─────────┘    └─────────┘    └─────────────┘
+            ▼               ┌─────────────────────────┐
+┌─────────────────────────┐ │ ThemeRegistry/          │
+│    Dashboard Layout     │─┤ ClientThemeProviders.tsx│
+│   (Side Drawer)         │ └───────────┬─────────────┘
+└───────────┬─────────────┘             │
+            │                           ▼
+    ┌───────┴────────┬───────────────┬───────────┐
+    ▼                ▼               ▼           ▼
+┌─────────┐    ┌─────────┐    ┌──────────┐  ┌─────────┐
+│ Profile │    │ Package │    │ Settings │  │ Other   │
+│  Page   │    │  Pages  │    │ (Theme)  │  │ Dash    │
+└────┬────┘    └────┬────┘    └──────────┘  │ Pages   │
+     │              │                       └─────────┘
+     ▼              ▼
+┌─────────┐    ┌─────────┐
+│ Gravatar│    │ Package │
+│ Support │    │  Cards  │
+└─────────┘    └─────────┘
 ```
 
 ### Key Dependencies
@@ -225,7 +244,7 @@ Below is a visual representation of the key component dependencies in the applic
    - Depends on: Supabase client
 
 2. **Navigation.tsx**
-   - Used by: Dashboard layout, Provider layout
+   - Used by: Dashboard layout, Provider layout (as side-drawer)
    - Depends on: AuthContext (for user role information)
 
 3. **LoadingProvider.tsx**
@@ -244,8 +263,12 @@ Below is a visual representation of the key component dependencies in the applic
    - Depends on: AuthContext, Supabase client, Gravatar integration
 
 7. **Dashboard Home**
-   - Depends on: AuthContext, Navigation, various card components
-   - Uses: AppointmentCard, PackageCard, Notifications
+   - Depends on: AuthContext, Navigation, various card components (AppointmentCard, BenefitPackageCard)
+
+8. **Theme Management**
+   - `ClientThemeProviders`: Depends on `AuthContext` (to get/set preference).
+   - `ThemeRegistry`: Wraps `ClientThemeProviders`.
+   - Settings Page: Consumes theme context from `ClientThemeProviders`.
 
 ## Backend Integration
 

@@ -161,46 +161,6 @@ To ensure users navigate the benefit verification flow correctly and prevent una
 
 This implementation provides a user-friendly approach to fertility benefit verification while offering clear upgrade paths for patients who want enhanced services beyond their employer-provided benefits.
 
-## Current Implementation Status (As of April 15, 2025)
-
-### Implemented Features:
-
-*   **Multi-Step Flow:** Basic UI and navigation structure for Steps 1-6.
-*   **State Management:** `BenefitVerificationContext` used for shared state.
-*   **Step 1:** Benefit source selection and update (`updateBenefitSource`).
-*   **Step 2:** Organization search (`searchOrganizations`) and selection (`updateSponsoringOrganization`).
-*   **Step 3 & 4:** Personal info and work email submission (`submitVerificationInfo`).
-*   **Basic Verification:** Verification logic checks submitted work email against `organization_approved_emails` table.
-*   **Base Package Assignment:** Default employer package assigned on successful basic verification.
-*   **Step 5:** Package viewing (`getBenefitPackages` - basic) and selection (`updateSelectedPackage`).
-*   **Step 6 (Confirmation/Payment):**
-    *   Displays selected package details (`getUserWithSelectedPackage`).
-    *   Initializes Stripe Elements for paid packages (`createPaymentIntent`).
-    *   Handles Payment Element submission.
-    *   Creates/retrieves Stripe Customer ID and associates it with the Payment Intent.
-    *   Finalizes setup by setting `benefit_status` to `verified` (`completeBenefitSetup`).
-*   **Admin Management:** Basic UI and server actions for adding organizations and approved emails.
-
-### Pending Items / Potential Enhancements (Aligned with TODO as of April 2025):
-
-*   [ ] **Benefit Verification Flow:**
-    *   [ ] Implement user-facing flow (Steps 1-3 mentioned as planned in README).
-    *   [ ] Complete partially implemented steps (Steps 4-6 mentioned in README).
-    *   [ ] Implement "No Work Email" alternative verification flow (Step 4).
-    *   [ ] Integrate verification status with package selection/dashboard.
-    *   [ ] Implement **Real Verification Logic** (replace basic email check in `submitVerificationInfo`).
-    *   [ ] Implement **Dynamic Package Filtering** (`getBenefitPackages` based on verified user).
-    *   [ ] Ensure correct **User Profile Data Handling** (saving info from Step 3).
-    *   [ ] Refine **Input Validation** (country code, phone on Step 3).
-*   [ ] **Layout-Based Status Checks:** Implement routing logic in Server Component layouts (`/dashboard/layout.tsx`, `/benefit-verification/layout.tsx`) based on `benefit_status`.
-*   [ ] **Admin Management:**
-    *   [ ] Verify/Complete **Admin Package Management** UI/API (README suggests implemented, Guide lists as upcoming).
-    *   [ ] Verify/Fix **Admin Organization Edit/Delete** UI/API (README suggests implemented, Guide lists as needing fixes).
-    *   [ ] Implement **Admin Email Edit** UI/API.
-*   [ ] **Stripe Webhooks:** Implement webhook handler (`/api/payments/webhook`) for reliable payment tracking.
-*   [ ] **UI/UX Refinements:** Continue improving loading states, error handling, and edge cases throughout the benefit flow.
-*   [ ] **Thorough Testing:** Conduct end-to-end testing of all implemented benefit features and user paths.
-
 ## Benefit Verification Status (`benefit_status`)
 
 A crucial piece of state management within the benefit verification flow is the `benefit_status` column added to the `profiles` table (`src/lib/db/schema.ts`).
@@ -222,6 +182,41 @@ This column tracks the user's current stage and outcome in the verification proc
     *   `src/app/(benefit-verification)/step5/page.tsx` (Displays outcome based on status).
 
 Understanding `benefit_status` is key to tracing the user's journey through the benefit verification module and how different components react to their progress.
+
+## Current Implementation Status (Reflecting Recent Changes)
+
+### Implemented Features:
+
+*   **Multi-Step Benefit Flow (Steps 1-6):** Full UI, navigation, state management (`BenefitVerificationContext`), and server actions implemented for the entire user flow.
+    *   **Step 1:** Benefit source selection (`updateBenefitSource`).
+    *   **Step 2:** Organization search & selection (`searchOrganizations`, `updateSponsoringOrganization`).
+    *   **Step 3:** Personal information collection (using `submitVerificationInfo` for employer path, `updateBasicProfile` for non-employer path).
+    *   **Step 4 (Implicit in Step 3):** Work email used for basic verification in `submitVerificationInfo`.
+    *   **Step 5:** Package viewing (`getBenefitPackages`) and selection (`updateSelectedPackage`).
+    *   **Step 6 (Confirmation/Payment):** Displays selected package (`getUserWithSelectedPackage`), initializes Stripe Elements for paid packages (`createPaymentIntent`), handles Payment Element submission, and finalizes setup (`completeBenefitSetup`).
+*   **Employer & Non-Employer Paths:** Logic handles both verification through an employer and direct profile updates/package selection for other paths.
+*   **Basic Email Verification:** Verification logic checks submitted work email against `organization_approved_emails` table for the employer path.
+*   **Base Package Assignment:** Default employer package assigned on successful employer verification.
+*   **Admin Management:** Basic UI and server actions for managing organizations and approved emails.
+*   **Layout-Based Status Checks:** Initial checks implemented in layouts/pages to redirect users based on authentication and benefit status (e.g., redirecting `verified` users to dashboard, redirecting `not_started` users to `/step1`).
+
+### Pending Items / Potential Enhancements (Review and Prioritize):
+
+*   [ ] **Benefit Verification Logic:** 
+    *   [ ] Enhance/replace basic email check with more robust verification methods if required (e.g., HRIS integration, manual review flags).
+    *   [ ] Implement "No Work Email" alternative verification flow if needed beyond the current non-employer path.
+*   [ ] **Dynamic Package Display:** Refine `getBenefitPackages` if filtering based on organization or verification status is needed beyond showing all available packages.
+*   [ ] **Profile Data Handling:** Ensure all necessary profile fields collected during the flow are consistently saved and potentially synced with a central `patient_profiles` table if used elsewhere.
+*   [ ] **Input Validation:** Further enhance validation for fields like phone numbers, addresses based on country, etc.
+*   [ ] **Admin Management:**
+    *   [ ] Verify/Complete **Admin Package Management** UI/API.
+    *   [ ] Verify/Fix **Admin Organization Edit/Delete** UI/API.
+    *   [ ] Implement **Admin Email Edit/Delete** UI/API.
+*   [ ] **Stripe Integration:**
+    *   [ ] Implement webhook handler (`/api/payments/webhook`) for robust payment tracking and fulfillment.
+    *   [ ] Implement subscription management logic if subscription-based packages are offered.
+*   [ ] **UI/UX Refinements:** Continue improving loading states, error handling, accessibility, and edge cases throughout the benefit flow and dashboard.
+*   [ ] **Testing:** Conduct thorough end-to-end testing of all benefit paths, payment scenarios, and edge cases.
 
 ## Upcoming Refactoring & Features
 
