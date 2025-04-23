@@ -41,7 +41,7 @@ import Logo from './Logo';
 const pages = [
   { title: 'Dashboard', path: '/dashboard', icon: <DashboardIcon fontSize="small" /> },
   { title: 'Appointments', path: '/dashboard/appointments', icon: <CalendarIcon fontSize="small" />, badge: 2 },
-  { title: 'Treatment Plans', path: '/dashboard/treatment-plans', icon: <AssignmentIcon fontSize="small" /> },
+  { title: 'Benefits', path: '/dashboard/benefits', icon: <AssignmentIcon fontSize="small" /> },
   { title: 'Packages', path: '/dashboard/packages', icon: <PackagesIcon fontSize="small" /> },
   { title: 'Messages', path: '/dashboard/messages', icon: <MessageIcon fontSize="small" />, badge: 3 },
 ];

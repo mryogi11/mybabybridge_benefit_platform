@@ -14,7 +14,12 @@ import {
     Link as MuiLink,
     Autocomplete,
     CircularProgress,
-    Alert
+    Alert,
+    Dialog, 
+    DialogTitle, 
+    DialogContent, 
+    DialogContentText, 
+    DialogActions
 } from '@mui/material';
 
 import { updateSponsoringOrganization, searchOrganizations } from '@/actions/benefitActions';
@@ -22,21 +27,36 @@ import { useBenefitVerification } from '@/contexts/BenefitVerificationContext';
 
 const steps = ['Benefit Verification', 'Organization Search', 'Personal Information', 'Package Selection'];
 
+interface OrganizationOption {
+    id: string;
+    label: string; 
+}
+
 export default function OrganizationSearchScreen() {
-    const { benefitSource, sponsoringOrganizationId, sponsoringOrganizationName, setSponsoringOrganization } = useBenefitVerification();
-    const [selectedOption, setSelectedOption] = useState<{ label: string; id: string } | null>( sponsoringOrganizationId ? { label: sponsoringOrganizationName || '', id: sponsoringOrganizationId} : null );
-    const [inputValue, setInputValue] = useState(sponsoringOrganizationName || '');
-    const [options, setOptions] = useState<{ label: string; id: string }[]>([]);
-    const [loadingOptions, setLoadingOptions] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [isPending, startTransition] = useTransition();
     const router = useRouter();
+    const { benefitSource, setSponsoringOrganizationId } = useBenefitVerification(); 
+    const [inputValue, setInputValue] = useState('');
+    const [options, setOptions] = useState<OrganizationOption[]>([]);
+    const [selectedOrg, setSelectedOrg] = useState<OrganizationOption | null>(null);
+    const [loadingSearch, setLoadingSearch] = useState(false);
+    const [searchError, setSearchError] = useState<string | null>(null);
+    const [isPending, startTransition] = useTransition();
     const [isVerifyingStep, setIsVerifyingStep] = useState(true);
+    
+    const [isNotSureDialogOpen, setIsNotSureDialogOpen] = useState(false);
+
+    const handleOpenNotSureDialog = () => {
+        setIsNotSureDialogOpen(true);
+    };
+
+    const handleCloseNotSureDialog = () => {
+        setIsNotSureDialogOpen(false);
+    };
 
     useEffect(() => {
         console.log('[Step 2] Checking prerequisite state...', { benefitSource });
-        if (!benefitSource || benefitSource !== 'employer_or_plan') {
-            console.log(`[Step 2] Invalid prerequisite state (${benefitSource}). Redirecting to Step 1.`);
+        if (benefitSource !== 'employer_or_plan') {
+            console.log(`[Step 2] Invalid benefitSource (${benefitSource}). Redirecting to Step 1.`);
             router.replace('/step1');
         } else {
             setIsVerifyingStep(false);
@@ -44,57 +64,47 @@ export default function OrganizationSearchScreen() {
     }, [benefitSource, router]);
 
     useEffect(() => {
-        if (selectedOption && selectedOption.label === inputValue) {
-            setOptions(selectedOption ? [selectedOption] : []);
-            return undefined; 
-        }
-
-        if (inputValue.trim().length < 2) { 
+        if (inputValue.length < 2) {
             setOptions([]);
-            setLoadingOptions(false);
-            return undefined;
+            setLoadingSearch(false);
+            return;
         }
 
-        setLoadingOptions(true);
-        setOptions([]);
-        
-        const delayDebounceFn = setTimeout(() => {
-            searchOrganizations(inputValue).then(newOptions => {
-                setOptions(newOptions);
-            }).catch(err => {
-                console.error("Failed to search organizations:", err);
-                setError("Error searching organizations. Please try again."); 
-            }).finally(() => {
-                setLoadingOptions(false);
-            });
+        setLoadingSearch(true);
+        setSearchError(null);
+        const timerId = setTimeout(async () => {
+            try {
+                 const results = await searchOrganizations(inputValue);
+                 setOptions(results);
+            } catch (err) {
+                 console.error("Organization search failed:", err);
+                 setSearchError("Failed to search for organizations.");
+                 setOptions([]);
+            } finally {
+                 setLoadingSearch(false);
+            }
         }, 500);
 
-        return () => clearTimeout(delayDebounceFn);
-    }, [inputValue, selectedOption]);
+        return () => clearTimeout(timerId);
+    }, [inputValue]);
 
     const handleContinue = () => {
-        if (!sponsoringOrganizationId) return;
-
-        setError(null);
+        if (!selectedOrg) return;
+        
         startTransition(async () => {
+            setSponsoringOrganizationId(selectedOrg.id);
+
             const formData = new FormData();
-            formData.append('organizationId', sponsoringOrganizationId);
-
+            formData.append('organizationId', selectedOrg.id);
             const result = await updateSponsoringOrganization(formData);
-
             if (result.success) {
                 router.push('/step3'); 
             } else {
-                setError(result.message || 'Failed to save organization.');
+                 console.error("Failed to update sponsoring organization:", result.message);
+                 setSearchError(result.message || "Failed to save organization selection.");
+                 setSponsoringOrganizationId(null);
             }
         });
-    };
-
-    const handleNotSure = () => {
-        console.log("'I'm not sure' clicked - flow TBD");
-        setSponsoringOrganization(null, null);
-        // TODO: Decide navigation for unsure users
-        // router.push('/step5'); // Maybe go straight to non-sponsored packages?
     };
 
     if (isVerifyingStep) {
@@ -125,81 +135,99 @@ export default function OrganizationSearchScreen() {
                     This may be your employer or health insurance company
                 </Typography>
 
-                {error && (
-                    <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+                {searchError && (
+                    <Alert severity="error" sx={{ mb: 2 }}>{searchError}</Alert>
                 )}
 
                 <Autocomplete
-                    id="organization-search-autocomplete"
-                    sx={{ width: '100%', mb: 2 }}
+                    id="organization-search"
                     options={options}
-                    autoComplete
-                    includeInputInList
+                    getOptionLabel={(option) => option.label}
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
                     filterOptions={(x) => x}
-                    filterSelectedOptions
-                    value={selectedOption}
-                    loading={loadingOptions}
-                    noOptionsText={inputValue.length < 2 ? "Type at least 2 characters" : "No organizations found"}
-                    onChange={(event: any, newValue: { label: string; id: string } | null) => {
-                        setOptions(newValue ? [newValue, ...options] : options);
-                        setSelectedOption(newValue);
-                        setSponsoringOrganization(newValue?.id || null, newValue?.label || null);
-                        setError(null);
+                    value={selectedOrg}
+                    onChange={(event, newValue) => {
+                        setSelectedOrg(newValue);
+                        setOptions(newValue ? [newValue, ...options.filter(o => o.id !== newValue.id)] : options);
                     }}
+                    inputValue={inputValue}
                     onInputChange={(event, newInputValue) => {
                         setInputValue(newInputValue);
                     }}
+                    loading={loadingSearch}
                     renderInput={(params) => (
                         <TextField 
                             {...params} 
-                            label="Search organization name" 
+                            label="Search Organization"
+                            variant="outlined" 
+                            fullWidth
                             InputProps={{
                                 ...params.InputProps,
                                 endAdornment: (
-                                    <React.Fragment>
-                                        {loadingOptions ? <CircularProgress color="inherit" size={20} /> : null}
+                                    <>
+                                        {loadingSearch ? <CircularProgress color="inherit" size={20} /> : null}
                                         {params.InputProps.endAdornment}
-                                    </React.Fragment>
+                                    </>
                                 ),
                             }}
                         />
                     )}
-                    renderOption={(props, option) => {
-                        return (
-                            <li {...props} key={option.id}> 
-                                {option.label}
-                            </li>
-                        );
-                    }}
-                    isOptionEqualToValue={(option, value) => option.id === value.id}
-                    getOptionLabel={(option) => option.label}
+                    sx={{ mb: 2 }}
                 />
-
-                <Box sx={{ textAlign: 'center', mb: 4 }}>
-                    <MuiLink component="button" variant="body2" onClick={handleNotSure} sx={{ cursor: 'pointer' }}>
-                        I'm not sure
-                    </MuiLink>
+                
+                <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3, mt: 1 }}>
+                     <Button 
+                        variant="text" 
+                        onClick={handleOpenNotSureDialog}
+                        sx={{ textTransform: 'none' }} 
+                     >
+                         I'm not sure
+                     </Button>
                 </Box>
 
                 <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                     <Button 
+                    <Button 
                         variant="contained" 
                         onClick={handleContinue}
-                        disabled={!sponsoringOrganizationId || isPending} 
-                        sx={{ 
-                            bgcolor: '#e0f2f1', 
+                        disabled={!selectedOrg || isPending}
+                         sx={{ 
+                            bgcolor: '#e0f2f1',
                             color: '#004d40',
                             '&:hover': { bgcolor: '#b2dfdb' },
-                            py: 1.5, 
-                            px: 5,
-                            textTransform: 'none'
+                            py: 1.5, px: 5, textTransform: 'none'
                         }}
-                         startIcon={isPending ? <CircularProgress size={20} color="inherit" /> : null}
+                        startIcon={isPending ? <CircularProgress size={20} color="inherit" /> : null}
                     >
-                         {isPending ? 'Saving...' : 'Continue'}
+                        {isPending ? 'Saving...' : 'Continue'}
                     </Button>
                 </Box>
             </Box>
+
+            <Dialog
+                open={isNotSureDialogOpen}
+                onClose={handleCloseNotSureDialog}
+                aria-labelledby="notsure-dialog-title"
+                aria-describedby="notsure-dialog-description"
+            >
+                <DialogTitle id="notsure-dialog-title">
+                    {"Need Help Finding Your Organization?"}
+                </DialogTitle>
+                <DialogContent>
+                    <DialogContentText id="notsure-dialog-description">
+                        If you're unsure which organization provides your fertility benefit, 
+                        please check your employee handbook, benefits portal, or contact your HR department.
+                        <br /><br />
+                        For further assistance, you can reach out to our support team at: 
+                        <MuiLink href="mailto:care@mybabybridge.com" sx={{ fontWeight: 'bold' }}> care@mybabybridge.com</MuiLink>.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseNotSureDialog} autoFocus>
+                        Close
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
         </Container>
     );
 } 

@@ -6,24 +6,6 @@ export type PurchaseType = 'subscription' | 'one-time';
 
 export type PackageStatus = 'purchased' | 'active' | 'expired' | 'completed';
 
-export type TreatmentMilestone = {
-  id: string;
-  treatment_plan_id: string;
-  appointment_id: string | null;
-  title: string;
-  description: string | null;
-  status: 'pending' | 'completed' | 'cancelled';
-  due_date: string | null;
-  created_at: string;
-  updated_at: string;
-  completed_at?: string;
-  treatment_plan?: {
-    title: string;
-  };
-  dependencies?: TreatmentMilestone[];
-  depends_on?: string[];
-};
-
 export type TreatmentStatus = 'pending' | 'in_progress' | 'completed';
 
 export type NotificationType = 
@@ -73,20 +55,6 @@ export interface PatientPackage {
   end_date: string;
   created_at: string;
   updated_at: string;
-}
-
-export interface Treatment {
-  id: string;
-  patient_id: string;
-  provider_id: string;
-  type: string;
-  description: string;
-  status: 'scheduled' | 'completed' | 'cancelled';
-  appointment_date: string;
-  notes?: string;
-  created_at: string;
-  provider?: Provider;
-  patient?: Patient;
 }
 
 export interface DashboardStats {
@@ -210,39 +178,6 @@ export interface Notification {
   appointment_id?: string;
   is_read: boolean;
   created_at: string;
-}
-
-export interface TreatmentPlan {
-  id: string;
-  patient_id: string;
-  provider_id: string;
-  type: string;
-  title: string;
-  description: string;
-  status: 'active' | 'completed' | 'discontinued';
-  start_date: string;
-  end_date?: string;
-  created_at: string;
-  provider?: Provider;
-  patient?: Patient;
-  milestones?: TreatmentMilestone[];
-}
-
-export interface TreatmentNote {
-  id: string;
-  treatment_plan_id: string;
-  milestone_id: string;
-  appointment_id: string;
-  provider_id: string;
-  content: string;
-  created_at: string;
-  updated_at: string;
-  provider?: {
-    first_name: string;
-    last_name: string;
-  };
-  milestone?: TreatmentMilestone;
-  appointment?: Appointment;
 }
 
 export interface MilestoneDependency {

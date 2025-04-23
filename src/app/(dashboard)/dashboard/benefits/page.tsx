@@ -21,7 +21,7 @@ import {
 // Remove client-side imports no longer needed at page level
 // import { useRouter } from 'next/navigation';
 // import { supabase } from '@/lib/supabase/client';
-import { Assignment, ErrorOutline, WorkspacePremium, Upgrade } from '@mui/icons-material';
+import { WorkspacePremium } from '@mui/icons-material';
 import { cookies } from 'next/headers'; // Keep this if you need cookies at request time
 
 // Import the server action to fetch data
@@ -95,7 +95,7 @@ const getMockTreatmentPlans = (): TreatmentPlan[] => [
 export const dynamic = 'force-dynamic';
 
 // Make the component async to use await for data fetching
-export default async function TreatmentPlansPage() {
+export default async function BenefitPackagePage() {
   // Fetch dashboard data (packages etc.) using the server action
   const { success: dataSuccess, data: dashboardData, message: dataMessage } = await getUserDashboardData();
 
@@ -107,7 +107,7 @@ export default async function TreatmentPlansPage() {
   if (!dataSuccess) {
     // Handle error fetching dashboard data - show message but maybe still render page?
     console.error("Failed to fetch dashboard data:", dataMessage);
-    error = `Could not load benefit plan details: ${dataMessage}. Treatment plans may still be visible.`;
+    error = `Could not load benefit plan details: ${dataMessage}.`;
     // Depending on requirements, you might want to return early or show a specific error state
   }
 
@@ -133,13 +133,9 @@ export default async function TreatmentPlansPage() {
       <Container maxWidth="lg">
         <Box sx={{ py: 4 }}>
           <Typography variant="h4" gutterBottom>
-            Treatment Plans
+            Your Benefit Plan
           </Typography>
-          <Alert severity="warning" sx={{ mb: 3 }} icon={<ErrorOutline />}>
-            {error} 
-          </Alert>
-           {/* Display treatment plans even if package info failed? Or hide? */}
-           {/* Current implementation will show error and then plans */} 
+          <Alert severity="warning" sx={{ mb: 3 }}>{error}</Alert>
         </Box>
       </Container>
     );
@@ -149,14 +145,14 @@ export default async function TreatmentPlansPage() {
     <Container maxWidth="lg">
       <Box sx={{ py: 4 }}>
         <Typography variant="h4" gutterBottom>
-          Treatment Plans & Benefits
+          Your Benefit Plan
         </Typography>
 
         {/* Current Benefit Plan Section */} 
         <Card variant="outlined" sx={{ mb: 4 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-               <WorkspacePremium sx={{ mr: 1 }} color="primary" /> Your Current Benefit Plan
+               <WorkspacePremium sx={{ mr: 1 }} color="primary" /> Current Plan Details
             </Typography>
             {currentPackage ? (
               <Box>
@@ -172,13 +168,14 @@ export default async function TreatmentPlansPage() {
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                   {currentPackage.description || 'No description available.'}
                 </Typography>
+                {/* Display Key Benefits */} 
                 {currentPackage.key_benefits && currentPackage.key_benefits.length > 0 && (
-                   <Box>
+                   <Box sx={{ mt: 2 }}>
                         <Typography variant="subtitle2">Key Benefits:</Typography>
-                        <List dense>
+                        <List dense sx={{ pl: 2 }}> {/* Indent list slightly */} 
                             {currentPackage.key_benefits.map((benefit, index) => (
-                                <ListItem key={index} sx={{ py: 0.5 }}>
-                                    <ListItemText primary={`- ${benefit}`} />
+                                <ListItem key={index} sx={{ py: 0.2, px: 0 }}>
+                                    <ListItemText primary={`• ${benefit}`} />
                                 </ListItem>
                             ))}
                         </List>
@@ -194,62 +191,16 @@ export default async function TreatmentPlansPage() {
         </Card>
 
         {/* Upgrade Options Section (Client Component) */} 
-        {currentPackage && (
+        {/* Render UpgradeOptions only if user has a package AND there are other packages available */}
+        {currentPackage && allPackages.length > 1 && (
              <UpgradeOptions currentPackage={currentPackage} allPackages={allPackages} />
         )}
        
-        <Divider sx={{ my: 4 }} />
+        {/* Remove divider if there are no upgrade options shown? */} 
+        {/* <Divider sx={{ my: 4 }} /> */} 
 
-        {/* Existing Treatment Plans List */}
-        <Typography variant="h5" gutterBottom sx={{ mb: 2 }}>
-          Your Treatment Plans
-        </Typography>
-        {plans.length > 0 ? (
-          <Paper elevation={2}>
-            <List disablePadding>
-              {plans.map((plan, index) => (
-                <React.Fragment key={plan.id}>
-                  <ListItem alignItems="flex-start">
-                    <ListItemText
-                      primary={plan.title || `Plan ID: ${plan.id}`}
-                      secondary={
-                        <React.Fragment>
-                          <Typography
-                            sx={{ display: 'inline' }}
-                            component="span"
-                            variant="body2"
-                            color="text.primary"
-                          >
-                            {plan.type} {plan.provider ? `- Dr. ${plan.provider.last_name} (${plan.provider.specialization})` : ''}
-                          </Typography>
-                          {` — ${plan.description || 'No description provided.'}`}
-                          <br />
-                          <Chip label={plan.status} color={getStatusColor(plan.status)} size="small" sx={{ mt: 1 }} />
-                        </React.Fragment>
-                      }
-                    />
-                    <ListItemSecondaryAction>
-                      {/* TODO: Implement navigation to detailed plan view */}
-                      <Button 
-                        variant="outlined" 
-                        size="small" 
-                        // onClick={() => router.push(`/dashboard/treatment-plans/${plan.id}`)}
-                        disabled // Disable for now until detail page exists
-                      >
-                        View Details
-                      </Button>
-                    </ListItemSecondaryAction>
-                  </ListItem>
-                  {index < plans.length - 1 && <Divider variant="inset" component="li" />}
-                </React.Fragment>
-              ))}
-            </List>
-          </Paper>
-        ) : (
-          <Typography variant="body1" color="text.secondary">
-            You currently have no active treatment plans.
-          </Typography>
-        )}
+        {/* Space for potential future content related to benefits */} 
+
       </Box>
     </Container>
   );

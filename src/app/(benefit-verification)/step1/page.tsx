@@ -55,13 +55,13 @@ export default function BenefitSourceScreen() {
                 if (benefitSource === 'employer_or_plan') {
                     router.push('/step2'); 
                 } else if (benefitSource === 'partner_or_parent') {
-                    // TODO: Navigate to partner/parent flow
-                    console.log("Partner/Parent flow TBD - Navigating to placeholder");
-                    router.push('/step5'); // Temp: Go to packages for now 
+                    // Path for non-employer benefit source
+                    console.log("Partner/Parent source selected - Navigating to Step 3 (Personal Info)");
+                    router.push('/step3'); // Navigate to Personal Info 
                 } else { // none
-                    // TODO: Navigate to standard package purchase/info (no verification needed)
-                    console.log("None of the above flow TBD - Navigating to placeholder");
-                    router.push('/step5'); // Temp: Go to packages for now
+                    // Path for no benefit source
+                    console.log("None of the above selected - Navigating to Step 3 (Personal Info)");
+                    router.push('/step3'); // Navigate to Personal Info
                 }
             } else {
                 setError(result.message || 'Failed to update benefit source.');

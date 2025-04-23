@@ -13,7 +13,6 @@ import {
   decimal
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-// import { AppointmentStatus } from '@/lib/types'; // Commented out as AppointmentStatus type might not be defined yet or needed here
 
 // --- Enums ---
 export const userRoleEnum = pgEnum('user_role', ['admin', 'staff', 'provider', 'patient']);
@@ -21,6 +20,7 @@ export const benefitSourceEnum = pgEnum('benefit_source', ['employer_or_plan', '
 export const benefitStatusEnum = pgEnum('benefit_status', ['not_started', 'pending_verification', 'verified', 'declined', 'no_benefit']);
 export const packageTierEnum = pgEnum('package_tier', ['basic', 'silver', 'gold', 'platinum']); // Based on BENEFIT_MODULE_GUIDE
 export const appointmentStatusEnum = pgEnum('appointment_status', ['scheduled', 'completed', 'cancelled', 'pending', 'confirmed']); // Defined based on existing appointments table
+// REMOVED: treatmentPlanStatusEnum
 
 // --- Organizations Table ---
 export const organizations = pgTable('organizations', {
@@ -47,12 +47,7 @@ export const packages = pgTable('packages', {
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-// Add FK constraint for organizations.benefit_tier_offered_id after packages table is defined
-// This requires raw SQL or a multi-step migration approach if using drizzle-kit directly
-// Alternatively, make it nullable or handle the relation logic in the application layer initially.
-// For now, let's keep it commented out in the organizations table definition.
-
-// --- NEW: Organization Packages Junction Table ---
+// --- Organization Packages Junction Table ---
 export const organization_packages = pgTable('organization_packages', {
     organization_id: uuid('organization_id').references(() => organizations.id, { onDelete: 'cascade' }).notNull(),
     package_id: uuid('package_id').references(() => packages.id, { onDelete: 'cascade' }).notNull(),
@@ -66,13 +61,12 @@ export const organization_packages = pgTable('organization_packages', {
   }
 );
 
-// --- NEW: Organization Approved Emails Table ---
+// --- Organization Approved Emails Table ---
 export const organization_approved_emails = pgTable('organization_approved_emails', {
   id: uuid('id').primaryKey().defaultRandom(),
   organization_id: uuid('organization_id').references(() => organizations.id, { onDelete: 'cascade' }).notNull(),
   email: text('email').notNull(), // The approved email address
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  // Add unique constraint for org_id + email?
 }, (table) => {
     return {
         orgEmailUnique: primaryKey({ columns: [table.organization_id, table.email] }) // Make org_id + email unique
@@ -80,36 +74,27 @@ export const organization_approved_emails = pgTable('organization_approved_email
 });
 
 // --- Users Table (Mirroring Supabase migration - linked to auth.users) ---
-// Note: Drizzle cannot directly reference auth.users. We assume this table
-// mirrors essential user data and links via the UUID.
-// You might need custom SQL or triggers in migrations if syncing is needed.
 export const users = pgTable('users', {
   id: uuid('id').primaryKey(), // References auth.users(id)
   email: text('email').notNull().unique(),
-  // Add real name fields (collected during verification)
-  first_name: text('first_name'), // Made nullable for existing users
-  last_name: text('last_name'),   // Made nullable for existing users
-  // Add address fields (collected during verification)
+  first_name: text('first_name'),
+  last_name: text('last_name'),
   address_line1: text('address_line1'),
-  address_line2: text('address_line2'), // Optional
+  address_line2: text('address_line2'),
   address_city: text('address_city'),
-  address_state: text('address_state'), // Or province
+  address_state: text('address_state'),
   address_postal_code: text('address_postal_code'),
-  address_country: text('address_country'), // Use ISO codes ideally
-
-  // Add other columns if they exist in your public.users table from migrations
+  address_country: text('address_country'),
   role: userRoleEnum('role').notNull().default('patient'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-
   // Benefit Module Fields
   benefit_source: benefitSourceEnum('benefit_source').default('none'),
-  sponsoring_organization_id: uuid('sponsoring_organization_id').references(() => organizations.id, { onDelete: 'set null' }), // Link to the sponsoring org
+  sponsoring_organization_id: uuid('sponsoring_organization_id').references(() => organizations.id, { onDelete: 'set null' }),
   benefit_status: benefitStatusEnum('benefit_status').default('not_started'),
-  selected_package_id: uuid('selected_package_id').references(() => packages.id, { onDelete: 'set null' }), // Link to the chosen package (base or upgrade)
-  
+  selected_package_id: uuid('selected_package_id').references(() => packages.id, { onDelete: 'set null' }),
   // Stripe Customer ID
-  stripe_customer_id: text('stripe_customer_id').unique(), // Add unique constraint
+  stripe_customer_id: text('stripe_customer_id').unique(),
 });
 
 // --- User Benefit Verification Attempts Table ---
@@ -131,12 +116,12 @@ export const user_benefit_verification_attempts = pgTable('user_benefit_verifica
 // --- Patient Profiles Table (Mirroring Supabase migration) ---
 export const patient_profiles = pgTable('patient_profiles', {
   id: uuid('id').primaryKey().defaultRandom(),
-  user_id: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(), // Ensure FK is not null
-  first_name: text('first_name'), // Made nullable based on verification flow needing these later
-  last_name: text('last_name'), // Made nullable
+  user_id: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  first_name: text('first_name'),
+  last_name: text('last_name'),
   email: text('email'),
-  phone: text('phone'), // Nullable
-  date_of_birth: date('date_of_birth'), // Nullable
+  phone: text('phone'),
+  date_of_birth: date('date_of_birth'),
   address: text('address'),
   city: text('city'),
   state: text('state'),
@@ -154,7 +139,7 @@ export const patient_profiles = pgTable('patient_profiles', {
 // --- Providers Table (Mirroring Supabase migration) ---
 export const providers = pgTable('providers', {
   id: uuid('id').primaryKey().defaultRandom(),
-  user_id: uuid('user_id') // FK to auth.users(id) in migration - linking to public.users here
+  user_id: uuid('user_id')
     .references(() => users.id, { onDelete: 'cascade' })
     .notNull(),
   first_name: text('first_name').notNull(),
@@ -162,11 +147,10 @@ export const providers = pgTable('providers', {
   specialization: text('specialization'),
   bio: text('bio'),
   experience_years: integer('experience_years'),
-  education: text('education').array(), // Correct way to define text array
-  certifications: text('certifications').array(), // Correct way to define text array
+  education: text('education').array(),
+  certifications: text('certifications').array(),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-  // slotDuration removed as it wasn't in the migration
 });
 
 // --- Provider Weekly Schedules Table (Was workingHours) ---
@@ -178,13 +162,12 @@ export const provider_weekly_schedules = pgTable(
       .references(() => providers.id, { onDelete: 'cascade' })
       .notNull(),
     day_of_week: integer('day_of_week').notNull(), // 0-6
-    start_time: time('start_time', { withTimezone: false }).notNull(), // TIME WITHOUT TIME ZONE
-    end_time: time('end_time', { withTimezone: false }).notNull(), // TIME WITHOUT TIME ZONE
+    start_time: time('start_time', { withTimezone: false }).notNull(),
+    end_time: time('end_time', { withTimezone: false }).notNull(),
     created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   }
 );
-// export type WorkingHour = typeof provider_weekly_schedules.$inferSelect; // Renamed type export if needed elsewhere
 
 // --- Provider Time Blocks Table ---
  export const provider_time_blocks = pgTable('provider_time_blocks', {
@@ -197,7 +180,6 @@ export const provider_weekly_schedules = pgTable(
    reason: text('reason'),
    is_unavailable: boolean('is_unavailable').default(true).notNull(),
    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-   // updated_at missing from migration, add if needed
  });
 
 
@@ -210,44 +192,30 @@ export const appointments = pgTable('appointments', {
   provider_id: uuid('provider_id')
     .references(() => providers.id, { onDelete: 'cascade' })
     .notNull(),
-  appointment_date: timestamp('appointment_date', { withTimezone: true }).notNull(), // Renamed from startTime, matches migration
+  appointment_date: timestamp('appointment_date', { withTimezone: true }).notNull(),
   status: appointmentStatusEnum('status')
-    .notNull(), // Default handled by app/trigger?
-    // .default('pending') - Migration doesn't specify default
+    .notNull(),
   notes: text('notes'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-  duration: integer('duration'), // Nullable based on migration
-  type: text('type'), // Nullable based on migration
-  // startTime removed as it wasn't in the migration
+  duration: integer('duration'),
+  type: text('type'),
 });
 
-// --- Provider Availability Table (Placeholder - remove if not needed or merge with weekly_schedules/time_blocks) ---
-// This seems redundant given provider_weekly_schedules and provider_time_blocks
-/*
-export const providerAvailabilities = pgTable('provider_availabilities', {
-   id: uuid('id').primaryKey().defaultRandom(),
-   providerId: uuid('provider_id').references(() => providers.id),
-   // ... other fields like day_of_week, start_time, end_time
- });
-*/
+// --- REMOVED Treatment Plans Table ---
 
 // --- Relations ---
-// Define relations based on the corrected table names and foreign keys
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   sponsoredUsers: many(users),
   approvedEmails: many(organization_approved_emails),
-  organizationPackages: many(organization_packages), // Relation to junction table
-  // relation to default package if FK is added later
+  organizationPackages: many(organization_packages),
 }));
 
 export const packagesRelations = relations(packages, ({ many }) => ({
   selectedByUsers: many(users),
-  organizationPackages: many(organization_packages), // Relation to junction table
-  // relation from organizations default package if FK is added later
+  organizationPackages: many(organization_packages),
 }));
 
-// Add relations for the junction table
 export const organizationPackagesRelations = relations(organization_packages, ({ one }) => ({
   organization: one(organizations, {
     fields: [organization_packages.organization_id],
@@ -260,15 +228,15 @@ export const organizationPackagesRelations = relations(organization_packages, ({
 }));
 
 export const usersRelations = relations(users, ({ one, many }) => ({
-  providerProfile: one(providers, { // Relation from user to provider profile
+  providerProfile: one(providers, {
     fields: [users.id],
     references: [providers.user_id],
   }),
-  patientProfile: one(patient_profiles, { // Relation from user to patient profile
+  patientProfile: one(patient_profiles, {
     fields: [users.id],
     references: [patient_profiles.user_id],
   }),
-  appointments: many(appointments), // User (as patient) can have many appointments
+  appointments: many(appointments),
   benefitVerificationAttempts: many(user_benefit_verification_attempts),
   sponsoringOrganization: one(organizations, {
     fields: [users.sponsoring_organization_id],
@@ -278,6 +246,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     fields: [users.selected_package_id],
     references: [packages.id],
   }),
+  // REMOVED: treatmentPlans relation
 }));
 
 export const userBenefitVerificationAttemptsRelations = relations(user_benefit_verification_attempts, ({ one }) => ({
@@ -285,7 +254,7 @@ export const userBenefitVerificationAttemptsRelations = relations(user_benefit_v
     fields: [user_benefit_verification_attempts.user_id],
     references: [users.id],
   }),
-  organization: one(organizations, { // Keep relation to the organization attempted
+  organization: one(organizations, {
     fields: [user_benefit_verification_attempts.organization_id],
     references: [organizations.id],
   }),
@@ -296,7 +265,6 @@ export const patientProfilesRelations = relations(patient_profiles, ({ one, many
     fields: [patient_profiles.user_id],
     references: [users.id],
   }),
-  // appointments relation removed - appointments link directly to users now
 }));
 
 export const providersRelations = relations(providers, ({ one, many }) => ({
@@ -304,10 +272,10 @@ export const providersRelations = relations(providers, ({ one, many }) => ({
     fields: [providers.user_id],
     references: [users.id],
   }),
-  weeklySchedules: many(provider_weekly_schedules), // Renamed relation
-  timeBlocks: many(provider_time_blocks), // Added relation
+  weeklySchedules: many(provider_weekly_schedules),
+  timeBlocks: many(provider_time_blocks),
   appointments: many(appointments),
-  // availabilities: many(providerAvailabilities), // Removed potentially redundant relation
+  // REMOVED: treatmentPlans relation
 }));
 
 export const providerWeeklySchedulesRelations = relations(provider_weekly_schedules, ({ one }) => ({
@@ -329,29 +297,17 @@ export const appointmentsRelations = relations(appointments, ({ one }) => ({
     fields: [appointments.provider_id],
     references: [providers.id],
   }),
-  patient: one(users, { // Changed to reference users table directly
+  patient: one(users, {
     fields: [appointments.patient_id],
     references: [users.id],
   }),
 }));
 
-// Remove relations for providerAvailabilities if table is removed
-/*
-export const providerAvailabilitiesRelations = relations(providerAvailabilities, ({ one }) => ({
-   provider: one(providers, {
-     fields: [providerAvailabilities.providerId],
-     references: [providers.id],
-   }),
- }));
-*/
+// REMOVED: treatmentPlansRelations
 
-// Note: You might need a patient_profiles table as well, based on bookAppointment logic.
-// Define it similarly if required.
-
-// --- NEW: Relation for Approved Emails ---
 export const organizationApprovedEmailsRelations = relations(organization_approved_emails, ({ one }) => ({
     organization: one(organizations, {
         fields: [organization_approved_emails.organization_id],
         references: [organizations.id],
     }),
-})); 
+}));

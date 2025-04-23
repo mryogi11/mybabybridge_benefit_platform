@@ -23,8 +23,9 @@ import {
   Alert,
 } from '@mui/material';
 import { supabase } from '@/lib/supabase/client';
-import { Package, PurchaseType, PackageTier } from '@/types';
+import { Package, PurchaseType, PackageTier, UserDashboardData } from '@/types';
 import { ShoppingBasket } from '@mui/icons-material';
+import { getUserDashboardData } from '@/actions/benefitActions';
 
 // Cache for package data
 let packageCache: Package[] | null = null;
@@ -33,6 +34,7 @@ const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
 
 export default function PackagesPage() {
   const [packages, setPackages] = useState<Package[]>([]);
+  const [currentPackageId, setCurrentPackageId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
@@ -81,9 +83,35 @@ export default function PackagesPage() {
     ];
   }, []);
 
-  const fetchPackages = useCallback(async (forceFresh = false) => {
-    // Check if we have cached data and it's not stale
+  const fetchPackagesAndUserData = useCallback(async (forceFresh = false) => {
+    setLoading(true);
+    setError(null);
     const now = Date.now();
+
+    // Fetch User Data first to know current package
+    let userPackageId: string | null = null;
+    try {
+      // TODO: Consider caching user dashboard data too?
+      console.log("Fetching user dashboard data for package page...");
+      const userDataResult = await getUserDashboardData();
+      if (userDataResult.success && userDataResult.data?.currentPackage) {
+        userPackageId = userDataResult.data.currentPackage.id;
+        setCurrentPackageId(userPackageId);
+        console.log("Current package ID:", userPackageId);
+      } else if (!userDataResult.success) {
+          // Handle error fetching user data, maybe set a specific error
+          console.error("Error fetching user data:", userDataResult.message);
+          setError("Could not load your current plan information.");
+          // Optionally return early if current plan is crucial
+          // setLoading(false); return;
+      }
+    } catch (userError) {
+        console.error('Error fetching user data:', userError);
+        setError("Could not load your current plan information.");
+        // setLoading(false); return; 
+    }
+    
+    // Fetch Packages List (using cache if available)
     if (!forceFresh && packageCache && (now - packageCacheTimestamp < CACHE_DURATION)) {
       console.log('Using cached package data');
       setPackages(packageCache);
@@ -92,47 +120,43 @@ export default function PackagesPage() {
     }
     
     try {
-      const { data, error } = await supabase
+      console.log('Fetching packages list from DB...');
+      const { data, error: packagesError } = await supabase
         .from('packages')
         .select('*')
-        .order('price', { ascending: true });
+        .order('monthly_cost', { ascending: true });
 
-      if (error) {
-        console.warn('Error fetching packages:', error.message);
-        
-        // If packages table doesn't exist, use mock data instead of showing error
-        if (error.message.includes('relation "public.packages" does not exist')) {
-          console.log('Using mock package data for development');
-          
-          const mockPackages = getMockPackages();
-          setPackages(mockPackages);
-          
-          // Update cache
-          packageCache = mockPackages;
-          packageCacheTimestamp = now;
-          return;
+      if (packagesError) {
+        console.warn('Error fetching packages:', packagesError.message);
+        if (packagesError.message.includes('relation "public.packages" does not exist')) {
+          // Fallback to mock data removed for now, rely on error display
+          console.log('Packages table does not exist.');
+          setError('Package information is currently unavailable.');
+          setPackages([]);
+        } else {
+             throw packagesError;
         }
-        throw error;
+      } else {
+          packageCache = data as any || [];
+          packageCacheTimestamp = now;
+          setPackages(data as any || []);
       }
-      
-      // Update cache with any cast
-      packageCache = data as any || [];
-      packageCacheTimestamp = now;
-      
-      // Set state with any cast
-      setPackages(data as any || []);
-    } catch (error) {
-      console.error('Error fetching packages:', error);
-      setError('Failed to load packages. Please try again later.');
+    } catch (fetchError) {
+      console.error('Error fetching packages:', fetchError);
+      // Set error only if not already set by user data fetch failure
+      if (!error) {
+           setError('Failed to load available packages. Please try again later.');
+      }
+      setPackages([]); // Ensure packages are empty on error
     } finally {
       setLoading(false);
     }
-  }, [getMockPackages]);
+  }, []);
 
-  // Load packages on initial component mount
+  // Load data on initial component mount
   useEffect(() => {
-    fetchPackages();
-  }, [fetchPackages]);
+    fetchPackagesAndUserData();
+  }, [fetchPackagesAndUserData]);
 
   const handlePurchaseClick = (pkg: Package) => {
     setSelectedPackage(pkg);
@@ -164,7 +188,7 @@ export default function PackagesPage() {
   const handleRefresh = () => {
     setLoading(true);
     setError(null);
-    fetchPackages(true); // force fresh data
+    fetchPackagesAndUserData(true); // force fresh data
   };
 
   const getTierColor = (tier: string) => {
@@ -180,55 +204,65 @@ export default function PackagesPage() {
 
   // Memoize the package cards to prevent unnecessary re-renders
   const packageCards = useMemo(() => {
-    return packages.map((pkg) => (
-      <Grid item xs={12} sm={6} md={4} key={pkg.id}>
-        <Card sx={{ 
-          height: '100%', 
-          display: 'flex', 
-          flexDirection: 'column',
-          transition: 'transform 0.2s, box-shadow 0.2s',
-          '&:hover': {
-            transform: 'translateY(-4px)',
-            boxShadow: 3,
-          }
-        }}>
-          <CardContent sx={{ flexGrow: 1 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" component="div">
-                {pkg.name}
+    return packages.map((pkg) => {
+      const isActive = pkg.id === currentPackageId;
+      return (
+        <Grid item xs={12} sm={6} md={4} key={pkg.id}>
+          <Card sx={{ 
+            height: '100%', 
+            display: 'flex', 
+            flexDirection: 'column',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+            border: isActive ? '2px solid' : '1px solid', 
+            borderColor: isActive ? 'primary.main' : 'divider',
+            backgroundColor: isActive ? 'action.hover' : 'background.paper',
+            '&:hover': {
+              transform: isActive ? 'none' : 'translateY(-4px)', // Prevent hover move for active
+              boxShadow: isActive ? 2 : 3,
+            }
+          }}>
+            <CardContent sx={{ flexGrow: 1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" component="div">
+                  {pkg.name}
+                </Typography>
+                <Chip
+                  label={pkg.tier.charAt(0).toUpperCase() + pkg.tier.slice(1)}
+                  color={getTierColor(pkg.tier)}
+                  size="small"
+                />
+              </Box>
+              <Typography color="text.secondary" gutterBottom sx={{ minHeight: '3em' }}>
+                {pkg.description}
               </Typography>
-              <Chip
-                label={pkg.tier.charAt(0).toUpperCase() + pkg.tier.slice(1)}
-                color={getTierColor(pkg.tier)}
-                size="small"
-              />
-            </Box>
-            <Typography color="text.secondary" gutterBottom>
-              {pkg.description}
-            </Typography>
-            <Typography variant="h6" color="primary" sx={{ mt: 2 }}>
-              ${pkg.price}
-            </Typography>
-            {pkg.validity_period && (
-              <Typography variant="body2" color="text.secondary">
-                Valid for {pkg.validity_period} days
+              <Typography variant="h6" color="primary" sx={{ mt: 2 }}>
+                ${pkg.price !== undefined ? pkg.price : pkg.monthly_cost}
               </Typography>
-            )}
-          </CardContent>
-          <CardActions>
-            <Button
-              size="small"
-              color="primary"
-              onClick={() => handlePurchaseClick(pkg)}
-              variant="contained"
-            >
-              Purchase
-            </Button>
-          </CardActions>
-        </Card>
-      </Grid>
-    ));
-  }, [packages]);
+              {pkg.validity_period && (
+                <Typography variant="body2" color="text.secondary">
+                  Valid for {pkg.validity_period} days
+                </Typography>
+              )}
+            </CardContent>
+            <CardActions sx={{ justifyContent: 'center', pb: 2 }}>
+              {isActive ? (
+                <Chip label="Current Plan" color="success" variant="outlined" />
+              ) : (
+                <Button
+                  size="small"
+                  color="primary"
+                  onClick={() => handlePurchaseClick(pkg)}
+                  variant="contained"
+                >
+                  Purchase
+                </Button>
+              )}
+            </CardActions>
+          </Card>
+        </Grid>
+      );
+    });
+  }, [packages, currentPackageId, getTierColor, handlePurchaseClick]);
 
   if (loading) {
     return (
