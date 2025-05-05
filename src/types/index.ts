@@ -1,263 +1,96 @@
-export type UserRole = 'admin' | 'staff' | 'patient' | 'provider';
+// src/types/index.ts
 
-export type PackageTier = 'basic' | 'premium' | 'custom';
-
-export type PurchaseType = 'subscription' | 'one-time';
-
-export type PackageStatus = 'purchased' | 'active' | 'expired' | 'completed';
-
-export type TreatmentStatus = 'pending' | 'in_progress' | 'completed';
-
-export type NotificationType = 
-  | 'appointment_scheduled' 
-  | 'appointment_reminder' 
-  | 'appointment_cancelled' 
-  | 'appointment_completed'
-  | 'milestone_completed';
-
+// --- User Type ---
+// Matches the fields selected in messageActions.ts, assumes dates are strings
 export interface User {
   id: string;
-  email: string;
-  role: UserRole;
-  first_name?: string;
-  last_name?: string;
-  avatar_url?: string;
-  created_at: string;
-  updated_at: string;
+  email: string; // non-null in schema
+  first_name?: string; // Use optional string (maps null to undefined)
+  last_name?: string; // Use optional string (maps null to undefined)
+  role: 'admin' | 'staff' | 'provider' | 'patient'; // userRoleEnum values
+  created_at: string; // Comes as Date, converted to string
+  updated_at: string; // Comes as Date, converted to string
+  avatar_url?: string | null; // Keep optional as it's not in DB
 }
 
-export interface UserActivity {
-  id: string;
-  user_id: string;
-  action: string;
-  created_at: string;
-}
-
-export interface Package {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  tier: PackageTier;
-  validity_period?: number; // in days
-  purchase_type: PurchaseType;
-  features?: string[];
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface PatientPackage {
-  id: string;
-  patient_id: string;
-  package_id: string;
-  status: PackageStatus;
-  start_date: string;
-  end_date: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface DashboardStats {
-  totalUsers: number;
-  totalPackages: number;
-  activeTreatments: number;
-  totalRevenue: number;
-}
-
-export interface Provider {
-  id: string;
-  user_id: string;
-  first_name: string;
-  last_name: string;
-  specialization?: string | null;
-  bio?: string | null;
-  experience_years?: number | null;
-  education?: string[] | null;
-  certifications?: string[] | null;
-  availability?: Record<string, any>;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface ProviderAvailability {
-  id: string;
-  provider_id: string;
-  day_of_week: number; // 0-6 for Sunday-Saturday
-  start_time: string; // HH:mm format
-  end_time: string; // HH:mm format
-  created_at: string;
-  updated_at: string;
-}
-
-export type Appointment = {
-  id: string;
-  patient_id: string;
-  provider_id: string;
-  appointment_date: string;
-  duration?: number;
-  type?: string;
-  status: 'scheduled' | 'completed' | 'cancelled' | 'pending';
-  notes?: string | null;
-  created_at: string;
-  updated_at: string;
-  provider?: {
-    id: string;
-    user_id: string;
-    first_name: string | null;
-    last_name: string | null;
-    specialization: string | null;
-  };
-  patient?: {
-    id: string;
-    user_id: string;
-    first_name: string | null;
-    last_name: string | null;
-    phone?: string | null;
-  };
-};
-
-export interface AppointmentSlot {
-  id: string;
-  provider_id: string;
-  date: string;
-  start_time: string;
-  end_time: string;
-  is_available: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Patient {
-  id: string;
-  user_id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  date_of_birth?: string;
-  phone?: string;
-  address?: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface Message {
-  id: string;
-  sender_id: string;
-  receiver_id: string;
-  content: string;
-  attachments?: (string | MessageAttachment)[];
-  created_at: string;
-  sender?: {
-    first_name: string;
-    last_name: string;
-    role: string;
-  };
-  receiver?: {
-    first_name: string;
-    last_name: string;
-    role: string;
-  };
-}
-
+// --- MessageAttachment Type ---
+// Matches the Drizzle schema for message_attachments table
 export interface MessageAttachment {
   id: string;
   message_id: string;
-  file_name: string;
   file_url: string;
-  file_type?: string;
-  file_size?: number;
-  created_at: string;
+  file_name: string | null;
+  file_type: string | null;
+  file_size: number | null;
+  created_at: string; // Comes as Date, converted to string
 }
 
-export interface Notification {
+// --- Message Type ---
+// Includes all fields selected/returned by messageActions.ts
+// Assumes dates are strings and handles nullability
+export interface Message {
+  id: string;
+  sender_id: string | null; // Can be null in DB
+  receiver_id: string | null; // Can be null in DB
+  content: string; // Mapped null to '' in actions
+  thread_id: string; // Included field
+  is_read: boolean; // Included field
+  created_at: string; // Comes as Date, converted to string
+  updated_at: string; // Included field, comes as Date, converted to string
+  sender?: User | null; // Optional sender object (User type defined above)
+  attachments: MessageAttachment[]; // Mapped null to [] in actions
+}
+
+// --- Provider Type ---
+// Matches the Drizzle schema for providers table
+export interface Provider {
   id: string;
   user_id: string;
-  type: NotificationType;
-  title: string;
-  message: string;
-  appointment_id?: string;
-  is_read: boolean;
-  created_at: string;
+  first_name: string; // Not null in schema
+  last_name: string; // Not null in schema
+  specialization: string | null;
+  bio: string | null;
+  experience_years: number | null;
+  education: string[] | null;
+  certifications: string[] | null;
+  created_at: string; // Assuming conversion to string if used directly
+  updated_at: string; // Assuming conversion to string if used directly
+  // Include User details if needed/joined elsewhere:
+  // user?: User;
 }
 
-export interface MilestoneDependency {
-  id: string;
-  milestone_id: string;
-  depends_on_milestone_id: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface PatientProfile {
-  id: string;
-  user_id: string;
-  first_name: string;
-  last_name: string;
-  email: string | null;
-  phone: string | null;
-  date_of_birth: string | null;
-  address: string | null;
-  city: string | null;
-  state: string | null;
-  zip_code: string | null;
-  insurance_provider: string | null;
-  insurance_id: string | null;
-  blood_type: string | null;
-  allergies: string | null;
-  medications: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface EmergencyContact {
+// --- Appointment Type (Example - ensure this matches your schema/usage) ---
+export interface Appointment {
   id: string;
   patient_id: string;
-  name: string;
-  relationship: string;
-  phone: string;
-  email: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface MedicalHistory {
-  id: string;
-  patient_id: string;
-  condition: string;
-  diagnosis_date: string;
-  treatment: string | null;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ProviderTimeBlock {
-  id: string;
   provider_id: string;
-  start_datetime: string; // ISO string format
-  end_datetime: string; // ISO string format
-  reason?: string | null;
-  is_unavailable: boolean;
+  appointment_date: string; // Assuming string conversion
+  status: 'scheduled' | 'completed' | 'cancelled' | 'pending' | 'confirmed';
+  notes: string | null;
+  duration: number | null;
+  type: string | null;
   created_at: string;
+  updated_at: string;
+  // Include patient/provider details if joined:
+  // patient?: User | null;
+  // provider?: Provider | null;
 }
 
-export interface Document {
+// --- Package Type (Example - ensure this matches your schema/usage) ---
+export interface Package {
   id: string;
-  patient_id: string;
-  category_id?: string | null;
-  title: string;
-  description?: string | null;
-  file_path: string;
-  file_type: string;
-  file_size: number;
-  is_private?: boolean | null;
-  metadata?: Record<string, any> | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-  uploaded_by?: string | null;
-  category?: {
-    id: string;
-    name: string;
-    description?: string | null;
-  } | null;
-} 
+  name: string;
+  tier: 'basic' | 'silver' | 'gold' | 'platinum';
+  monthly_cost: number; // Assuming converted from string
+  description: string | null;
+  key_benefits: string[] | null;
+  is_base_employer_package: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- Add other necessary type definitions below ---
+
+// export interface PatientProfile { ... }
+// export interface Organization { ... }
+// etc.

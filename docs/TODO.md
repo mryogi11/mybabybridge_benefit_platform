@@ -11,16 +11,24 @@ This document tracks the features and tasks for the MyBabyBridge platform.
     *   [ ] Implement "No Work Email" alternative verification flow (Step 4) - *(Need to clarify if this is still required)*.
     *   [ ] Review/Refine Stripe Integration for package purchase in Step 6.
     *   [ ] *(Ref: `docs/BENEFIT_MODULE_GUIDE.md`)*
-*   [ ] **Secure Messaging:**
+*   [✅] **Secure Messaging:** *(Core functionality implemented)*
     *   [ ] Implement UI for patient-provider communication.
     *   [ ] Implement backend logic (Server Actions/API) for sending/receiving messages.
     *   [ ] Handle message storage and retrieval.
     *   [ ] Implement real-time updates (e.g., via Supabase Realtime).
-*   [ ] **Payments (Stripe Integration):**
-    *   [ ] Verify/complete Stripe Payment Intent creation logic (used in Benefit Step 6).
-    *   [ ] Implement and test Stripe Webhook handler (`/api/payments/webhook` mentioned in PRD).
-    *   [ ] Handle subscription management (linking status to `PatientPackages` table or user profile).
-*   [ ] **Analytics Module:**
+    *   [ ] Refine UI/UX, potentially consolidate patient path (`/dashboard/communication` vs `/dashboard/messages` placeholder).
+    *   [ ] Convert direct Supabase calls to Server Actions for consistency.
+*   [🚧] **Payments (Stripe Integration):**
+    *   [✅] Verify/complete Stripe Payment Intent creation logic (used in Benefit Step 6).
+    *   [ ] Implement and test Stripe Webhook handler (`/api/webhooks/stripe` or similar path).
+    *   [ ] Handle subscription management (linking status to `PatientPackages` table or user profile based on webhook events).
+    *   [ ] Implement/fix API routes for managing payment methods/subscriptions (currently placeholders/mock data).
+*   [🚧] **Analytics Module:** *(Partially implemented across different roles)*
+    *   [🚧] **Admin Analytics (`/admin/analytics`):** Basic UI exists with charts. Data fetching is client-side, inefficient, incomplete (revenue commented out), uses mock data (success rates), and lacks full PRD features (e.g., logs, detailed metrics). Needs significant rework.
+    *   [✅] **Provider Analytics (`/provider/analytics`):** Functional dashboard using RPCs for aggregated data (revenue, success, progress, appointments).
+    *   [✅] **Patient Analytics (`/dashboard/analytics`):** Functional dashboard using dedicated `analytics_metrics` table (engagement, treatment, appointments).
+    *   [✅] **Provider Education Analytics (`/dashboard/provider/education/analytics`):** Functional dashboard for resource/category engagement.
+    *   [ ] **Treatment Plan Analytics (`/provider/treatment-plans/[id]/analytics`):** Placeholder exists, needs implementation.
     *   [ ] Design and implement Admin dashboard UI for analytics.
     *   [ ] Implement data collection/aggregation for required metrics (e.g., Revenue, User Activity, Package Selection).
     *   [ ] Develop backend logic/API endpoints for fetching analytics data.
@@ -42,11 +50,12 @@ This document tracks the features and tasks for the MyBabyBridge platform.
     *   [ ] **User Activity Logs:** Implement mechanism for logging and viewing admin-relevant user actions.
     *   [ ] **Platform Metrics Dashboard:** Implement dashboard UI described in PRD/Analytics section.
 *   **Provider Module:**
-    *   [ ] **Profile Management:** Implement UI for providers to manage professional details, visibility settings (as per PRD).
-    *   [ ] **Patient Communication:** Linked to Secure Messaging feature.
+    *   [✅] **Profile Management:** Implement UI for providers to manage professional details, visibility settings (as per PRD).
+    *   [✅] **Patient Communication:** Linked to Secure Messaging feature.
 *   **Patient Module:**
-    *   [ ] **Dashboard Refinement:** Enhance dashboard beyond upcoming appointments (e.g., displaying current benefit package status/details).
+    *   [🚧] **Dashboard Refinement:** Enhance dashboard beyond upcoming appointments (e.g., displaying current benefit package status/details).
     *   [ ] **Profile Management:** Implement UI for patients to view/edit their profile.
+    *   [✅] **Communication:** Linked to Secure Messaging feature.
 
 ### Authentication & Authorization
 
@@ -171,6 +180,8 @@ OUTDATED CONTENT:
 *   **Admin Portal:**
     *   [x] `/admin` (Accessible via login)
     *   [x] `/admin/users` (Accessible via sidebar)
+    *   [x] `/admin/providers` (Accessible via sidebar)
+    *   [x] `/admin/analytics` (Accessible via sidebar)
     *   [🚧] `/admin/settings` (Needs sidebar link & page)
 
 ## Priorities (High to Low)

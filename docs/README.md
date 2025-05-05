@@ -104,7 +104,7 @@ npm start
 
 ## Features
 
-*   **User Dashboards**: Implemented basic dashboards for Patients (`/dashboard`) and Providers (`/provider/dashboard`) with role-specific widgets (e.g., upcoming appointments, current benefit package) and a side-drawer navigation layout.
+*   **User Dashboards**: Implemented basic dashboards for Patients (`/dashboard`), Providers (`/provider/dashboard`) and Admins (`/admin`) with role-specific widgets (e.g., upcoming appointments, current benefit package) and a side-drawer navigation layout.
 *   **Authentication**: Implemented basic email/password login & registration via Supabase Auth. Role checks are used in RLS/APIs. Social login and specific 'staff' role implementation status needs verification.
 *   **Appointment Management**: Core functionality implemented.
     *   Patients: Can book, view list/calendar, and cancel appointments (using Server Actions).
@@ -114,13 +114,13 @@ npm start
 *   **Admin - Organization Management**: Implemented UI (`/admin/organizations`, `/admin/organizations/[orgId]`) and APIs for CRUD operations on organizations and managing approved email domains.
 *   **Admin - Benefit Package Management**: Implemented UI (`/admin/packages`) and APIs for CRUD operations on benefit packages linked to organizations.
 *   **Benefit Verification & Package Selection**: Implemented user-facing flow (Steps 1-6) allowing users to identify their benefit source (Employer, Partner/Parent, None), verify eligibility (currently via work email for employer path), provide personal info, select a benefit package, and complete setup (including Stripe payment for non-sponsored packages). Handles both employer-sponsored and direct purchase paths.
-*   **Secure Messaging**: *Implementation status needs verification.* PRD outlines requirements.
-*   **Payments (Stripe)**: Integrated Stripe Elements for package purchases in the benefit flow (Step 6). Webhook handling and full subscription management require review/completion.
-*   **Analytics**: *Implementation status needs verification.* PRD outlines detailed requirements for an admin analytics module.
+*   **Secure Messaging**: *Implementation status needs verification.* PRD outlines requirements. Core functionality implemented for Patient (`/dashboard/communication`) and Provider (`/provider/messages`) including real-time updates, DB storage, and attachments. UI/UX refinement and refactoring to Server Actions may be needed.
+*   **Payments (Stripe)**: Integrated Stripe Elements for package purchases in the benefit flow (Step 6). Webhook handling and full subscription management require review/completion. Stripe Elements integrated for payment *initiation* (Step 6 via `createPaymentIntent`). Critical **webhook handling** for payment confirmation/subscription updates is **missing**. APIs for managing payment methods/subscriptions are placeholders.
+*   **Analytics**: *Implementation status needs verification.* PRD outlines detailed requirements for an admin analytics module. Dashboards exist for Admin (`/admin/analytics`), Provider (`/provider/analytics`), and Patient (`/dashboard/analytics`) with varying levels of completion. Provider/Patient analytics use RPCs/dedicated tables. Admin analytics are basic, use client-side aggregation, and lack full PRD features. Education-specific analytics (`/dashboard/provider/education/analytics`) also exist. Treatment plan analytics are pending.
 *   **Educational Resources**: *Implementation status needs verification.* PRD requires curated content.
-*   **Admin - Provider Management**: *Implementation status needs verification.* PRD requires admin functionality for provider CRUD, credentials, monitoring.
-*   **Admin - User Activity Logs / Metrics**: *Implementation status needs verification.* PRD requires viewing logs and a metrics dashboard.
-*   **Provider - Profile Management**: *Implementation status needs verification.* PRD requires UI for managing professional details, visibility.
+*   **Admin - Provider Management**: *Implementation status needs verification.* PRD requires admin functionality for provider CRUD, credentials, monitoring. Basic CRUD UI/API exists (`/admin/providers`), but advanced features from PRD (credentials, monitoring) are likely pending.
+*   **Admin - User Activity Logs / Metrics**: *Implementation status needs verification.* PRD requires viewing logs and a metrics dashboard. Partially covered by basic Admin Analytics, but full PRD requirements pending.
+*   **Provider - Profile Management**: *Implementation status needs verification.* PRD requires UI for managing professional details, visibility. Implemented at `/provider/profile` allowing providers to manage details like specialization, bio, education, certifications.
 *   **Notifications**: *Implementation status needs verification.* `notifications` table exists, but triggers and dedicated UI likely needed.
 *   **Dynamic Theme Switching**: Users can select between Light, Dark, and System themes via the Settings page. Preference is saved to the user's profile (`theme_preference` column in `users` table).
 

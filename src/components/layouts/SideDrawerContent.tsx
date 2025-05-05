@@ -46,7 +46,7 @@ const menuItems: MenuItemType[] = [
   { title: 'Appointments', path: '/dashboard/appointments', icon: <CalendarIcon />, badge: 2 }, // Example badge
   { title: 'Treatment Plans', path: '/dashboard/treatment-plans', icon: <AssignmentIcon /> },
   { title: 'Packages', path: '/dashboard/packages', icon: <PackagesIcon /> },
-  { title: 'Messages', path: '/dashboard/messages', icon: <MessageIcon />, badge: 3 }, // Example badge
+  { title: 'Messages', path: '/dashboard/communication', icon: <MessageIcon />, badge: 3 }, // Example badge
   // Add other top-level items here
   // Example Sub-menu structure:
   // {

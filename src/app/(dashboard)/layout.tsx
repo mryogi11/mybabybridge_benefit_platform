@@ -66,7 +66,7 @@ const patientNavItems = [
   { text: 'Appointments', icon: <CalendarIcon />, path: '/dashboard/appointments' },
   { text: 'Benefits', icon: <BenefitsIcon />, path: '/dashboard/benefits' }, // Separate Benefits
   { text: 'Packages', icon: <CardGiftcardIcon />, path: '/dashboard/packages' }, // Separate Packages
-  { text: 'Messages', icon: <MessageIcon />, path: '/dashboard/messages' }, // Assuming /messages is correct
+  { text: 'Messages', icon: <MessageIcon />, path: '/dashboard/communication' }, // Updated path
   { text: 'Documents', icon: <DocumentsIcon />, path: '/dashboard/documents' },
   { text: 'Education', icon: <EducationIcon />, path: '/dashboard/education' },
   { text: 'Payments', icon: <PaymentIcon />, path: '/dashboard/payments' },

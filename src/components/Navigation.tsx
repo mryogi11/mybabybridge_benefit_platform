@@ -43,7 +43,7 @@ const pages = [
   { title: 'Appointments', path: '/dashboard/appointments', icon: <CalendarIcon fontSize="small" />, badge: 2 },
   { title: 'Benefits', path: '/dashboard/benefits', icon: <AssignmentIcon fontSize="small" /> },
   { title: 'Packages', path: '/dashboard/packages', icon: <PackagesIcon fontSize="small" /> },
-  { title: 'Messages', path: '/dashboard/messages', icon: <MessageIcon fontSize="small" />, badge: 3 },
+  { title: 'Messages', path: '/dashboard/communication', icon: <MessageIcon fontSize="small" />, badge: 3 },
 ];
 
 export default function Navigation() {
