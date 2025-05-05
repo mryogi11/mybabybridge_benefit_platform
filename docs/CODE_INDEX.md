@@ -190,7 +190,7 @@ For better user experience, the application uses optimistic updates for common o
 - **Appointments**: Appointment scheduling and history
 - **Benefit Verification**: Multi-step flow for benefit verification and package selection.
 - **Packages**: Available benefit/treatment packages.
-- **Messages**: Secure messaging between patients and providers
+- **Communication**: Patient communication center (`/dashboard/communication/page.tsx`) for secure messaging with providers. Uses Server Actions (`src/actions/messageActions.ts`) and Supabase Realtime.
 - **Notifications**: User notifications center
 - **Education**: Educational resources for patients
 - **Documents**: Document management and sharing
@@ -201,6 +201,7 @@ For better user experience, the application uses optimistic updates for common o
 - **Provider Dashboard**: Provider-specific dashboard
 - **Patient Management**: Provider tools for managing patient information
 - **Schedule Management**: Provider appointment scheduling tools
+- **Messages**: Provider secure messaging interface (`/provider/messages/page.tsx`) for communicating with patients. Uses Server Actions (`src/actions/messageActions.ts`) and Supabase Realtime.
 
 #### Admin Pages
 

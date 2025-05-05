@@ -14,7 +14,7 @@ MyBabyBridge is a comprehensive fertility care platform designed to connect pati
 - **Authentication**: Supabase Auth
 - **State Management**: React Context API
 - **Styling**: Material UI with custom theming
-- **API**: REST endpoints with Next.js API routes & Next.js Server Actions
+- **API**: REST endpoints with Next.js API routes & **Next.js Server Actions** (e.g., for messaging, appointments)
 
 ## Application Structure
 
@@ -30,6 +30,7 @@ The application follows the Next.js 14 App Router structure with route groups an
 - `src/contexts/`: React context providers
 - `src/lib/`: Utility libraries and functions
   - `db/`: Drizzle ORM client (`index.ts`) and schema definition (`schema.ts`)
+- `src/actions/`: **Server Actions** (e.g., `messageActions.ts`, `appointmentActions.ts`)
 - `src/styles/`: Global styles and theme configuration
 - `src/types/`: TypeScript type definitions (including shared types like `AppointmentStatus` in `lib/types.ts`)
 - `public/`: Static assets
@@ -54,8 +55,8 @@ The application uses Supabase for authentication with the following key componen
 ## Key Features
 
 1. **User Dashboards**: Patient, Provider, and Admin dashboards with role-specific views and a consistent side-drawer navigation layout.
-2. **Appointment Management**: Scheduling, history, and reminders
-3. **Secure Messaging**: Communication between patients and providers
+2. **Appointment Management**: Scheduling, history, and reminders (Patient side uses Server Actions).
+3. **Secure Messaging**: Refactored Patient (`/dashboard/communication/page.tsx`) and Provider (`/provider/messages/page.tsx`) messaging using Server Actions (`src/actions/messageActions.ts`). Supports real-time updates, initiating conversations, and handles database operations securely on the server. See *Messaging Module Refactor Details* section for details.
 4. **Educational Resources**: Curated content for fertility education
 5. **Analytics**: Treatment success metrics and insights
 6. **Payments**: Integration with payment processing (Status: In Development / Partially Implemented)
@@ -88,6 +89,7 @@ The application uses Supabase for authentication with the following key componen
 22. ✅ Implemented dynamic theme switching (Light/Dark/System) with persistence
 23. ✅ Refactored Stripe client initialization to separate server/client logic
 24. ✅ Added loading overlay for smoother logout experience
+25. ✅ Refactored messaging modules (Patient & Provider) to use Server Actions, implemented default conversation loading, auto-scrolling, and fixed numerous layout/state bugs.
 
 ## Recent UI/UX Improvements
 
@@ -130,7 +132,7 @@ The application uses Supabase for authentication with the following key componen
 
 ## Known Issues and Challenges
 
-1. **Database Schema Synchronization (Drizzle):** If manual SQL changes are made to the Supabase database without updating the Drizzle schema (`src/lib/db/schema.ts`), or vice-versa, `drizzle-kit generate` might produce incorrect migration scripts (e.g., trying to create tables/columns that already exist, or drop things unexpectedly). Careful review of generated SQL is essential before application. The migration file `drizzle/0001_ambitious_blur.sql` required significant manual commenting-out due to initial sync issues.
+1. **Database Schema Synchronization (Drizzle):** If manual SQL changes are made to the Supabase database without updating the Drizzle schema (`src/lib/db/schema.ts`), or vice-versa, `drizzle-kit generate` might produce incorrect migration scripts or report "No Changes". This was encountered during the messaging refactor, requiring manual SQL (`ALTER TABLE`) to add missing columns (`is_read`, `thread_id`) when `drizzle-kit generate` failed to detect the schema drift. `drizzle-kit push` should be used with extreme caution due to potential data loss if schemas have significantly diverged.
 2. **Historical Migration Files (`supabase/migrations`):** The project contains historical migration files in `supabase/migrations/` from the previous Supabase CLI workflow. These are **no longer used** for applying schema changes but serve as a reference for the database's intended structure. The payment-related migrations in this directory may have non-standard filenames and were likely never applied correctly.
 3. **Authentication Redirect Issues**: Sometimes there can be issues with redirection after login. The code now includes fallback mechanisms.
 4. **API Routes with Cookies**: Some API routes use cookies which causes warnings during build about dynamic server usage.
@@ -143,13 +145,14 @@ The application uses Supabase for authentication with the following key componen
 
 ## Code Patterns and Best Practices
 
-1. **'use client'** directive must be included at the top of all client-side components
-2. **Authentication Checks**: Always check for user authentication before rendering protected content
-3. **Error Handling**: Implement proper error boundaries and loading states in all data-fetching components
-4. **Environment Variables**: Use environment variables for Supabase and other service credentials
-5. **Responsive Design**: Follow Material UI breakpoint patterns for consistent responsive layouts
-6. **Asset Management**: Store images in the public/images directory with proper organization
-7. **Loading States**: Implement skeleton loaders for better user experience during data fetching
+1. **'use client'** directive must be included at the top of all client-side components needing interactivity/hooks.
+2. **Authentication Checks**: Always check for user authentication before rendering protected content or calling actions requiring user context.
+3. **Server Actions for Mutations**: Use Next.js Server Actions (e.g., in `src/actions/`) for database writes (create, update, delete) and sensitive data fetching to keep business logic and database interactions server-side.
+4. **Error Handling**: Implement proper error boundaries and loading states in all data-fetching components and actions.
+5. **Environment Variables**: Use environment variables for Supabase and other service credentials
+6. **Responsive Design**: Follow Material UI breakpoint patterns for consistent responsive layouts
+7. **Asset Management**: Store images in the public/images directory with proper organization
+8. **Loading States**: Implement skeleton loaders for better user experience during data fetching
 
 ## Development Workflow
 
@@ -358,3 +361,49 @@ Find this in your Supabase Dashboard > Project Settings > Database > Connection 
     *   Click **RUN**.
 
 **Crucial Note:** Do **NOT** use the Supabase CLI commands like `supabase db reset`, `supabase migrations up`, or `supabase db push`. These commands interact with the `supabase/migrations` system, which is **not** synchronized with the Drizzle schema defined in this project. Applying schema changes *only* through the Drizzle workflow described above is essential for maintaining consistency. 
+
+## Messaging Module Refactor Details (May 2025)
+
+*   **Goal:** Refactor Patient (`/dashboard/communication`) and Provider (`/provider/messages`) pages to use Server Actions instead of direct Supabase client calls for improved security, maintainability, and consistency.
+*   **Implementation:**
+    *   Created `src/actions/messageActions.ts` to house all messaging-related server actions.
+    *   Implemented actions: `getCommunicationContactsForPatient`, `getCommunicationContactsForProvider`, `getMessagesForThread`, `sendMessage`, `createMessageWithAttachment`, `markMessagesAsRead`, `getMessageUploadSignedUrl`.
+    *   Refactored `/dashboard/communication/page.tsx` to use `getCommunicationContactsForPatient` and other relevant actions.
+    *   Refactored `/provider/messages/page.tsx` to use `getCommunicationContactsForProvider` and other relevant actions.
+    *   Added logic for patients to initiate conversations with providers they have appointments with.
+    *   Updated Supabase RLS policies (implicitly, by moving logic to server actions running with user context or service role for specific tasks like signed URLs).
+    *   Implemented optimistic UI updates for sending messages.
+    *   Fixed layout issues causing full-page scrolling; implemented container-specific scrolling for message lists.
+    *   Added default conversation loading on page load.
+    *   Implemented auto-scrolling to the bottom of the message list when conversations load.
+*   **Challenges Encountered:**
+    *   **Database Schema Drift:** Significant discrepancies between `src/lib/db/schema.ts` (Drizzle schema) and the actual Supabase database state (missing `messages` and `message_attachments` tables initially, then missing `thread_id` and `is_read` columns). `drizzle-kit generate` failed to detect these changes reliably.
+    *   **Migration Failures:** Attempts to generate/apply migrations failed due to existing tables or `drizzle-kit` not detecting changes. Required manual SQL (`ALTER TABLE`) to add missing columns.
+    *   **`drizzle-kit push` Danger:** Attempting `drizzle-kit push` revealed it would drop numerous tables/columns due to the schema drift. Aborted to prevent data loss.
+    *   **Supabase SSR Cookie Handling:** Persistent issues with `@supabase/ssr` `createServerClient` and `cookies()` in Next.js 14/15 App Router/Server Actions. Required specific async/await patterns within the helper's cookie methods to satisfy both runtime needs and linter checks.
+    *   **TypeScript Type Mismatches:** Numerous errors due to differences between database return types (e.g., `Date` objects, nullability) and frontend type definitions (`@/types/index.ts`). Required careful alignment.
+    *   **UI State/Rendering Loops:** Issues with `useEffect` dependencies causing infinite re-renders (e.g., Supabase listener dependency, fetching threads after fetching messages). Resolved by adjusting dependencies and removing redundant fetch calls.
+    *   **Auto-Scrolling:** Initial attempts using `scrollIntoView` and basic `setTimeout` were unreliable. Switched to setting `scrollTop = scrollHeight` on the scroll container ref within `fetchMessages` for robust auto-scrolling. 
+
+    ## Messaging Module Refactor Details (May 2025)
+
+*   **Goal:** Refactor Patient (`/dashboard/communication`) and Provider (`/provider/messages`) pages to use Server Actions instead of direct Supabase client calls for improved security, maintainability, and consistency.
+*   **Implementation:**
+    *   Created `src/actions/messageActions.ts` to house all messaging-related server actions.
+    *   Implemented actions: `getCommunicationContactsForPatient`, `getCommunicationContactsForProvider`, `getMessagesForThread`, `sendMessage`, `createMessageWithAttachment`, `markMessagesAsRead`, `getMessageUploadSignedUrl`.
+    *   Refactored `/dashboard/communication/page.tsx` to use `getCommunicationContactsForPatient` and other relevant actions.
+    *   Refactored `/provider/messages/page.tsx` to use `getCommunicationContactsForProvider` and other relevant actions.
+    *   Added logic for patients to initiate conversations with providers they have appointments with.
+    *   Updated Supabase RLS policies (implicitly, by moving logic to server actions running with user context or service role for specific tasks like signed URLs).
+    *   Implemented optimistic UI updates for sending messages.
+    *   Fixed layout issues causing full-page scrolling; implemented container-specific scrolling for message lists.
+    *   Added default conversation loading on page load.
+    *   Implemented auto-scrolling to the bottom of the message list when conversations load.
+*   **Challenges Encountered:**
+    *   **Database Schema Drift:** Significant discrepancies between `src/lib/db/schema.ts` (Drizzle schema) and the actual Supabase database state (missing `messages` and `message_attachments` tables initially, then missing `thread_id` and `is_read` columns). `drizzle-kit generate` failed to detect these changes reliably.
+    *   **Migration Failures:** Attempts to generate/apply migrations failed due to existing tables or `drizzle-kit` not detecting changes. Required manual SQL (`ALTER TABLE`) to add missing columns.
+    *   **`drizzle-kit push` Danger:** Attempting `drizzle-kit push` revealed it would drop numerous tables/columns due to the schema drift. Aborted to prevent data loss.
+    *   **Supabase SSR Cookie Handling:** Persistent issues with `@supabase/ssr` `createServerClient` and `cookies()` in Next.js 14/15 App Router/Server Actions. Required specific async/await patterns within the helper\'s cookie methods to satisfy both runtime needs and linter checks.
+    *   **TypeScript Type Mismatches:** Numerous errors due to differences between database return types (e.g., `Date` objects, nullability) and frontend type definitions (`@/types/index.ts`). Required careful alignment.
+    *   **UI State/Rendering Loops:** Issues with `useEffect` dependencies causing infinite re-renders (e.g., Supabase listener dependency, fetching threads after fetching messages). Resolved by adjusting dependencies and removing redundant fetch calls.
+    *   **Auto-Scrolling:** Initial attempts using `scrollIntoView` and basic `setTimeout` were unreliable. Switched to setting `scrollTop = scrollHeight` on the scroll container ref within `fetchMessages` for robust auto-scrolling.
