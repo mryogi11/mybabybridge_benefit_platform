@@ -29,7 +29,7 @@ import {
   Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { supabase } from '@/lib/supabase/client';
-import { User, UserRole } from '@/types';
+import type { User } from '@/types';
 import { DataGrid, GridColDef, GridRenderCellParams, GridToolbarContainer, GridToolbarQuickFilter, GridToolbarProps } from '@mui/x-data-grid';
 import { format } from 'date-fns';
 import { createUserAction } from '@/actions/userActions';
@@ -40,7 +40,7 @@ interface NewUserData {
     last_name: string;
     email: string;
     password?: string; // Password is required logic-wise, but keep optional for type flexibility if needed initially
-    role: UserRole;
+    role: User['role'];
     // Add optional provider fields
     specialization?: string;
     bio?: string;
@@ -61,7 +61,7 @@ function AddUserDialog({ open, onClose, onAddUser, error }: AddUserDialogProps) 
     const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [roles, setRoles] = useState<UserRole[]>(['patient']);
+    const [roles, setRoles] = useState<User['role'][]>(['patient']);
     // Add state for provider fields
     const [specialization, setSpecialization] = useState('');
     const [bio, setBio] = useState('');
@@ -91,7 +91,7 @@ function AddUserDialog({ open, onClose, onAddUser, error }: AddUserDialogProps) 
 
     const handleRoleChange = (event: any) => {
         const { value } = event.target;
-        setRoles([value] as UserRole[]); // Assume single role selection
+        setRoles([value] as User['role'][]); // Assume single role selection
     };
 
     const handleAddClick = async () => {
@@ -281,7 +281,7 @@ interface EditUserDialogProps {
 function EditUserDialog({ open, onClose, user, onUpdateUser, error }: EditUserDialogProps) {
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
-    const [role, setRole] = useState<UserRole>('patient');
+    const [editRole, setEditRole] = useState<User['role']>('patient');
     const [dialogError, setDialogError] = useState<string | null>(null); // Internal validation error
     const [loading, setLoading] = useState(false);
 
@@ -290,7 +290,7 @@ function EditUserDialog({ open, onClose, user, onUpdateUser, error }: EditUserDi
         if (open && user) {
             setFirstName(user.first_name || '');
             setLastName(user.last_name || '');
-            setRole(user.role || 'patient');
+            setEditRole(user.role || 'patient');
             setDialogError(null); // Clear internal error
             // We rely on the external `error` prop for API errors
             setLoading(false);
@@ -298,6 +298,10 @@ function EditUserDialog({ open, onClose, user, onUpdateUser, error }: EditUserDi
              setDialogError(null); // Clear errors when closing
         }
     }, [open, user]);
+
+    const handleEditRoleChange = (event: SelectChangeEvent<User['role']>) => {
+        setEditRole(event.target.value as User['role']);
+    };
 
     const handleUpdateClick = async () => {
         if (!user) return; // Should not happen if dialog is open with a user
@@ -323,8 +327,8 @@ function EditUserDialog({ open, onClose, user, onUpdateUser, error }: EditUserDi
             updatedData.last_name = lastName.trim();
              hasChanges = true;
         }
-        if (role !== (user.role || 'patient')) {
-            updatedData.role = role;
+        if (editRole !== (user.role || 'patient')) {
+            updatedData.role = editRole;
              hasChanges = true;
         }
 
@@ -385,8 +389,8 @@ function EditUserDialog({ open, onClose, user, onUpdateUser, error }: EditUserDi
                     <Select
                         labelId="edit-role-label"
                         id="editRole"
-                        value={role}
-                        onChange={(e) => setRole(e.target.value as UserRole)}
+                        value={editRole}
+                        onChange={handleEditRoleChange}
                         label="Role"
                     >
                         <MenuItem value="admin">Admin</MenuItem>
@@ -617,21 +621,23 @@ export default function UsersManagementPage() {
 
   // Update handleAddUser function signature to accept NewUserData
   const handleAddUser = async (userData: NewUserData) => {
-    setAddUserError(null); // Clear previous errors
-    console.log("Calling createUserAction with:", userData);
-
-    // Call the Server Action
-    const result = await createUserAction(userData);
-
-    if (result.success) {
-      console.log("Server Action successful. Closing dialog and refreshing users.");
-      setAddUserDialogOpen(false); // Close the dialog on success
-      await fetchUsers(); // Refresh the user list
-    } else {
-      // Server action failed, display the error from the action
-      console.error("Server Action failed:", result.error);
-      setAddUserError(result.error || "An unexpected error occurred on the server.");
-      // Keep the dialog open so the user sees the error
+    setAddUserError(null);
+    console.log('[Admin Users Page] Payload for createUserAction:', JSON.stringify(userData, null, 2));
+    try {
+      const result = await createUserAction(userData);
+      if (result.success) {
+        console.log("Server Action successful. Closing dialog and refreshing users.");
+        setAddUserDialogOpen(false); // Close the dialog on success
+        await fetchUsers(); // Refresh the user list
+      } else {
+        // Server action failed, display the error from the action
+        console.error("Server Action failed:", result.error);
+        setAddUserError(result.error || "An unexpected error occurred on the server.");
+        // Keep the dialog open so the user sees the error
+      }
+    } catch (err) {
+      // Error is now handled by the parent via the error prop
+      // No need to setDialogError here as the parent controls it via `addUserError` state
     }
   };
 
@@ -693,10 +699,10 @@ export default function UsersManagementPage() {
             field: 'role',
             headerName: 'Role',
             width: 150,
-            renderCell: (params: GridRenderCellParams<User, UserRole>) => (
+            renderCell: (params: GridRenderCellParams<User, User['role']>) => (
                  params.value ? <Chip label={params.value} size="small" sx={{ mr: 0.5 }} variant="outlined" /> : null
             ),
-            sortComparator: (v1: UserRole, v2: UserRole) => (v1 || '').localeCompare(v2 || ''),
+            sortComparator: (v1: User['role'], v2: User['role']) => (v1 || '').localeCompare(v2 || ''),
         },
         {
             field: 'created_at',

@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, createContext, useContext } from 'react';
+import React, { useState, useEffect, useMemo, createContext, useContext, useCallback } from 'react';
 import { createTheme, ThemeProvider, useMediaQuery, PaletteMode } from '@mui/material';
 import type { ThemeOptions } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 
 // Import Auth context and server action
 import { useAuth } from '@/contexts/AuthContext';
-import { updateThemePreference } from '@/actions/userActions';
+import { updateUserThemePreference } from '@/actions/userActions';
 
 // Re-import fonts if needed here, or ensure they are loaded globally
 import '@fontsource/public-sans/400.css';
@@ -122,7 +122,7 @@ const darkPalette: ThemeOptions['palette'] = {
 // --- End Copied Section --- 
 
 export default function ClientThemeProviders({ children }: { children: React.ReactNode }) {
-  const { user: authUser, profile, isProfileLoading } = useAuth(); // Get authUser as well
+  const { user: authUser, profile, isProfileLoading, fetchAndSetProfile } = useAuth(); // Get authUser as well
   // Default state should ideally be 'dark' as per requirement
   const [modeSetting, setModeSettingState] = useState<ThemeModeSetting>('dark'); 
   // We don't need initialModeSet flag anymore with correct dependency handling
@@ -159,29 +159,42 @@ export default function ClientThemeProviders({ children }: { children: React.Rea
   }, [modeSetting, prefersDarkMode]);
 
   // Updated function to call server action
-  const setModeSetting = async (newMode: ThemeModeSetting) => {
+  const setModeSetting = useCallback(async (newMode: ThemeModeSetting) => {
     if (!authUser) { 
         console.warn("[Theme] Attempted to set theme while logged out. Ignoring.");
-        return; // Don't allow setting theme if logged out
+        // Optionally, still update localStorage for logged-out users if desired
+        // if (typeof window !== 'undefined') {
+        //     localStorage.setItem('themeMode', newMode);
+        //     setModeSettingState(newMode); 
+        // }
+        return; 
     }
-    // Optimistically update local state
+
+    // Optimistic update of local state and localStorage
     setModeSettingState(newMode);
-    
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('themeMode', newMode);
+    }
+
     // Call server action to update DB
     try {
-      console.log(`[Theme] User ${authUser.id} changed theme to ${newMode}. Calling updateThemePreference action...`);
-      const result = await updateThemePreference(newMode);
+      console.log(`[Theme] User ${authUser.id} changed theme to ${newMode}. Calling updateUserThemePreference action...`);
+      const result = await updateUserThemePreference(newMode);
       if (!result.success) {
-        console.error("Failed to save theme preference to DB:", result.error);
-        // TODO: Consider reverting optimistic update or showing error
+        // Use result.message for the error details
+        console.error("Failed to save theme preference to DB:", result.message);
+        // TODO: Consider reverting optimistic update or showing error to user
       } else {
         console.log("[Theme] Successfully saved theme preference to DB.");
+        if (fetchAndSetProfile) {
+          await fetchAndSetProfile(); // Refresh profile in AuthContext
+        }
       }
-    } catch (error) {
-        console.error("Error calling updateThemePreference action:", error);
+    } catch (error) { // error here is of type any or unknown
+        console.error("Error calling updateUserThemePreference action:", error);
         // TODO: Handle error (e.g., revert, show message)
     }
-  };
+  }, [authUser, setModeSettingState, fetchAndSetProfile]);
 
   const theme = useMemo(() => {
     const currentPalette = activeMode === 'dark' ? darkPalette : lightPalette;

@@ -235,7 +235,6 @@ export default function ProviderMessagesPage() {
                 if (!result.success || !result.data) {
                      setError(result.error || 'Failed to send message with attachment.');
                 } else {
-                    // Optimistic UI update
                     setMessages(prev => [...prev, result.data!]);
                     setNewMessage('');
                     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -248,20 +247,19 @@ export default function ProviderMessagesPage() {
         } finally {
             setIsUploading(false);
         }
-    } 
-    else if (textContent) {
+    } else {
+        // Handle text-only message
         startSendingTransition(async () => {
             const result = await sendMessage({
                 receiverId: receiverId,
                 content: textContent,
             });
 
-            if (!result.success || !result.data) {
-                setError(result.error || 'Failed to send message.');
+            if (result.success && result.data) {
+                setMessages(prev => [...prev, result.data!]);
+                setNewMessage('');
             } else {
-                 // Optimistic UI update
-                 setMessages(prev => [...prev, result.data!]);
-                 setNewMessage('');
+                setError(result.error || 'Failed to send message.');
             }
         });
     }
@@ -326,7 +324,11 @@ export default function ProviderMessagesPage() {
                 </ListItemAvatar>
                 <ListItemText
                     primary={`${thread.participant?.first_name || 'Unknown'} ${thread.participant?.last_name || 'User'}`}
-                    secondary={thread.last_message?.content?.substring(0, 40) + (thread.last_message?.content?.length > 40 ? '...' : '')}
+                    secondary={
+                        thread.last_message?.content
+                        ? (thread.last_message.content.substring(0, 40) + (thread.last_message.content.length > 40 ? '...' : ''))
+                        : (thread.last_message?.attachments && thread.last_message.attachments.length > 0 ? '[Attachment]' : 'No messages yet')
+                    }
                     secondaryTypographyProps={{ noWrap: true }}
                 />
                 {thread.unread_count > 0 && (

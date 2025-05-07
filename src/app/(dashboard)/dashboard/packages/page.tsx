@@ -15,19 +15,15 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Alert,
+  CircularProgress,
 } from '@mui/material';
-import { supabase } from '@/lib/supabase/client';
-import { Package, PurchaseType, PackageTier, UserDashboardData } from '@/types';
+// import { supabase } from '@/lib/supabase/client'; // Not directly used now
+import { Package, PackageTier } from '@/types'; // PurchaseType removed if not used
 import { ShoppingBasket } from '@mui/icons-material';
-import { getUserDashboardData } from '@/actions/benefitActions';
+import { getUserDashboardData, selectPackageForUser } from '@/actions/benefitActions';
 
-// Cache for package data
+// Cache for package data (can be kept if useful for future caching strategies)
 let packageCache: Package[] | null = null;
 let packageCacheTimestamp: number = 0;
 const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
@@ -35,189 +31,136 @@ const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
 export default function PackagesPage() {
   const [packages, setPackages] = useState<Package[]>([]);
   const [currentPackageId, setCurrentPackageId] = useState<string | null>(null);
+  // const [userId, setUserId] = useState<string | null>(null); // Removed as selectPackageForUser will get it from auth
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false);
-  const [purchaseType, setPurchaseType] = useState<PurchaseType>('one-time');
+  const [purchasing, setPurchasing] = useState(false);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
 
-  // Create a memoized mock data function to avoid recreating the data every render
-  const getMockPackages = useCallback((): Package[] => {
-    return [
-      {
-        id: '1',
-        name: 'Basic Treatment Package',
-        description: 'Essential therapy sessions to address developmental needs. Includes initial assessment and 4 therapy sessions.',
-        price: 299,
-        tier: 'basic' as PackageTier,
-        validity_period: 30,
-        purchase_type: 'one-time' as PurchaseType,
-        features: ['Initial assessment', '4 therapy sessions', 'Basic progress tracking'],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      {
-        id: '2',
-        name: 'Advanced Care Package',
-        description: 'Comprehensive therapy plan with regular sessions and progress tracking. Includes assessment, 8 therapy sessions, and 2 progress reviews.',
-        price: 599,
-        tier: 'premium' as PackageTier,
-        validity_period: 60,
-        purchase_type: 'one-time' as PurchaseType,
-        features: ['Comprehensive assessment', '8 therapy sessions', '2 progress reviews', 'Home program'],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      {
-        id: '3',
-        name: 'Family Support Bundle',
-        description: 'Complete care package for families. Includes assessments, therapy sessions, parent coaching, and home program development.',
-        price: 899,
-        tier: 'premium' as PackageTier,
-        validity_period: 90,
-        purchase_type: 'subscription' as PurchaseType,
-        features: ['Comprehensive assessment', '12 therapy sessions', 'Parent coaching', 'Home program', 'Monthly reviews'],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-    ];
-  }, []);
+  // getMockPackages function has been removed.
 
   const fetchPackagesAndUserData = useCallback(async (forceFresh = false) => {
     setLoading(true);
     setError(null);
     const now = Date.now();
 
-    // Fetch User Data first to know current package
-    let userPackageId: string | null = null;
+    // Basic caching check (optional, as action might have its own caching or be quick)
+    if (!forceFresh && packageCache && (now - packageCacheTimestamp < CACHE_DURATION)) {
+      console.log('Using cached package data for initial render hint, action will still run.');
+      // setPackages(packageCache); // Potentially set from cache, but action will overwrite
+    }
+
     try {
-      // TODO: Consider caching user dashboard data too?
       console.log("Fetching user dashboard data for package page...");
       const userDataResult = await getUserDashboardData();
-      if (userDataResult.success && userDataResult.data?.currentPackage) {
-        userPackageId = userDataResult.data.currentPackage.id;
-        setCurrentPackageId(userPackageId);
-        console.log("Current package ID:", userPackageId);
-      } else if (!userDataResult.success) {
-          // Handle error fetching user data, maybe set a specific error
-          console.error("Error fetching user data:", userDataResult.message);
-          setError("Could not load your current plan information.");
-          // Optionally return early if current plan is crucial
-          // setLoading(false); return;
-      }
-    } catch (userError) {
-        console.error('Error fetching user data:', userError);
-        setError("Could not load your current plan information.");
-        // setLoading(false); return; 
-    }
-    
-    // Fetch Packages List (using cache if available)
-    if (!forceFresh && packageCache && (now - packageCacheTimestamp < CACHE_DURATION)) {
-      console.log('Using cached package data');
-      setPackages(packageCache);
-      setLoading(false);
-      return;
-    }
-    
-    try {
-      console.log('Fetching packages list from DB...');
-      const { data, error: packagesError } = await supabase
-        .from('packages')
-        .select('*')
-        .order('monthly_cost', { ascending: true });
-
-      if (packagesError) {
-        console.warn('Error fetching packages:', packagesError.message);
-        if (packagesError.message.includes('relation "public.packages" does not exist')) {
-          // Fallback to mock data removed for now, rely on error display
-          console.log('Packages table does not exist.');
-          setError('Package information is currently unavailable.');
-          setPackages([]);
+      if (userDataResult.success && userDataResult.data) {
+        if (userDataResult.data.currentPackage) {
+          setCurrentPackageId(userDataResult.data.currentPackage.id);
+          console.log("Current package ID:", userDataResult.data.currentPackage.id);
         } else {
-             throw packagesError;
+          setCurrentPackageId(null);
         }
-      } else {
-          packageCache = data as any || [];
-          packageCacheTimestamp = now;
-          setPackages(data as any || []);
+        // setUserId(userDataResult.data.userId); // Not needed if action gets it
+        // console.log("User ID:", userDataResult.data.userId); // Not needed
+
+        const fetchedPackages = (userDataResult.data.allPackages || []) as Package[]; // Cast to Package[]
+        setPackages(fetchedPackages);
+        packageCache = fetchedPackages; // Update cache with fresh data
+        packageCacheTimestamp = now;
+
+      } else if (!userDataResult.success) {
+          console.error("Error fetching user data:", userDataResult.message);
+          setError(userDataResult.message || "Could not load your current plan information or available packages.");
+          setPackages([]);
       }
-    } catch (fetchError) {
-      console.error('Error fetching packages:', fetchError);
-      // Set error only if not already set by user data fetch failure
-      if (!error) {
-           setError('Failed to load available packages. Please try again later.');
-      }
-      setPackages([]); // Ensure packages are empty on error
-    } finally {
-      setLoading(false);
+    } catch (userError: any) {
+        console.error('Error fetching user data:', userError);
+        setError(userError.message || "Could not load your current plan information or available packages.");
+        setPackages([]);
+    } finally { // Ensure loading is always set to false
+        setLoading(false);
     }
   }, []);
 
-  // Load data on initial component mount
   useEffect(() => {
     fetchPackagesAndUserData();
   }, [fetchPackagesAndUserData]);
 
   const handlePurchaseClick = (pkg: Package) => {
     setSelectedPackage(pkg);
+    setPurchaseError(null);
     setPurchaseDialogOpen(true);
   };
 
   const handlePurchaseClose = () => {
     setPurchaseDialogOpen(false);
     setSelectedPackage(null);
+    setPurchaseError(null);
+    setPurchasing(false);
   };
 
   const handlePurchase = async () => {
-    if (!selectedPackage) return;
+    if (!selectedPackage) { // Removed userId check
+      setPurchaseError('Selected package information is missing. Please refresh.');
+      return;
+    }
     
+    setPurchasing(true);
+    setPurchaseError(null);
+
     try {
-      // TODO: Implement Stripe payment integration
-      console.log('Processing purchase:', {
-        package: selectedPackage,
-        purchaseType,
-      });
-      
-      // Close dialog after successful purchase
-      handlePurchaseClose();
-    } catch (error) {
+      console.log(`Attempting to purchase package ${selectedPackage.id}`);
+      // Call selectPackageForUser without userId, as it should get it from auth
+      const result = await selectPackageForUser(selectedPackage.id);
+
+      if (result.success) {
+        console.log('Purchase successful:', result.message);
+        handlePurchaseClose();
+        await fetchPackagesAndUserData(true); // Refresh data
+      } else {
+        console.error('Purchase failed:', result.message, result.error);
+        setPurchaseError(result.message || 'An unknown error occurred during purchase.');
+      }
+    } catch (error: any) {
       console.error('Error processing purchase:', error);
+      setPurchaseError(error.message || 'An unexpected error occurred. Please try again.');
+    } finally {
+      setPurchasing(false);
     }
   };
 
   const handleRefresh = () => {
     setLoading(true);
     setError(null);
-    fetchPackagesAndUserData(true); // force fresh data
+    fetchPackagesAndUserData(true); // Force fresh data
   };
 
-  const getTierColor = (tier: string) => {
+  const getTierColor = (tier: PackageTier) => {
     switch (tier) {
-      case 'premium':
-        return 'primary';
-      case 'custom':
-        return 'secondary';
-      default:
-        return 'default';
+      case 'platinum': return 'primary';
+      case 'gold': return 'warning';
+      case 'silver': return 'info';
+      case 'basic': default: return 'default';
     }
   };
 
-  // Memoize the package cards to prevent unnecessary re-renders
   const packageCards = useMemo(() => {
     return packages.map((pkg) => {
       const isActive = pkg.id === currentPackageId;
       return (
         <Grid item xs={12} sm={6} md={4} key={pkg.id}>
-          <Card sx={{ 
-            height: '100%', 
-            display: 'flex', 
+          <Card sx={{
+            height: '100%',
+            display: 'flex',
             flexDirection: 'column',
             transition: 'transform 0.2s, box-shadow 0.2s',
-            border: isActive ? '2px solid' : '1px solid', 
+            border: isActive ? '2px solid' : '1px solid',
             borderColor: isActive ? 'primary.main' : 'divider',
             backgroundColor: isActive ? 'action.hover' : 'background.paper',
             '&:hover': {
-              transform: isActive ? 'none' : 'translateY(-4px)', // Prevent hover move for active
+              transform: isActive ? 'none' : 'translateY(-4px)',
               boxShadow: isActive ? 2 : 3,
             }
           }}>
@@ -236,12 +179,17 @@ export default function PackagesPage() {
                 {pkg.description}
               </Typography>
               <Typography variant="h6" color="primary" sx={{ mt: 2 }}>
-                ${pkg.price !== undefined ? pkg.price : pkg.monthly_cost}
+                ${pkg.monthly_cost}
               </Typography>
-              {pkg.validity_period && (
-                <Typography variant="body2" color="text.secondary">
-                  Valid for {pkg.validity_period} days
-                </Typography>
+              {pkg.key_benefits && pkg.key_benefits.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="subtitle2" gutterBottom>Key Benefits:</Typography>
+                  <ul style={{ paddingLeft: 20, margin: 0 }}>
+                    {pkg.key_benefits.map((benefit, index) => (
+                      <li key={index}><Typography variant="body2">{benefit}</Typography></li>
+                    ))}
+                  </ul>
+                </Box>
               )}
             </CardContent>
             <CardActions sx={{ justifyContent: 'center', pb: 2 }}>
@@ -249,12 +197,13 @@ export default function PackagesPage() {
                 <Chip label="Current Plan" color="success" variant="outlined" />
               ) : (
                 <Button
-                  size="small"
-                  color="primary"
-                  onClick={() => handlePurchaseClick(pkg)}
                   variant="contained"
+                  color="primary"
+                  startIcon={<ShoppingBasket />}
+                  onClick={() => handlePurchaseClick(pkg)}
+                  disabled={loading || purchasing}
                 >
-                  Purchase
+                  Select Plan
                 </Button>
               )}
             </CardActions>
@@ -262,116 +211,84 @@ export default function PackagesPage() {
         </Grid>
       );
     });
-  }, [packages, currentPackageId, getTierColor, handlePurchaseClick]);
+  }, [packages, currentPackageId, loading, purchasing, handlePurchaseClick]);
 
-  if (loading) {
-    return (
-      <Box sx={{ width: '100%', py: 4 }}>
-        <LinearProgress />
-        <Typography variant="body2" sx={{ mt: 2, textAlign: 'center' }}>
-          Loading available packages...
-        </Typography>
-      </Box>
-    );
+  if (loading && packages.length === 0) {
+    return <LinearProgress sx={{ width: '100%' }} />;
   }
 
   if (error) {
     return (
-      <Box sx={{ width: '100%', py: 4 }}>
-        <Alert severity="error" sx={{ mb: 2 }}>
+      <Box sx={{ textAlign: 'center', mt: 4 }}>
+        <Alert severity="error" action={<Button color="inherit" size="small" onClick={handleRefresh}>Retry</Button>}>
           {error}
         </Alert>
-        <Button 
-          variant="outlined" 
-          onClick={handleRefresh}
-        >
-          Try Again
-        </Button>
       </Box>
     );
   }
 
+  if (packages.length === 0 && !loading) {
+    return (
+        <Box sx={{ textAlign: 'center', mt: 4 }}>
+            <Typography variant="h6">No packages available at the moment.</Typography>
+            <Button onClick={handleRefresh} sx={{ mt: 2 }}>Refresh Packages</Button>
+        </Box>
+    );
+  }
+
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">
-          Treatment Packages
-        </Typography>
-        <Button 
-          variant="outlined" 
-          onClick={handleRefresh}
-        >
-          Refresh
-        </Button>
-      </Box>
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" gutterBottom sx={{ mb: 3, textAlign: 'center' }}>
+        Available Benefit Packages {/* Removed (Test - Cards Removed) */}
+      </Typography>
+      <Grid container spacing={3}>
+        {packageCards} {/* Restored packageCards usage */}
+      </Grid>
 
-      {packages.length === 0 ? (
-        <Card variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
-          <ShoppingBasket sx={{ fontSize: 60, color: 'primary.light', mb: 2 }} />
-          <Typography variant="h6" gutterBottom>
-            No packages available
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            There are currently no treatment packages available for purchase.
-            Please check back later or contact your healthcare provider for more information.
-          </Typography>
-          <Button 
-            variant="outlined" 
-            onClick={handleRefresh}
-          >
-            Refresh
-          </Button>
-        </Card>
-      ) : (
-        <Grid container spacing={3}>
-          {packageCards}
-        </Grid>
+      {selectedPackage && (
+        <Dialog open={purchaseDialogOpen} onClose={handlePurchaseClose} maxWidth="xs" fullWidth>
+          <DialogTitle>Confirm Purchase: {selectedPackage.name}</DialogTitle>
+          <DialogContent dividers>
+            <Typography variant="body1" gutterBottom>
+              You are about to select the package: <strong>{selectedPackage.name}</strong>.
+            </Typography>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Description: {selectedPackage.description}
+            </Typography>
+            <Typography variant="h6" color="primary" sx={{ my: 2 }}>
+              Price: ${selectedPackage.monthly_cost}
+            </Typography>
+            {purchaseError && (
+              <Alert severity="error" sx={{ mt: 2 }}>{purchaseError}</Alert>
+            )}
+            {purchasing && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 2 }}>
+                <CircularProgress size={24} sx={{ mr: 1 }} />
+                <Typography>Processing...</Typography>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ p: '16px 24px' }}>
+            <Button onClick={handlePurchaseClose} color="inherit" disabled={purchasing}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handlePurchase} 
+              variant="contained" 
+              color="primary" 
+              disabled={purchasing}
+              startIcon={purchasing ? <CircularProgress size={20} color="inherit" /> : <ShoppingBasket />}
+            >
+              {purchasing ? 'Processing...' : 'Confirm Purchase'}
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
-
-      <Dialog
-        open={purchaseDialogOpen}
-        onClose={handlePurchaseClose}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          Purchase Package
-        </DialogTitle>
-        <DialogContent>
-          {selectedPackage && (
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="h6" gutterBottom>
-                {selectedPackage.name}
-              </Typography>
-              <Typography variant="body1" gutterBottom>
-                ${selectedPackage.price}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                {selectedPackage.description}
-              </Typography>
-              {selectedPackage.purchase_type === 'subscription' && (
-                <FormControl fullWidth margin="normal">
-                  <InputLabel>Purchase Type</InputLabel>
-                  <Select
-                    value={purchaseType}
-                    onChange={(e) => setPurchaseType(e.target.value as PurchaseType)}
-                    label="Purchase Type"
-                  >
-                    <MenuItem value="one-time">One-time Purchase</MenuItem>
-                    <MenuItem value="subscription">Monthly Subscription</MenuItem>
-                  </Select>
-                </FormControl>
-              )}
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handlePurchaseClose}>Cancel</Button>
-          <Button onClick={handlePurchase} variant="contained" color="primary">
-            Purchase
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
-} 
+}
+
+// Make sure to add ChipProps to your MUI imports if you use it for getTierColor return type:
+// import { ChipProps } from '@mui/material';
+// For the above code, direct ChipProps isn't strictly necessary for `getTierColor` as MUI
+// infers the string literal types for `color` prop of `Chip`.

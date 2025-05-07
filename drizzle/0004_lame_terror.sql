@@ -1,0 +1,1 @@
+ALTER TABLE "appointments" ALTER COLUMN "type" SET DATA TYPE appointment_type USING type::text::appointment_type;

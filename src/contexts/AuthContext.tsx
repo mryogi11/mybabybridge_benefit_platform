@@ -32,6 +32,7 @@ interface AuthContextType {
   profile: Profile | null;
   isLoading: boolean;
   isProfileLoading: boolean;
+  fetchAndSetProfile: (userId: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ user: User | null; session: Session | null } | undefined>;
   signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<{ user: User | null; session: Session | null } | undefined>;
   signOut: () => Promise<void>;
@@ -43,6 +44,7 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   isLoading: true,
   isProfileLoading: false,
+  fetchAndSetProfile: async () => {},
   signIn: async () => undefined,
   signUp: async () => undefined,
   signOut: async () => {},
@@ -65,21 +67,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     debugLog('Fetching profile (from users table) for user ID:', userId);
     setIsProfileLoading(true);
     try {
-      // Select specific columns including the new one, or keep '*'. Using '*' for now.
       const { data, error } = await supabase
         .from('users') 
-        .select('id, first_name, last_name, role, theme_preference') // Explicitly select needed fields including theme
+        .select('id, first_name, last_name, role, theme_preference')
         .eq('id', userId)
         .single();
+
       if (error) {
         debugLog('Error fetching user profile:', error);
         setProfile(null);
       } else if (data) {
         debugLog('User profile fetched successfully:', data);
-        // Now the type assertion is safer
         setProfile(data as Profile); 
       } else {
-        // Handle case where query succeeded but no user found (data is null)
         debugLog('User profile not found for ID:', userId);
         setProfile(null);
       }
@@ -274,20 +274,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  return (
-    <AuthContext.Provider value={{ 
-      user, 
-      session, 
-      profile,
-      isLoading, 
-      isProfileLoading,
-      signIn, 
-      signUp, 
-      signOut,
-    }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const value = {
+    user,
+    session,
+    profile,
+    isLoading,
+    isProfileLoading,
+    fetchAndSetProfile,
+    signIn,
+    signUp,
+    signOut,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => {

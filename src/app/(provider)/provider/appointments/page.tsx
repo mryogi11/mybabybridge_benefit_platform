@@ -314,7 +314,7 @@ export default function ProviderAppointmentsPage() {
           // Corrected nested join query syntax - Removed comment
           .select(`
             *,
-            patient:users!appointments_patient_id_fkey ( 
+            patient:users!appointments_patient_id_users_id_fk ( 
               id,
               email,
               patient_profiles ( 

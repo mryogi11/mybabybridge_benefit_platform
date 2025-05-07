@@ -25,7 +25,6 @@ import DashboardWidget from '@/components/admin/DashboardWidget';
 interface DashboardStats {
   totalUsers: number;
   totalPackages: number;
-  activeTreatments: number;
   totalRevenue: number;
 }
 
@@ -35,12 +34,6 @@ interface MonthlyData {
   users: number;
   packages: number;
   [key: string]: string | number;
-}
-
-// Interface for treatment trend data
-interface TreatmentTrendData {
-  months: string[];
-  counts: number[];
 }
 
 // Helper function to get month name from month index (0-11)
@@ -94,49 +87,13 @@ const processMonthlyChartData = (users: { created_at: string }[], packages: { cr
   });
 };
 
-// Helper function to process monthly treatment counts
-const processMonthlyTreatmentData = (treatments: { created_at: string }[], monthsCount: number): TreatmentTrendData => {
-    const now = new Date();
-    const monthlyCounts: { [key: string]: number } = {};
-    const result: TreatmentTrendData = { months: [], counts: [] };
-
-    // Initialize counts and labels for the last `monthsCount` months
-    for (let i = monthsCount - 1; i >= 0; i--) {
-        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
-        const monthName = getMonthName(date.getMonth());
-        monthlyCounts[monthKey] = 0;
-        result.months.push(monthName);
-    }
-
-    // Process treatments
-    treatments.forEach(treatment => {
-        const createdAt = new Date(treatment.created_at);
-        const monthKey = `${createdAt.getFullYear()}-${createdAt.getMonth()}`;
-        if (monthlyCounts[monthKey] !== undefined) { // Check if the month is within our range
-            monthlyCounts[monthKey]++;
-        }
-    });
-
-    // Populate counts array in the correct order
-    result.months.forEach((_, index) => {
-        const date = new Date(now.getFullYear(), now.getMonth() - (monthsCount - 1 - index), 1);
-        const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
-        result.counts.push(monthlyCounts[monthKey] || 0);
-    });
-
-    return result;
-};
-
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     totalPackages: 0,
-    activeTreatments: 0,
     totalRevenue: 0,
   });
   const [monthlyChartData, setMonthlyChartData] = useState<MonthlyData[]>([]);
-  const [treatmentTrendData, setTreatmentTrendData] = useState<TreatmentTrendData>({ months: [], counts: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -162,11 +119,6 @@ export default function AdminDashboardPage() {
         .from('packages')
         .select('*', { count: 'exact', head: true });
 
-      const { count: treatmentsCount } = await supabase
-        .from('treatments')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'in_progress');
-
       // Fetch total revenue (Example: Sum of all package prices)
       const { data: packagePrices, error: priceError } = await supabase
         .from('packages')
@@ -176,7 +128,6 @@ export default function AdminDashboardPage() {
       setStats({
         totalUsers: usersCount || 0,
         totalPackages: packagesCount || 0,
-        activeTreatments: treatmentsCount || 0,
         totalRevenue,
       });
 
@@ -196,23 +147,10 @@ export default function AdminDashboardPage() {
       const processedBarData = processMonthlyChartData(recentUsers || [], recentPackages || [], monthsToFetch);
       setMonthlyChartData(processedBarData);
 
-      // --- Fetch Line Chart Data ---
-       const { data: recentTreatments, error: treatmentsError } = await supabase
-           .from('treatments')
-           .select('created_at')
-           .gte('created_at', startDateString);
-       
-       if (treatmentsError) throw treatmentsError;
-
-       // Process data for the line chart
-       const processedLineData = processMonthlyTreatmentData(recentTreatments || [], monthsToFetch);
-       setTreatmentTrendData(processedLineData);
-
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       // Set empty chart data on error
       setMonthlyChartData(processMonthlyChartData([], [], 6));
-      setTreatmentTrendData({ months: processMonthlyChartData([], [], 6).map(d => d.month), counts: [] }); // Provide default structure
     } finally {
       setLoading(false);
     }
@@ -231,12 +169,6 @@ export default function AdminDashboardPage() {
       value: stats.totalPackages,
       icon: <ShoppingCartIcon sx={{ fontSize: 32 }} />,
       color: 'success', // Use theme key
-    },
-    {
-      title: 'Active Treatments',
-      value: stats.activeTreatments,
-      icon: <MedicalServicesIcon sx={{ fontSize: 32 }} />,
-      color: 'warning', // Use theme key
     },
     {
       title: 'Total Revenue',
@@ -301,6 +233,7 @@ export default function AdminDashboardPage() {
             <Typography variant="h6" gutterBottom>
               Monthly Treatments Started (Last 6 Months)
             </Typography>
+            {/*
             {treatmentTrendData.months.length > 0 && treatmentTrendData.counts.length > 0 ? (
                 <LineChart
                   xAxis={[{ 
@@ -323,6 +256,12 @@ export default function AdminDashboardPage() {
             ) : (
                 <Typography sx={{ textAlign: 'center', p: 4 }}>No data available for chart.</Typography>
             )}
+            */}
+             <Paper sx={{ p: 2, height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Typography variant="body1" color="textSecondary">
+                    Treatment trends chart placeholder.
+                </Typography>
+            </Paper>
           </Paper>
         </Grid>
       </Grid>

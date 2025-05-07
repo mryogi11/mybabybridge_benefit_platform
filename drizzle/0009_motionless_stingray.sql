@@ -1,0 +1,2 @@
+CREATE TYPE "public"."user_package_status" AS ENUM('not_started', 'active', 'completed', 'cancelled', 'on_hold');--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN "package_status" "user_package_status" DEFAULT 'not_started';

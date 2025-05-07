@@ -415,7 +415,7 @@ export default function PatientCommunicationPage() {
                                 p: 1.5,
                                 maxWidth: '75%',
                                 bgcolor: message.sender_id === user?.id ? 'secondary.light' : 'grey.200',
-                                color: message.sender_id === user?.id ? 'secondary.contrastText' : 'text.primary',
+                                color: message.sender_id === user?.id ? 'secondary.contrastText' : 'grey.900',
                                 borderRadius: message.sender_id === user?.id ? '15px 15px 0 15px' : '15px 15px 15px 0',
                               }}
                             >

@@ -10,7 +10,10 @@ import {
   date,
   pgEnum, // Keep pgEnum import
   jsonb,
-  decimal
+  decimal,
+  unique,
+  foreignKey,
+  pgPolicy,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 // DO NOT import from './enums'
@@ -23,6 +26,33 @@ export const packageTierEnum = pgEnum('package_tier', ['basic', 'silver', 'gold'
 export const appointmentStatusEnum = pgEnum('appointment_status', ['scheduled', 'completed', 'cancelled', 'pending', 'confirmed']);
 export const themeModeEnum = pgEnum('theme_mode', ['light', 'dark', 'system']);
 export const verificationStatusEnum = pgEnum('verification_status', ['pending', 'success', 'failed']);
+
+// --- START: Added Appointment Type Enum ---
+export const appointmentTypeEnum = pgEnum('appointment_type', ['consultation', 'follow_up', 'procedure']); 
+// --- END: Added Appointment Type Enum ---
+
+// --- START: Added Notifications Table ---
+export const notificationTypeEnum = pgEnum('notification_type', [
+  'appointment_scheduled', 
+  'appointment_reminder', 
+  'appointment_cancelled', 
+  'appointment_completed',
+  'milestone_completed' // Assuming this type from other files
+]);
+
+export const notifications = pgTable('notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  // Assuming user_id references public.users table managed by Drizzle.
+  // The SQL migration references auth.users directly, which Drizzle doesn't typically manage FKs for.
+  user_id: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }), 
+  type: notificationTypeEnum('type').notNull(),
+  title: text('title').notNull(),
+  message: text('message').notNull(),
+  appointment_id: uuid('appointment_id').references(() => appointments.id, { onDelete: 'cascade' }),
+  is_read: boolean('is_read').default(false).notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+// --- END: Added Notifications Table ---
 
 // --- Organizations Table ---
 export const organizations = pgTable('organizations', {
@@ -68,7 +98,7 @@ export const organization_approved_emails = pgTable('organization_approved_email
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => {
     return {
-        orgEmailUnique: primaryKey({ columns: [table.organization_id, table.email] })
+        uq_organization_email: unique('uq_organization_email').on(table.organization_id, table.email)
     };
 });
 
@@ -90,9 +120,9 @@ export const users = pgTable('users', {
   benefit_source: benefitSourceEnum('benefit_source').default('none'),
   sponsoring_organization_id: uuid('sponsoring_organization_id').references(() => organizations.id, { onDelete: 'set null' }),
   benefit_status: benefitStatusEnum('benefit_status').default('not_started'),
-  selected_package_id: uuid('selected_package_id').references(() => packages.id, { onDelete: 'set null' }),
   stripe_customer_id: text('stripe_customer_id').unique(),
   theme_preference: themeModeEnum('theme_preference').default('dark'),
+  selected_package_id: uuid('selected_package_id').references(() => packages.id, { onDelete: 'set null' }),
 });
 
 // --- User Benefit Verification Attempts Table ---
@@ -114,7 +144,7 @@ export const user_benefit_verification_attempts = pgTable('user_benefit_verifica
 // --- Patient Profiles Table ---
 export const patient_profiles = pgTable('patient_profiles', {
   id: uuid('id').primaryKey().defaultRandom(),
-  user_id: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  user_id: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull().unique(),
   first_name: text('first_name'),
   last_name: text('last_name'),
   email: text('email'),
@@ -138,7 +168,8 @@ export const providers = pgTable('providers', {
   id: uuid('id').primaryKey().defaultRandom(),
   user_id: uuid('user_id')
     .references(() => users.id, { onDelete: 'cascade' })
-    .notNull(),
+    .notNull()
+    .unique(),
   first_name: text('first_name').notNull(),
   last_name: text('last_name').notNull(),
   specialization: text('specialization'),
@@ -196,7 +227,7 @@ export const appointments = pgTable('appointments', {
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   duration: integer('duration'),
-  type: text('type'),
+  type: appointmentTypeEnum('type'),
 });
 
 // --- Messages Table ---
@@ -252,7 +283,6 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   appointments: many(appointments),
   benefitVerificationAttempts: many(user_benefit_verification_attempts),
   sponsoringOrganization: one(organizations, { fields: [users.sponsoring_organization_id], references: [organizations.id] }),
-  selectedPackage: one(packages, { fields: [users.selected_package_id], references: [packages.id] }),
   sentMessages: many(messages, { relationName: 'sentMessages' }),
   receivedMessages: many(messages, { relationName: 'receivedMessages' }),
 }));
@@ -338,3 +368,16 @@ export const messageAttachmentsRelations = relations(message_attachments, ({ one
     references: [messages.id],
   }),
 }));
+
+// --- START: Added Notifications Relations ---
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, {
+    fields: [notifications.user_id],
+    references: [users.id],
+  }),
+  appointment: one(appointments, {
+    fields: [notifications.appointment_id],
+    references: [appointments.id],
+  }),
+}));
+// --- END: Added Notifications Relations ---

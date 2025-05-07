@@ -1,6 +1,6 @@
 'use client';
 
-import { Box, Button, Typography, Container, Grid, useTheme, Paper } from '@mui/material';
+import { Box, Button, Typography, Container, Grid, useTheme, Paper, alpha } from '@mui/material';
 import Link from 'next/link';
 import Image from 'next/image';
 import Logo from '@/components/Logo';
@@ -22,7 +22,7 @@ export default function HomePage() {
             justifyContent: 'center',
             alignItems: { xs: 'center', md: 'flex-start' },
             p: 4,
-            backgroundColor: '#f5f5f5',
+            backgroundColor: theme.palette.background.default,
             position: 'relative',
             zIndex: 1
           }}
@@ -152,7 +152,7 @@ export default function HomePage() {
               left: 20,
               p: 1.5,
               maxWidth: 180,
-              backgroundColor: 'rgba(255,255,255,0.9)',
+              backgroundColor: alpha(theme.palette.background.paper, 0.9),
               backdropFilter: 'blur(10px)',
               borderRadius: 2,
               zIndex: 2,

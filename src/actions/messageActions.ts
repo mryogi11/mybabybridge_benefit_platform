@@ -239,11 +239,15 @@ export async function getMessagesForThread(threadId: string): ActionResponse<Mes
     const supabase = createSupabaseServerClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
+    console.log(`[getMessagesForThread] Called with threadId: ${threadId} for user: ${user?.id}`); // Log entry
+
     if (authError || !user) {
+        console.log('[getMessagesForThread] User not authenticated.');
         return { success: false, error: 'User not authenticated.' };
     }
 
     if (!threadId) {
+         console.log('[getMessagesForThread] Thread ID is required.');
          return { success: false, error: 'Thread ID is required.' };
     }
 
@@ -275,6 +279,8 @@ export async function getMessagesForThread(threadId: string): ActionResponse<Mes
             .where(eq(messages.thread_id, threadId))
             .orderBy(messages.created_at);
 
+        console.log(`[getMessagesForThread] Found ${fetchedMessagesRaw.length} messages raw for threadId: ${threadId}`); // Log count
+
         await markMessagesAsRead(threadId);
 
         // Map raw results to the Message type
@@ -300,6 +306,7 @@ export async function getMessagesForThread(threadId: string): ActionResponse<Mes
             thread_id: msg.thread_id,
         })) as Message[];
 
+        console.log(`[getMessagesForThread] Returning ${typedMessages.length} typed messages for threadId: ${threadId}`); // Log final count
         return { success: true, data: typedMessages };
 
     } catch (error: any) {
@@ -560,40 +567,60 @@ export async function markMessagesAsRead(threadId: string): ActionResponse<null>
 // --- NEW ACTION for Providers ---
 export async function getCommunicationContactsForProvider(): ActionResponse<CommunicationContact[]> {
     const supabase = createSupabaseServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
-    if (authError || !user) {
-        return { success: false, error: 'User not authenticated.' };
+    if (authError || !authUser) {
+        return { success: false, error: 'Provider not authenticated.' };
     }
-    // Assuming the logged-in user is the provider
-    const providerUserId = user.id;
+    const providerAuthUserId = authUser.id;
 
     try {
-        // Step 1: Find all distinct patient IDs the provider has messages with.
-        // This query fetches distinct thread_ids and the other participant's ID
-        const distinctThreadsResult = await db.execute(sql`
-            SELECT DISTINCT
-                thread_id,
-                CASE
-                    WHEN sender_id = ${providerUserId} THEN receiver_id
-                    ELSE sender_id
-                END AS participant_id
-            FROM ${messages}
-            WHERE sender_id = ${providerUserId} OR receiver_id = ${providerUserId}
-        `);
+        // Step 1: Get the provider's profile ID from the 'providers' table
+        const providerProfile = await db.query.providers.findFirst({
+            where: eq(providers.user_id, providerAuthUserId),
+            columns: { id: true }
+        });
 
-        const allProviderThreads: { thread_id: string; participant_id: string }[] = distinctThreadsResult.rows as any;
-        console.log(`[getCommContactsProvider] Found threads for provider ${providerUserId}:`, allProviderThreads.length);
-
-        if (allProviderThreads.length === 0) {
-            return { success: true, data: [] }; // Provider has no message threads yet
+        if (!providerProfile) {
+            console.error(`[getCommContactsProvider] No provider profile found for auth user ID: ${providerAuthUserId}`);
+            return { success: false, error: 'Provider profile not found.' };
         }
+        const providerProfileId = providerProfile.id; // This is the ID from the providers table PK
 
-        const participantUserIds = [...new Set(allProviderThreads.map(t => t.participant_id))];
-        console.log(`[getCommContactsProvider] Distinct participant IDs:`, participantUserIds);
+        // Step 2: Fetch distinct patient USER IDs from appointments with this provider
+        const appointmentPatientRecords = await db.selectDistinct({ patientUserId: appointments.patient_id })
+            .from(appointments)
+            .where(eq(appointments.provider_id, providerProfileId));
+        
+        const patientUserIdsFromAppointments = new Set(appointmentPatientRecords.map(r => r.patientUserId));
+        console.log(`[getCommContactsProvider] Patients from appointments:`, Array.from(patientUserIdsFromAppointments));
 
-        // Step 2: Fetch details for all participants (patients)
-        const participantDetailsList = await db.select({
+        // Step 3: Fetch distinct patient USER IDs from existing messages with this provider
+        const distinctMessagePatientRecords = await db.execute(sql`
+            SELECT DISTINCT
+                CASE
+                    WHEN sender_id = ${providerAuthUserId} THEN receiver_id
+                    ELSE sender_id
+                END AS patient_user_id
+            FROM ${messages}
+            WHERE (sender_id = ${providerAuthUserId} OR receiver_id = ${providerAuthUserId})
+              AND CASE WHEN sender_id = ${providerAuthUserId} THEN receiver_id ELSE sender_id END IS NOT NULL
+        `);
+        const patientUserIdsFromMessages = new Set((distinctMessagePatientRecords.rows as { patient_user_id: string }[]).map(r => r.patient_user_id));
+        console.log(`[getCommContactsProvider] Patients from messages:`, Array.from(patientUserIdsFromMessages));
+
+        // Step 4: Combine and de-duplicate all potential patient contact USER IDs
+        const allPatientContactUserIds = new Set([...patientUserIdsFromAppointments, ...patientUserIdsFromMessages]);
+        const allPatientContactUserIdsArray = Array.from(allPatientContactUserIds);
+
+        if (allPatientContactUserIdsArray.length === 0) {
+            console.log(`[getCommContactsProvider] No potential contacts found for provider ${providerAuthUserId}.`);
+            return { success: true, data: [] };
+        }
+        console.log(`[getCommContactsProvider] All potential patient contacts (user IDs):`, allPatientContactUserIdsArray);
+
+        // Step 5: Fetch user details for all these patient USER IDs
+        const patientUserDetailsList = await db.select({
             id: users.id,
             first_name: users.first_name,
             last_name: users.last_name,
@@ -603,11 +630,11 @@ export async function getCommunicationContactsForProvider(): ActionResponse<Comm
             updated_at: users.updated_at,
         })
         .from(users)
-        .where(sql`${users.id} IN ${participantUserIds}`);
-
-        const participantDetailsMap = new Map<string, User>();
-        participantDetailsList.forEach(p => {
-             const typedParticipant: User = { // Map to User type
+        .where(sql`${users.id} IN ${allPatientContactUserIdsArray}`);
+        
+        const patientDetailsMap = new Map<string, User>();
+        patientUserDetailsList.forEach(p => {
+            patientDetailsMap.set(p.id, {
                 id: p.id,
                 email: p.email,
                 first_name: p.first_name ?? undefined,
@@ -615,101 +642,78 @@ export async function getCommunicationContactsForProvider(): ActionResponse<Comm
                 role: p.role,
                 created_at: p.created_at.toISOString(),
                 updated_at: p.updated_at.toISOString(),
-             };
-             participantDetailsMap.set(p.id, typedParticipant as User);
+            } as User);
         });
-        console.log(`[getCommContactsProvider] Fetched participant details count:`, participantDetailsMap.size);
+        console.log(`[getCommContactsProvider] Fetched patient details count:`, patientDetailsMap.size);
 
-        // Step 3: Fetch last message and unread count for each thread
-        const communicationContactsPromises = allProviderThreads.map(async (thread) => {
-            const threadId = thread.thread_id;
-            const participantId = thread.participant_id;
-            const participantDetails = participantDetailsMap.get(participantId);
+        // Step 6: Fetch thread details (last message, unread count) for threads between provider and each patient
+        const existingThreadsMap = new Map<string, { thread_id: string; last_message: Message | null; unread_count: number }>();
+        const threadDetailPromises = allPatientContactUserIdsArray.map(async (patientUserId) => {
+            // Determine thread_id (consistent with sendMessage)
+            const threadId = [providerAuthUserId, patientUserId].sort().join('__');
 
-            // Fetch last message
             const [lastMessageResult] = await db.select({
-                id: messages.id,
-                sender_id: messages.sender_id,
-                receiver_id: messages.receiver_id,
-                content: messages.content,
-                thread_id: messages.thread_id,
-                is_read: messages.is_read,
-                created_at: messages.created_at,
-                updated_at: messages.updated_at,
+                id: messages.id, sender_id: messages.sender_id, receiver_id: messages.receiver_id,
+                content: messages.content, thread_id: messages.thread_id, is_read: messages.is_read,
+                created_at: messages.created_at, updated_at: messages.updated_at,
                 attachments: sql<(MessageAttachment[] | null)>`(SELECT json_agg(ma.*) FROM ${message_attachments} ma WHERE ma.message_id = ${messages.id})`
             })
             .from(messages)
             .where(eq(messages.thread_id, threadId))
             .orderBy(desc(messages.created_at))
             .limit(1);
-            
+
             const typedLastMessage: Message | null = lastMessageResult ? {
-                id: lastMessageResult.id,
-                sender_id: lastMessageResult.sender_id,
-                receiver_id: lastMessageResult.receiver_id,
-                content: lastMessageResult.content ?? '',
-                is_read: lastMessageResult.is_read,
-                created_at: lastMessageResult.created_at.toISOString(),
-                attachments: lastMessageResult.attachments || [],
-                updated_at: lastMessageResult.updated_at.toISOString(),
-                thread_id: lastMessageResult.thread_id,
+                id: lastMessageResult.id, sender_id: lastMessageResult.sender_id, receiver_id: lastMessageResult.receiver_id,
+                content: lastMessageResult.content ?? '', is_read: lastMessageResult.is_read,
+                created_at: lastMessageResult.created_at.toISOString(), attachments: lastMessageResult.attachments || [],
+                updated_at: lastMessageResult.updated_at.toISOString(), thread_id: lastMessageResult.thread_id,
             } : null;
 
-            // Fetch unread count (messages sent TO the provider that are unread)
             const [unreadCountResult] = await db.select({ value: countDistinct(messages.id) })
                  .from(messages)
-                 .where(and(eq(messages.thread_id, threadId), eq(messages.receiver_id, providerUserId), eq(messages.is_read, false)));
+                 .where(and(eq(messages.thread_id, threadId), eq(messages.receiver_id, providerAuthUserId), eq(messages.is_read, false)));
             const unreadCount = unreadCountResult?.value ?? 0;
+            
+            // For this function, we want all contacts from appointments, so we add them regardless of messages here.
+            // The data structure `CommunicationContact` expects thread_id to be potentially null if no messages.
+            existingThreadsMap.set(patientUserId, {
+                thread_id: threadId, // Use the consistently generated threadId
+                last_message: typedLastMessage,
+                unread_count: unreadCount
+            });
+        });
+        await Promise.all(threadDetailPromises);
+        console.log(`[getCommContactsProvider] Fetched existing thread details count (for all potential contacts):`, existingThreadsMap.size);
 
-            // Define the return type for this specific map operation
-            type ProviderContactResult = Omit<CommunicationContact, 'id' | 'thread_id'> & { id: string; thread_id: string };
+        // Step 7: Construct the final contact list
+        const communicationContacts: CommunicationContact[] = allPatientContactUserIdsArray.map(patientUserId => {
+            const participantDetails = patientDetailsMap.get(patientUserId);
+            const threadData = existingThreadsMap.get(patientUserId);
+            // Ensure consistent thread_id generation if one wasn't found from existing messages for this contact pair
+            const currentThreadId = threadData?.thread_id || [providerAuthUserId, patientUserId].sort().join('__');
 
             return {
-                id: threadId, // Use thread_id as the key for the list
+                id: patientUserId, // The ID of the contact (patient)
                 participant: participantDetails || null,
-                last_message: typedLastMessage as Message | null,
-                unread_count: unreadCount,
-                thread_id: threadId, // Explicitly include thread_id (already known to be string here)
-            } as ProviderContactResult; // Assert the return type
-        });
+                last_message: threadData?.last_message || null,
+                unread_count: threadData?.unread_count || 0,
+                thread_id: currentThreadId, 
+            };
+        }).filter(contact => contact.participant !== null); // Ensure we only return contacts with details
 
-        // Now communicationContacts will have the correct type
-        let communicationContacts: (Omit<CommunicationContact, 'id' | 'thread_id'> & { id: string; thread_id: string })[] = await Promise.all(communicationContactsPromises);
-
-        // Ensure we only have one entry per participant (handling potential duplicate threads if logic allows)
-        // This might not be strictly necessary if thread_id generation is solid
-        const finalContactsMap = new Map<string, typeof communicationContacts[number]>(); // Use inferred type
-        communicationContacts.forEach(contact => {
-             if (contact.participant && !finalContactsMap.has(contact.participant.id)) {
-                 finalContactsMap.set(contact.participant.id, contact);
-             }
-             // If duplicates needed merging, logic would go here
-        });
-        communicationContacts = Array.from(finalContactsMap.values());
-
-        // Step 4: Sort the final list (e.g., by last message time, then alphabetically)
+        // Step 8: Sort contacts
         communicationContacts.sort((a, b) => {
             const timeA = a.last_message ? new Date(a.last_message.created_at).getTime() : 0;
             const timeB = b.last_message ? new Date(b.last_message.created_at).getTime() : 0;
-            if (timeB !== timeA) {
-                return timeB - timeA; // Sort by most recent message first
-            }
+            if (timeB !== timeA) return timeB - timeA;
             const nameA = `${a.participant?.first_name} ${a.participant?.last_name}`.toLowerCase();
             const nameB = `${b.participant?.first_name} ${b.participant?.last_name}`.toLowerCase();
             return nameA.localeCompare(nameB);
         });
 
         console.log(`[getCommContactsProvider] Final contacts count:`, communicationContacts.length);
-        // Ensure return type matches CommunicationContact[]
-        const finalData: CommunicationContact[] = communicationContacts.map(c => ({
-            id: c.participant!.id, // Return participant ID as top-level ID
-            participant: c.participant,
-            last_message: c.last_message,
-            unread_count: c.unread_count,
-            thread_id: c.thread_id // No longer needs assertion
-        }));
-
-        return { success: true, data: finalData };
+        return { success: true, data: communicationContacts };
 
     } catch (error: any) {
         console.error('[Server Action Error] getCommunicationContactsForProvider:', error);

@@ -84,7 +84,7 @@ export default function AdminAnalyticsPage() {
             acc.push({ name: typeName, value: 1 });
           }
           
-          return acc;
+      return acc;
         }, []);
 
         // Fetch user growth
@@ -105,7 +105,7 @@ export default function AdminAnalyticsPage() {
             acc.push({ month, users: 1 });
           }
           
-          return acc;
+        return acc;
         }, []);
 
         // Calculate success rates (mock data for now)
@@ -246,4 +246,4 @@ export default function AdminAnalyticsPage() {
       </Box>
     </Container>
   );
-} 
+}

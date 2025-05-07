@@ -128,25 +128,41 @@ export default function ProviderDashboardPage() {
 
       try {
         // 1. Get provider profile ID
+        console.log(`Fetching provider profile ID for user ID: ${user.id}`);
         const { data: providerData, error: providerError } = await supabase
           .from('providers')
           .select('id')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle(); // Use maybeSingle() instead of single()
 
-        if (providerError || !providerData) {
-          throw new Error(providerError?.message || "Could not find provider profile.");
+        // Handle potential errors from the query itself
+        if (providerError) {
+          console.error('Supabase error fetching provider profile:', providerError);
+          throw new Error(providerError.message);
         }
-        const providerProfileId = providerData.id;
 
-        // 2. Fetch appointments with explicit FK for first join, inferred for nested
+        // Handle case where no provider profile is found for the user
+        if (!providerData) {
+            console.error(`No provider profile found for user ID: ${user.id}`);
+            // Set a specific error message for the UI
+            setErrorAppointments("Provider profile not found. Cannot fetch appointments.");
+            setLoadingAppointments(false); // Stop loading as we can't proceed
+            setUpcomingAppointments([]); // Ensure appointments are cleared
+            return; // Exit the function early
+        }
+
+        const providerProfileId = providerData.id;
+        console.log(`Found provider profile ID: ${providerProfileId}`);
+
+        // 2. Fetch appointments using the found providerProfileId
+        console.log(`Fetching appointments for provider profile ID: ${providerProfileId}`);
         const { data, error } = await supabase
           .from('appointments')
           .select(`
             *,
             duration,
             type,
-            patient:users!appointments_patient_id_fkey (
+            patient:users!appointments_patient_id_users_id_fk (
               id,
               email,
               patient_profile:patient_profiles (
@@ -162,6 +178,7 @@ export default function ProviderDashboardPage() {
           .limit(5); // Limit for dashboard widget
 
         if (error) {
+          console.error('Supabase error fetching appointments:', error);
           throw error;
         }
         

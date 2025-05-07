@@ -5,7 +5,7 @@
 import { createServerClient } from '@supabase/ssr'; // Use ssr
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
-import { UserRole } from '@/types';
+import type { User } from '@/types'; // <<< IMPORT User type
 import type { Database } from '@/types/supabase'; // Assuming Database type
 // Removed Database import temporarily - Please provide correct path later
 // import { Database } from '@/lib/supabase/database.types'; 
@@ -13,10 +13,11 @@ import { z } from 'zod';
 // Remove incorrect auth import
 // import { auth } from '@/lib/auth/auth'; 
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema';
+import { users, themeModeEnum } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { ThemeModeSetting } from '@/components/ThemeRegistry/ClientThemeProviders'; // Import the type
+import { CookieOptions } from 'next/headers';
 
 // Reuse the NewUserData interface definition or redefine if needed
 // It's better to import it if possible to avoid duplication
@@ -25,7 +26,7 @@ interface NewUserData {
     last_name: string;
     email: string;
     password?: string;
-    role: UserRole;
+    role: User['role']; // <<< USE User['role']
     specialization?: string;
     bio?: string;
     experience_years?: number;
@@ -148,10 +149,9 @@ export async function createUserAction(userData: NewUserData): Promise<{ success
             .upsert({
                 id: newUserId, // Use the obtained ID
                 email: userData.email,
-                role: userData.role
-                // Removed first_name and last_name as they don't exist in users table
-                // first_name: userData.first_name,
-                // last_name: userData.last_name,
+                role: userData.role,
+                first_name: userData.first_name,
+                last_name: userData.last_name,
             }, { onConflict: 'id' }); // Specify the conflict column
 
         if (usersTableError) {
@@ -164,16 +164,18 @@ export async function createUserAction(userData: NewUserData): Promise<{ success
         // Step 3: If the role is 'provider', upsert into the 'providers' table using the Admin Client
         if (userData.role === 'provider') {
             console.log("[Server Action] User role is provider, attempting to upsert into providers table...");
-            const { error: providerTableError } = await supabaseAdmin // Use admin client
+            const providerPayload = { // Construct payload explicitly
+                 user_id: newUserId, 
+                 first_name: userData.first_name,
+                 last_name: userData.last_name,
+                 specialization: userData.specialization,
+                 bio: userData.bio,
+                 experience_years: userData.experience_years,
+             };
+             console.log("[Server Action] Payload for providers upsert:", providerPayload); // <<< ADDED LOG
+             const { error: providerTableError } = await supabaseAdmin // Use admin client
                 .from('providers')
-                .upsert({
-                    user_id: newUserId, // Match on this column (assuming it's unique or PK)
-                    first_name: userData.first_name,
-                    last_name: userData.last_name,
-                    specialization: userData.specialization,
-                    bio: userData.bio,
-                    experience_years: userData.experience_years,
-                }, { onConflict: 'user_id' }); // Specify the conflict column
+                .upsert(providerPayload, { onConflict: 'user_id' }); // Specify the conflict column
 
             if (providerTableError) {
                 console.error("[Server Action] Supabase providers table upsert Error:", providerTableError);
@@ -210,64 +212,52 @@ export async function createUserAction(userData: NewUserData): Promise<{ success
     }
 }
 
-// Zod schema for validation
-const ThemePreferenceSchema = z.object({
-  preference: z.enum(['light', 'dark', 'system']),
-});
-
-export async function updateThemePreference(preference: ThemeModeSetting) {
-  // Create Supabase client for Server Actions
-  const cookieStore = cookies();
-  const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set(name: string, value: string, options: any) {
-          cookieStore.set({ name, value, ...options });
-        },
-        remove(name: string, options: any) {
-          cookieStore.set({ name, value: '', ...options });
-        },
-      },
+// Helper to get authenticated user (similar to one in benefitActions)
+async function getAuthenticatedUser() {
+    const cookieStore = await cookies();
+    const supabaseAuthClient = createServerClient<Database>(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                get(name: string) { return cookieStore.get(name)?.value; },
+                set(name: string, value: string, options: CookieOptions) { try { cookieStore.set({ name, value, ...options }); } catch (e) { /* ignore */ } },
+                remove(name: string, options: CookieOptions) { try { cookieStore.set({ name, value: '', ...options }); } catch (e) { /* ignore */ } },
+            },
+        }
+    );
+    const { data: { user }, error } = await supabaseAuthClient.auth.getUser();
+    if (error || !user) {
+        throw new Error("User is not authenticated.");
     }
-  );
+    return user;
+}
 
-  // Get user session
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
+const ThemePreferenceSchema = z.enum(themeModeEnum.enumValues);
 
-  if (userError || !user) {
-    console.error('Error getting user or user not authenticated:', userError);
-    return { success: false, error: 'User not authenticated' };
-  }
+export async function updateUserThemePreference(theme: string): Promise<{
+    success: boolean;
+    message: string;
+    newTheme?: typeof themeModeEnum.enumValues[number];
+}> {
+    try {
+        const authUser = await getAuthenticatedUser();
+        const validatedTheme = ThemePreferenceSchema.parse(theme);
 
-  const userId = user.id;
+        await db.update(users)
+            .set({ theme_preference: validatedTheme, updated_at: new Date() })
+            .where(eq(users.id, authUser.id));
 
-  const validation = ThemePreferenceSchema.safeParse({ preference });
-
-  if (!validation.success) {
-    console.error("Validation Error:", validation.error.errors);
-    return { success: false, error: 'Invalid theme preference value.' };
-  }
-
-  try {
-    await db
-      .update(users)
-      .set({ theme_preference: validation.data.preference })
-      .where(eq(users.id, userId)); // Use userId from getUser()
-
-    // Optionally revalidate paths if theme affects server-rendered components 
-    // dependent on this data, though unlikely needed for just theme.
-    // revalidatePath('/', 'layout'); 
-
-    console.log(`Theme preference updated for user ${userId} to ${validation.data.preference}`);
-    return { success: true };
-
-  } catch (error) {
-    console.error("Database Error: Failed to update theme preference", error);
-    return { success: false, error: 'Database error: Failed to update theme preference.' };
-  }
+        console.log(`User ${authUser.id} updated theme preference to ${validatedTheme}`);
+        return { success: true, message: 'Theme preference updated successfully.', newTheme: validatedTheme };
+    } catch (error: any) {
+        console.error('Error updating theme preference:', error);
+        let errorMessage = 'Failed to update theme preference.';
+        if (error instanceof z.ZodError) {
+            errorMessage = 'Invalid theme value provided.';
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+        return { success: false, message: errorMessage };
+    }
 } 

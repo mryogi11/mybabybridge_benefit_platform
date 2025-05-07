@@ -220,7 +220,7 @@ export default function ProviderMainLayout({ children }: { children: React.React
           p: 3,
           width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
           minHeight: '100vh',
-          backgroundColor: theme.palette.grey[100],
+          backgroundColor: theme.palette.background.default,
         }}
       >
         <Toolbar /> {/* Offset content below AppBar */}

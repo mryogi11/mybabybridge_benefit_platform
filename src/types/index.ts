@@ -76,17 +76,26 @@ export interface Appointment {
   // provider?: Provider | null;
 }
 
-// --- Package Type (Example - ensure this matches your schema/usage) ---
+// --- Package Related Enums/Types ---
+export type PackageTier = 'basic' | 'silver' | 'gold' | 'platinum';
+export type PurchaseType = 'one-time' | 'subscription'; // Add other types if needed
+
+// --- Package Type ---
 export interface Package {
   id: string;
   name: string;
-  tier: 'basic' | 'silver' | 'gold' | 'platinum';
-  monthly_cost: number; // Assuming converted from string
+  tier: PackageTier; // Use the exported type
+  monthly_cost: number; 
   description: string | null;
   key_benefits: string[] | null;
   is_base_employer_package: boolean;
   created_at: string;
   updated_at: string;
+  // Fields that were causing errors, decide if they should be optional or removed
+  // price?: number; // If monthly_cost is the primary, this might be redundant or for display variations
+  // validity_period?: number;
+  // purchase_type?: PurchaseType; // if package itself dictates this, otherwise managed by purchase flow
+  // features?: string[]; // if key_benefits is the standard
 }
 
 // --- Add other necessary type definitions below ---
