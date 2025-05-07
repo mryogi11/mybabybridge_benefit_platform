@@ -11,6 +11,7 @@ interface Profile {
   last_name?: string;
   role?: string;
   theme_preference?: 'light' | 'dark' | 'system' | null; // Added optional theme preference
+  benefit_status?: 'pending_verification' | 'verified' | 'declined' | 'not_applicable' | 'not_started' | null; // Added benefit_status
   // Add other profile fields as needed
 }
 
@@ -69,7 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('users') 
-        .select('id, first_name, last_name, role, theme_preference')
+        .select('id, first_name, last_name, role, theme_preference, benefit_status')
         .eq('id', userId)
         .single();
 

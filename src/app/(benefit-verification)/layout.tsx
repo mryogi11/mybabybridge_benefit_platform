@@ -54,7 +54,7 @@ export default function BenefitVerificationLayout({ children }: BenefitVerificat
     // 3. Check Benefit Status - **REVISED LOGIC**
     // Redirect ONLY if status is 'verified'. Allow all other statuses (not_started, pending, declined, etc.)
     if (profile.benefit_status === 'verified') {
-       console.log(`[Benefit Layout] User benefit status is 'verified', redirecting to dashboard.`);
+       console.log(`[Benefit Layout] User benefit status is 'verified', redirecting to /dashboard.`);
        router.replace('/dashboard'); 
        return;
     }

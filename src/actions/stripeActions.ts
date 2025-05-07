@@ -58,7 +58,7 @@ const PaymentIntentPayloadSchema = z.object({
 export async function createPaymentIntent(payload: z.infer<typeof PaymentIntentPayloadSchema>): Promise<{ success: boolean; clientSecret?: string | null; message: string; }> {
     try {
         // Get the stripe client instance when needed
-        const stripe = getServerStripeClient();
+        const stripe = await getServerStripeClient();
 
         // Validate payload first
         const validatedPayload = PaymentIntentPayloadSchema.parse(payload);

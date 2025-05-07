@@ -276,12 +276,11 @@ export async function submitVerificationInfo(data: VerificationInfo) {
 
 export async function updateBasicProfile(data: BasicProfileData) {
     try {
-        const user = await getAuthenticatedUser();
-        console.log(`[updateBasicProfile] User ID: ${user.id}`);
-        const validatedData = BasicProfileSchema.parse(data);
-        console.log(`[updateBasicProfile] Validated Data:`, validatedData);
+        const user = await getAuthenticatedUser(); // Ensure user is authenticated
+        const validatedData = BasicProfileSchema.parse(data); // Validate incoming data
 
-        const updateResult = await db.update(users)
+        // Update the user's profile in the database
+        await db.update(users)
             .set({
                 first_name: validatedData.firstName,
                 last_name: validatedData.lastName,
@@ -292,16 +291,13 @@ export async function updateBasicProfile(data: BasicProfileData) {
                 address_postal_code: validatedData.addressPostalCode,
                 address_country: validatedData.addressCountry,
                 updated_at: new Date(),
+                // Potentially update benefit_status if this path implies something specific
+                // For example, if this path means they are 'not_applicable' or 'verified_other'
+                // benefit_status: 'not_applicable', // Example, adjust as needed
             })
-            .where(eq(users.id, user.id))
-            .returning({ updatedId: users.id });
+            .where(eq(users.id, user.id));
 
-        console.log(`[updateBasicProfile] DB update result:`, updateResult);
-        if (!updateResult || updateResult.length === 0) {
-            console.error(`[updateBasicProfile] Failed to update profile in DB for user ${user.id}.`);
-            throw new Error("Failed to confirm profile update in database.");
-        }
-        console.log(`[updateBasicProfile] Successfully updated profile for user ${user.id}`);
+        console.log(`[updateBasicProfile] User profile updated for user ${user.id}.`);
         return { success: true, message: 'Profile updated successfully.' };
 
     } catch (error) {

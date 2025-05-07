@@ -73,7 +73,7 @@ export interface Appointment {
   updated_at: string;
   // Include patient/provider details if joined:
   // patient?: User | null;
-  // provider?: Provider | null;
+  provider?: Provider | null; // Uncommented provider details
 }
 
 // --- Package Related Enums/Types ---

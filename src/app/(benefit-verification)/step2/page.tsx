@@ -34,7 +34,7 @@ interface OrganizationOption {
 
 export default function OrganizationSearchScreen() {
     const router = useRouter();
-    const { benefitSource, setSponsoringOrganizationId } = useBenefitVerification(); 
+    const { benefitSource, setSponsoringOrganization } = useBenefitVerification(); 
     const [inputValue, setInputValue] = useState('');
     const [options, setOptions] = useState<OrganizationOption[]>([]);
     const [selectedOrg, setSelectedOrg] = useState<OrganizationOption | null>(null);
@@ -92,7 +92,7 @@ export default function OrganizationSearchScreen() {
         if (!selectedOrg) return;
         
         startTransition(async () => {
-            setSponsoringOrganizationId(selectedOrg.id);
+            setSponsoringOrganization(selectedOrg.id, selectedOrg.label);
 
             const formData = new FormData();
             formData.append('organizationId', selectedOrg.id);
@@ -102,7 +102,7 @@ export default function OrganizationSearchScreen() {
             } else {
                  console.error("Failed to update sponsoring organization:", result.message);
                  setSearchError(result.message || "Failed to save organization selection.");
-                 setSponsoringOrganizationId(null);
+                 setSponsoringOrganization(null, '');
             }
         });
     };

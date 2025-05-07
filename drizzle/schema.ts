@@ -194,7 +194,7 @@ export const users = pgTable("users", {
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	benefitSource: benefitSource("benefit_source").default('none'),
 	sponsoringOrganizationId: uuid("sponsoring_organization_id"),
-	benefitStatus: text("benefit_status").default('not_started'),
+	benefitStatus: benefitStatus("benefit_status").default('not_started'),
 	stripeCustomerId: text("stripe_customer_id"),
 	firstName: text("first_name"),
 	lastName: text("last_name"),

@@ -22,6 +22,7 @@ import { loadStripe, StripeElementsOptions } from '@stripe/stripe-js';
 import { completeBenefitSetup, getUserWithSelectedPackage } from '@/actions/benefitActions';
 import { createPaymentIntent } from '@/actions/stripeActions';
 import { useBenefitVerification } from '@/contexts/BenefitVerificationContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Re-define locally the types expected from the modified getUserWithSelectedPackage action
 interface SimplePackageDetails {
@@ -196,6 +197,7 @@ function ConfirmationForm({
     const router = useRouter();
     const stripe = useStripe(); // Hook to get Stripe instance (null if Elements provider is missing)
     const elements = useElements(); // Hook to get Elements instance
+    const { user, fetchAndSetProfile } = useAuth(); // Get user and fetchAndSetProfile from AuthContext
     const [isProcessing, setIsProcessing] = useState(false); // For Stripe processing
     const [errorMessage, setErrorMessage] = useState<string | null>(null); // For displaying errors
     const [isCompletingSetup, startTransition] = useTransition(); // For final setup action transition
@@ -287,24 +289,27 @@ function ConfirmationForm({
 
     // --- Helper Function to Call Final Server Action --- 
     const completeSetupAction = () => {
-         setIsProcessing(false); // Ensure Stripe processing indicator is off
-         startTransition(async () => { // Use transition for the server action call
+        startTransition(async () => {
             try {
-                 console.log("[Step 6] Calling completeBenefitSetup action...");
-                 const completeResult = await completeBenefitSetup(); 
-                if (completeResult.success) {
-                    console.log("[Step 6] Benefit setup marked complete by server action. Redirecting to dashboard...");
-                    // Redirect user to their dashboard upon successful completion
-                    router.push('/dashboard'); 
+                console.log("[Step 6] Calling completeBenefitSetup action...");
+                const result = await completeBenefitSetup();
+                if (result.success) {
+                    console.log("[Step 6] Benefit setup marked complete by server action. Refreshing profile...");
+                    if (user?.id) {
+                        await fetchAndSetProfile(user.id); // Refresh profile
+                        console.log("[Step 6] Profile refreshed. Redirecting to /dashboard...");
+                        router.push('/dashboard');
+                    } else {
+                        console.error("[Step 6] User ID not available, cannot refresh profile. Redirecting anyway to /dashboard...");
+                        router.push('/dashboard'); // Fallback redirect to /dashboard
+                    }
                 } else {
-                    // Handle failure from the server action
-                    console.error("[Step 6] completeBenefitSetup action returned failure:", completeResult.message);
-                    setErrorMessage(completeResult.message || 'Failed to finalize your setup. Please contact support.');
+                    console.error("[Step 6] completeBenefitSetup action failed:", result.message);
+                    setErrorMessage(result.message || "Failed to complete setup. Please try again.");
                 }
             } catch (err) {
-                 // Handle unexpected errors during the server action call
-                 console.error("[Step 6] Error calling completeBenefitSetup:", err);
-                 setErrorMessage("An unexpected error occurred while finalizing your setup. Please contact support.");
+                console.error("[Step 6] Error during completeBenefitSetup transition:", err);
+                setErrorMessage(err instanceof Error ? err.message : "An unexpected error occurred.");
             }
         });
     };

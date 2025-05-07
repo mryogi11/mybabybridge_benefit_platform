@@ -34,12 +34,11 @@ import {
 } from 'date-fns';
 import { toZonedTime, fromZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { revalidatePath } from 'next/cache';
-import { Appointment, Provider, Patient } from '@/types'; // Import the updated Appointment type and profile types (Removed UserProfile, Corrected Provider/Patient)
-import { and, eq, gte, lte, or, inArray } from 'drizzle-orm'; // Added inArray
+import { Appointment, Provider } from '@/types'; // Removed Patient import
+import { and, eq, gte, lte, or, inArray } from 'drizzle-orm'; // No sql import needed here now
 import { db } from '@/lib/db';
 import {
   appointments,
-  // ProviderAvailability, // Removed typo/unused import
   providers, // Added providers import
   users,
   // WorkingHour, // Removed as it's not exported from schema (renamed to providerWeeklySchedules)
@@ -288,42 +287,44 @@ export async function bookAppointment_Supabase(
         if (!isValid(appointmentDate)) throw new Error('Invalid appointment date format provided.');
         const appointmentDateISO = appointmentDate.toISOString();
 
-        // --- Insert the appointment using Drizzle --- 
-        const inserted = await db
-            .insert(appointments)
-            .values({
-                patient_id: patientAuthUserId, // Use the AUTH User ID (references users.id)
+        // Insert the new appointment
+        const { data: newAppointmentData, error: insertError } = await supabase
+            .from('appointments')
+            .insert({
                 provider_id: providerId,
-                appointment_date: appointmentDate, // Drizzle often prefers Date objects
-                status: 'pending', // Start as pending, provider can confirm
-                duration: duration,
-                type: appointmentType,
+                patient_id: patientAuthUserId,
+                appointment_date: formatISO(appointmentDate), // Use ISO format string
+                status: 'pending', 
                 notes: notes,
-                // created_at and updated_at should have database defaults
+                duration: duration,
+                // Pass the string type directly; DB/RLS might enforce enum values
+                type: appointmentType, 
             })
-            .returning(); // Get the inserted row back
+            .select() 
+            .single();
 
-        if (!inserted || inserted.length === 0) {
-            throw new Error("Failed to insert appointment into database.");
-        }
-        const newAppointment = inserted[0];
-        
-        // Basic transformation - adjust based on actual data and Appointment type
-        const finalAppointment: Appointment = {
-            id: newAppointment.id, 
-            patient_id: newAppointment.patient_id, 
-            provider_id: newAppointment.provider_id, 
-            appointment_date: newAppointment.appointment_date.toISOString(), // Convert Date back to string if needed for type
-            status: newAppointment.status as Appointment['status'], // Assume status is correct
-            notes: newAppointment.notes ?? null, 
-            created_at: newAppointment.created_at.toISOString(), // Convert Date back to string if needed for type
-            updated_at: newAppointment.updated_at.toISOString(), // Convert Date back to string if needed for type
-            provider: undefined, 
-            patient: undefined,
+        if (insertError) throw insertError;
+        if (!newAppointmentData) throw new Error('Failed to create appointment or retrieve data.');
+
+        // Transform the returned data
+        const transformedAppointment: Appointment = {
+            id: newAppointmentData.id,
+            patient_id: newAppointmentData.patient_id,
+            provider_id: newAppointmentData.provider_id,
+            // Assume dates from DB are strings or null
+            appointment_date: newAppointmentData.appointment_date ?? '',
+            status: newAppointmentData.status as Appointment['status'],
+            notes: newAppointmentData.notes ?? null,
+            duration: newAppointmentData.duration ?? null,
+            type: newAppointmentData.type ?? null,
+            created_at: newAppointmentData.created_at ?? '', 
+            updated_at: newAppointmentData.updated_at ?? '',
+            // provider is not included in the insert return
+            // patient is not included 
         };
 
         revalidatePath('/dashboard/appointments');
-        return { success: true, appointment: finalAppointment };
+        return { success: true, appointment: transformedAppointment };
 
     } catch (error: any) {
         return { success: false, error: `Database error: ${error.message}` };
@@ -354,22 +355,19 @@ export async function getAppointmentsForUser_Supabase(
     }
 
     try {
-        // Determine the correct column to filter on based on the role
-        // Note: We assume providerId in appointments table also refers to the providers.user_id (Auth ID)
-        // If provider_id refers to providers.id (Profile ID), this needs adjustment for the 'provider' role.
         let filterColumn: 'patient_id' | 'provider_id' = userRole === 'patient' ? 'patient_id' : 'provider_id';
 
         console.log(`Fetching appointments where ${filterColumn} = ${userId}`);
 
-        // Fetch appointments using the Auth User ID
+        // Fetch appointments and related provider data
         const { data, error } = await supabase
             .from('appointments')
-            .select('*') // Select all columns for now, refine if needed
-            .eq(filterColumn, userId) // Filter by the appropriate column using the Auth User ID
+            // Select all appointment fields and necessary fields from the related provider
+            .select('*, providers ( id, user_id, first_name, last_name, specialization ) ') 
+            .eq(filterColumn, userId)
             .order('appointment_date', { ascending: true });
 
         if (error) {
-            // Log the specific Supabase error
             console.error(`Error fetching appointments from Supabase for ${userRole} ${userId}:`, error.message, error.details);
             return [];
         }
@@ -380,14 +378,12 @@ export async function getAppointmentsForUser_Supabase(
 
         console.log(`Found ${data.length} appointments for ${userRole} ${userId}`);
 
-
         // Basic transformation - adjust based on actual data and Appointment type
         const transformedAppointments: Appointment[] = (data || []).map((appt: any): Appointment | null => {
              if (!appt || !appt.id || !appt.appointment_date || !appt.status) {
                   console.warn('Skipping invalid appointment data:', appt);
                   return null;
              }
-            // Ensure appointment_date is parsed correctly if it's a string
             const appointmentDate = typeof appt.appointment_date === 'string'
                 ? parseISO(appt.appointment_date)
                 : appt.appointment_date;
@@ -396,22 +392,37 @@ export async function getAppointmentsForUser_Supabase(
                  return null;
             }
 
+            // Map the fetched provider data
+            const providerData = appt.providers ? {
+                id: appt.providers.id,
+                user_id: appt.providers.user_id,
+                first_name: appt.providers.first_name,
+                last_name: appt.providers.last_name,
+                specialization: appt.providers.specialization,
+                // Map other Provider fields if needed and available
+                bio: null, // Placeholder or fetch if needed
+                experience_years: null, // Placeholder or fetch if needed
+                education: null, // Placeholder or fetch if needed
+                certifications: null, // Placeholder or fetch if needed
+                created_at: '', // Placeholder or fetch if needed
+                updated_at: '', // Placeholder or fetch if needed
+            } : null;
+
             return {
                 id: appt.id,
-                patient_id: appt.patient_id, // Keep original patient_id (Auth ID)
-                provider_id: appt.provider_id, // Keep original provider_id (assumed Auth ID for now)
-                appointment_date: appointmentDate.toISOString(), // Ensure consistent ISO string format
-                duration: appt.duration, // Assuming duration exists
-                type: appt.type, // Assuming type exists
+                patient_id: appt.patient_id, 
+                provider_id: appt.provider_id, 
+                appointment_date: appointmentDate.toISOString(),
+                duration: appt.duration,
+                type: appt.type,
                 status: ['scheduled', 'completed', 'cancelled', 'pending'].includes(appt.status)
                         ? appt.status as Appointment['status']
-                        : 'pending', // Default to pending if status is invalid
+                        : 'pending',
                 notes: appt.notes ?? null,
-                created_at: typeof appt.created_at === 'string' ? appt.created_at : appt.created_at?.toISOString() ?? new Date().toISOString(), // Handle potential Date object or string
-                updated_at: typeof appt.updated_at === 'string' ? appt.updated_at : appt.updated_at?.toISOString() ?? new Date().toISOString(), // Handle potential Date object or string
-                // Provider/Patient details might need separate queries or joins in Supabase select
-                provider: undefined, // Needs join or separate fetch
-                patient: undefined,  // Needs join or separate fetch
+                created_at: typeof appt.created_at === 'string' ? appt.created_at : appt.created_at?.toISOString() ?? new Date().toISOString(),
+                updated_at: typeof appt.updated_at === 'string' ? appt.updated_at : appt.updated_at?.toISOString() ?? new Date().toISOString(),
+                provider: providerData, // Assign mapped provider data
+                // patient: undefined, // Patient data not fetched here
             };
         }).filter((appt): appt is Appointment => appt !== null);
 
@@ -481,15 +492,14 @@ export async function updateAppointmentStatus_Supabase(
             .from('appointments')
             .update({ status: newStatus, updated_at: new Date().toISOString() })
             .eq('id', appointmentId)
-            // Fix select statement syntax
-            .select('id, patient_id, provider_id, appointment_date, status, notes, created_at, updated_at') // Removed duration/type as they might not exist
+            // Select duration and type as well if they exist in the table
+            .select('id, patient_id, provider_id, appointment_date, status, notes, created_at, updated_at, duration, type') 
             .single();
 
         if (updateError) throw updateError;
         if (!updatedData) return { success: false, error: 'Failed to update or retrieve updated record.' };
 
-        // Basic transformation - adjust based on actual data and Appointment type
-        const finalUpdatedAppointment: Appointment = { // Use Partial to be safe
+        const finalUpdatedAppointment: Appointment = { 
             id: updatedData.id,
             patient_id: updatedData.patient_id,
             provider_id: updatedData.provider_id,
@@ -498,8 +508,12 @@ export async function updateAppointmentStatus_Supabase(
                     ? updatedData.status as Appointment['status']
                     : 'pending',
             notes: updatedData.notes ?? null,
+            // Add missing fields
+            duration: updatedData.duration ?? null, 
+            type: updatedData.type ?? null,
             created_at: updatedData.created_at,
             updated_at: updatedData.updated_at,
+            // Provider details not fetched here
          };
 
         revalidatePath('/dashboard/appointments');
@@ -525,32 +539,51 @@ export async function getProviderProfiles_Supabase(): Promise<Provider[]> { // R
     );
 
     try {
-        // This assumes RLS allows access. Select includes user details via foreign key relationship.
-        const { data, error } = await supabase.from('providers').select(`id, specialization, bio, user_id, users ( id, email, raw_user_meta_data )`);
+        const { data, error } = await supabase.from('providers').select(`
+            id, 
+            user_id, 
+            first_name, 
+            last_name, 
+            specialization, 
+            bio, 
+            experience_years, 
+            education, 
+            certifications, 
+            created_at, 
+            updated_at
+            // users ( id, email ) // Temporarily remove nested user select if it complicates typing/mapping
+        `);
 
-        if (error) { console.error('Error fetching provider profiles:', error); return []; }
+        if (error) { 
+            console.error('Error fetching provider profiles:', error);
+            return []; // Return empty array on error
+        }
 
-         // Basic transformation - adjust based on actual data and Provider type
-         const transformedProfiles: Provider[] = (data || []).map((profile: any): Provider | null => {
-             // Added check for profile.users existence
-             if (!profile || !profile.id || !profile.users) return null; 
-             const userMeta = profile.users.raw_user_meta_data || {};
-             return {
-                 id: profile.id,
-                 user_id: profile.user_id,
-                 first_name: userMeta.first_name ?? '',
-                 last_name: userMeta.last_name ?? '',
-                 specialization: profile.specialization ?? '',
-                 bio: profile.bio ?? null,
-                 // Add other fields from Provider type if available in query
-             };
-         }).filter((profile): profile is Provider => profile !== null);
+        const transformedProviders: Provider[] = (data || []).map((provider: any): Provider | null => {
+            if (!provider || !provider.id || !provider.user_id) { // Check essential fields
+                 console.warn("Skipping provider with missing essential fields:", provider);
+                 return null;
+            }
+            return {
+                id: provider.id,
+                user_id: provider.user_id,
+                first_name: provider.first_name ?? '', // Provide defaults for all fields
+                last_name: provider.last_name ?? '',
+                specialization: provider.specialization ?? null,
+                bio: provider.bio ?? null,
+                experience_years: provider.experience_years ?? null,
+                education: provider.education ?? null,
+                certifications: provider.certifications ?? null,
+                created_at: provider.created_at ?? new Date().toISOString(),
+                updated_at: provider.updated_at ?? new Date().toISOString(),
+            };
+        }).filter((provider): provider is Provider => provider !== null); // Type guard to filter out nulls
 
-        return transformedProfiles;
+        return transformedProviders;
 
     } catch (error: any) {
-        console.error('Error fetching provider profiles:', error?.message || error);
-        return [];
+        console.error('[Server Action] Error in getProviderProfiles (Supabase):', error?.message || error);
+        return []; // Return empty array on exception
     }
 }
 

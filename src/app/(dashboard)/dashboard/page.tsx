@@ -56,7 +56,7 @@ interface DashboardErrorState {
 export default function PatientDashboardPage() {
     const theme = useTheme();
     const router = useRouter();
-    const { user: authUser, isLoading: authLoading } = useAuth(); // Get user from context
+    const { user: authUser, isLoading: authLoading, profile, isProfileLoading } = useAuth(); 
     const [dashboardData, setDashboardData] = useState<{ currentPackage: DashboardPackageInfo | null, allPackages: DashboardPackageInfo[] } | null>(null);
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -64,69 +64,77 @@ export default function PatientDashboardPage() {
 
     // Fetch all necessary data
   useEffect(() => {
-        const loadDashboard = async () => {
-            if (!authUser || authLoading) {
-                 console.log("Dashboard Effect: Waiting for auth user...");
-                 return; // Wait for authentication
+        const isUserDataLoading = authLoading || isProfileLoading;
+
+        if (!isUserDataLoading) {
+            console.log("[Dashboard Page] authUser content:", JSON.stringify(authUser, null, 2));
+            console.log("[Dashboard Page] profile content:", JSON.stringify(profile, null, 2));
+        }
+
+        if (!isUserDataLoading && authUser && profile) { // Ensure profile is also loaded
+            // Directly use profile.benefit_status as AuthContext should now provide it
+            const finalBenefitStatus = profile?.benefit_status;
+            console.log(`[Dashboard Page] Checking benefit_status from profile: ${finalBenefitStatus}`);
+            
+            if (finalBenefitStatus === 'not_started') { 
+                console.log('[Dashboard Page] User benefit status is \'not_started\', redirecting to /step1.');
+                router.push('/step1');
+                return; 
             }
-             console.log("Dashboard Effect: Auth user loaded, starting data fetch...");
-             setIsLoading(true);
-             setError({ dashboardData: null, appointments: null }); // Reset errors
-             let dataError: string | null = null;
-             let apptError: string | null = null;
+            
+            const loadDashboard = async () => {
+                 console.log("Dashboard Effect: Auth user and profile loaded, starting data fetch...");
+                 setIsLoading(true);
+                 setError({ dashboardData: null, appointments: null }); // Reset errors
+                 let dataError: string | null = null;
+                 let apptError: string | null = null;
+    
+                try {
+                     console.log("Dashboard Effect: Calling getUserDashboardData...");
+                     const dataResult = await getUserDashboardData();
+                     if (dataResult.success && dataResult.data) {
+                         console.log("Dashboard Effect: getUserDashboardData SUCCESS");
+                         setDashboardData(dataResult.data);
+                     } else {
+                         console.error("Dashboard Effect: getUserDashboardData FAILED:", dataResult.message);
+                         dataError = dataResult.message || 'Failed to load benefit information.';
+                     }
+                    
+                     console.log("Dashboard Effect: Attempting to fetch appointments...");
+                     try {
+                         console.log(`Dashboard Effect: Calling getAppointmentsForUser with userId: ${authUser.id}, role: patient`);
+                         const fetchedAppointments = await getAppointmentsForUser(authUser.id, 'patient'); 
+                         console.log("Dashboard Effect: getAppointmentsForUser SUCCESS. Count:", fetchedAppointments.length);
+                         console.log("Dashboard Effect: Fetched Appointments Data:", fetchedAppointments); 
+                         setAppointments(fetchedAppointments);
+                     } catch (fetchApptError: any) {
+                         console.error("Dashboard Effect: getAppointmentsForUser FAILED:", fetchApptError?.message || fetchApptError);
+                         apptError = fetchApptError?.message || 'Failed to load appointments.';
+                         setAppointments([]); 
+                     }
+    
+                } catch (err) {
+                     console.error("Dashboard Effect: General catch block error:", err);
+                     if (!dataError) dataError = "An unexpected error occurred loading benefit data.";
+                     if (!apptError) apptError = "An unexpected error occurred loading appointments.";
+                 } finally {
+                     console.log("Dashboard Effect: Fetch completed. Setting final state.");
+                     setError({ dashboardData: dataError, appointments: apptError });
+                     setIsLoading(false);
+                }
+            };
+    
+            loadDashboard();
+        } else if (!isUserDataLoading && !authUser) {
+            console.log('[Dashboard Page] No authenticated user found after loading, redirecting to login.');
+            router.push('/login');
+        }
 
-            try {
-                 console.log("Dashboard Effect: Calling getUserDashboardData...");
-                 // Uncomment the original call
-                 
-                 const dataResult = await getUserDashboardData();
-                 if (dataResult.success && dataResult.data) {
-                     console.log("Dashboard Effect: getUserDashboardData SUCCESS");
-                     setDashboardData(dataResult.data);
-                 } else {
-                     console.error("Dashboard Effect: getUserDashboardData FAILED:", dataResult.message);
-                     dataError = dataResult.message || 'Failed to load benefit information.';
-                 }
-                 
-                 // console.log("Dashboard Effect: SKIPPED getUserDashboardData call."); // Remove skip log
-                 // setDashboardData(null); // Remove null setting
+    }, [authUser, authLoading, profile, isProfileLoading, router]); 
 
-                 console.log("Dashboard Effect: Attempting to fetch appointments...");
-                 // Fetch appointments - Corrected error handling
-                 try {
-                     console.log(`Dashboard Effect: Calling getAppointmentsForUser with userId: ${authUser.id}, role: patient`);
-                     // Adding 'patient' role as the likely missing second argument
-                     const fetchedAppointments = await getAppointmentsForUser(authUser.id, 'patient'); 
-                     // Assuming success if no error is thrown, directly set the array
-                     console.log("Dashboard Effect: getAppointmentsForUser SUCCESS. Count:", fetchedAppointments.length);
-                     console.log("Dashboard Effect: Fetched Appointments Data:", fetchedAppointments); // Log the actual data
-                     setAppointments(fetchedAppointments);
-                 } catch (fetchApptError: any) {
-                     // Catch errors specifically from getAppointmentsForUser
-                     console.error("Dashboard Effect: getAppointmentsForUser FAILED:", fetchApptError?.message || fetchApptError);
-                     apptError = fetchApptError?.message || 'Failed to load appointments.';
-                     setAppointments([]); // Clear appointments on error
-                 }
-
-            } catch (err) {
-                 console.error("Dashboard Effect: General catch block error:", err);
-                 // Set a general error if specific fetches didn't catch it
-                 if (!dataError) dataError = "An unexpected error occurred loading benefit data.";
-                 // apptError should be set by the inner try/catch if appointment fetch failed
-                 if (!apptError) apptError = "An unexpected error occurred loading appointments.";
-             } finally {
-                 console.log("Dashboard Effect: Fetch completed. Setting final state.");
-                 setError({ dashboardData: dataError, appointments: apptError });
-                 setIsLoading(false);
-            }
-        };
-
-        loadDashboard();
-
-    }, [authUser, authLoading]); // Rerun when auth state changes
-
-    // Loading State
-    if (isLoading || authLoading) {
+    // Loading State - Remove profile check for benefit status here if it's unreliable
+    // Show loading while auth is resolving or dashboard data is loading
+    if (authLoading || isLoading) {
     return (
             <Container maxWidth="lg">
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
