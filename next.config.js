@@ -2,7 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['example.supabase.co', 'gravatar.com', 'secure.gravatar.com'],
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [
       {
@@ -12,6 +11,18 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'lh3.googleusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'example.supabase.co',
+      },
+      {
+        protocol: 'https',
+        hostname: 'gravatar.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'secure.gravatar.com',
       },
     ],
   },

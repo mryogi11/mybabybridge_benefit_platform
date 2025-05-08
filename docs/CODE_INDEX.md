@@ -60,6 +60,32 @@ src/
 └── types/                  # TypeScript type definitions
 ```
 
+## Key Database Schema Definitions (`src/lib/db/schema.ts`)
+
+The database schema is defined in `src/lib/db/schema.ts` and managed using Drizzle ORM. Migrations are generated using `drizzle-kit` (e.g., `npm run drizzle:generate`) and applied (e.g., `npm run drizzle:push` for local dev, or manual SQL execution for staging/production). See `README.md` and `docs/SUPABASE_ROLE_INSTRUCTIONS.md` for more on the migration process and RLS/Policy considerations.
+
+Key tables include:
+
+*   **`users` (`public.users`)**
+    *   Stores core information for all user types (patients, providers, admins).
+    *   Key fields: `id` (uuid, PK), `email` (text, unique), `role` (enum: 'admin', 'provider', 'patient'), `first_name` (text), `last_name` (text), `theme_preference` (enum: 'light', 'dark', 'system'), `created_at`, `updated_at`.
+    *   Note: `first_name` and `last_name` were recently ensured to be part of the standard user record.
+    *   The `selected_package_id` field was previously used but has been removed; package associations are handled differently now.
+
+*   **`patient_profiles` (`public.patient_profiles`)**
+    *   Stores additional information specific to patients.
+    *   Key fields: `id` (uuid, PK), `user_id` (uuid, FK to `users.id`, **UNIQUE** constraint recently added), `date_of_birth`, `address`, etc.
+
+*   **`provider_profiles` (`public.provider_profiles`)**
+    *   Stores additional information specific to providers, such as specialization, bio, etc.
+    *   Key fields: `id` (uuid, PK), `user_id` (uuid, FK to `users.id`, UNIQUE), `specialization`, etc.
+
+*   **`appointments` (`public.appointments`)**
+    *   Manages appointment bookings between patients and providers.
+    *   Key fields: `id` (uuid, PK), `patient_id` (uuid, FK to `users.id`), `provider_id` (uuid, FK to `provider_profiles.id` or `users.id` - *confirm correct FK target*), `appointment_date` (timestamp), `duration_minutes` (integer), `status` (enum: 'scheduled', 'confirmed', 'cancelled', 'completed'), `type` (enum `appointment_type`: e.g., 'consultation', 'follow-up', recently changed from free text).
+
+*   **Other important tables** include `organizations`, `packages`, `notifications`, `provider_weekly_schedules`, `conversations`, `messages`, etc., each with their specific roles in the application.
+
 ## Core Components
 
 ### Authentication
@@ -206,7 +232,20 @@ For better user experience, the application uses optimistic updates for common o
 #### Admin Pages
 
 - **Admin Dashboard**: Administrative dashboard
-- **User Management**: Admin tools for managing users
+- **User Management**: Admin tools for managing users (reflects `users` table structure including first/last names).
+
+## Server Actions (`src/actions/*`)
+
+Server Actions are used for many backend operations, mutations, and data fetching, providing a secure way to interact with the database and other services from client components.
+
+*   **`userActions.ts`**
+    *   `createUserAction`: Handles the creation of new users (patients/providers) by an admin. Recently updated to ensure `first_name` and `last_name` are correctly saved to the `public.users` table during the upsert operation.
+    *   `updateUserThemePreference`: Updates the theme preference for a user.
+*   **`appointmentActions.ts`**
+    *   `bookAppointment`: Handles the booking of new appointments. Its parameters and internal logic now align with the `appointments.type` enum.
+    *   `getAppointmentsForUser`, `getAvailableDatesForProvider`, `getAvailableSlots`, `updateAppointmentStatus`, etc.
+*   **`messageActions.ts`**: Handles sending and fetching messages.
+*   **Other action files** exist for managing organizations, packages, payments, etc.
 
 ## Component Dependency Map
 

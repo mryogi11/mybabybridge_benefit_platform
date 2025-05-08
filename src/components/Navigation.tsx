@@ -36,6 +36,7 @@ import {
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePageLoading } from '@/contexts/LoadingContext';
 import Logo from './Logo';
 
 const pages = [
@@ -55,6 +56,7 @@ export default function Navigation() {
   const router = useRouter();
   const pathname = usePathname();
   const { user, signOut } = useAuth();
+  const { setIsLoadingPage } = usePageLoading();
   const theme = useTheme();
 
   // Prefetch all dashboard pages on component mount
@@ -98,6 +100,7 @@ export default function Navigation() {
     // Show navigation state immediately
     setNavigating(true);
     setCurrentNavPath(path);
+    setIsLoadingPage(true);
     
     // Close any open menus
     handleCloseNavMenu();

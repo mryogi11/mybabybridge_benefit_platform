@@ -13,6 +13,9 @@ import './globals.css'
 
 // Import the new ThemeRegistry
 import ThemeRegistry from '@/components/ThemeRegistry/ThemeRegistry';
+import { LoadingProvider } from '@/contexts/LoadingContext';
+import { PageChangeHandler } from '@/components/globals/PageChangeHandler';
+import React from 'react';
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -31,7 +34,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthProvider>
           {/* Then wrap with the ThemeRegistry */}
           <ThemeRegistry>
-            {children} 
+            <LoadingProvider>
+              <React.Suspense fallback={null}>
+                <PageChangeHandler />
+              </React.Suspense>
+              {children} 
+            </LoadingProvider>
           </ThemeRegistry>
         </AuthProvider>
       </body>

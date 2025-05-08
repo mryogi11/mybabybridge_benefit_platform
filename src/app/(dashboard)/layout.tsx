@@ -46,6 +46,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client'; // Keep for auth checks
+import { usePageLoading } from '@/contexts/LoadingContext'; // <-- ADD THIS IMPORT
 
 // Helper function to check if the loggedIn cookie exists
 const hasLoggedInCookie = () => {
@@ -80,10 +81,11 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading, signOut } = useAuth(); // Add signOut
+  const { user, isLoading, signOut, profile } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const theme = useTheme();
+  const { isLoadingPage } = usePageLoading(); // <-- ADD THIS LINE TO GET THE STATE
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [hasManuallyCheckedCookie, setHasManuallyCheckedCookie] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -430,16 +432,35 @@ export default function DashboardLayout({
         component="main"
         sx={{
           flexGrow: 1,
-          p: { xs: 2, sm: 3 }, // Responsive padding
+          p: { xs: 2, sm: 3 }, 
           width: { sm: `calc(100% - ${drawerWidth}px)` },
-          // backgroundColor: theme.palette.background.default, // Ensure background color
-          mt: { xs: '56px', sm: '64px' }, // Adjust top margin to account for AppBar height
-          overflowX: 'hidden', // Prevent horizontal scroll
+          mt: { xs: '56px', sm: '64px' }, 
+          position: 'relative', // <-- ENSURE THIS IS PRESENT OR ADD IT
+          backgroundColor: theme.palette.background.default, 
+          overflowX: 'hidden', 
         }}
       >
         {/* Remove the Toolbar spacer here as mt handles the space */}
         {/* <Toolbar /> */}
         {children}
+        {/* PAGE LOADER START */}
+        <Backdrop
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            color: (theme) => theme.palette.mode === 'dark' ? theme.palette.grey[300] : theme.palette.grey[700],
+            backgroundColor: (theme) => alpha(theme.palette.background.default, 0.3),
+            backdropFilter: 'blur(3px)',
+            zIndex: (theme) => theme.zIndex.drawer + 10, 
+          }}
+          open={isLoadingPage}
+        >
+          <CircularProgress color="inherit" />
+        </Backdrop>
+        {/* PAGE LOADER END */}
       </Box>
 
       {/* Logout Loading Overlay */} 

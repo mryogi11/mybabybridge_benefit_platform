@@ -132,7 +132,7 @@ The application uses Supabase for authentication with the following key componen
 
 ## Known Issues and Challenges
 
-1. **Database Schema Synchronization (Drizzle):** If manual SQL changes are made to the Supabase database without updating the Drizzle schema (`src/lib/db/schema.ts`), or vice-versa, `drizzle-kit generate` might produce incorrect migration scripts or report "No Changes". This was encountered during the messaging refactor, requiring manual SQL (`ALTER TABLE`) to add missing columns (`is_read`, `thread_id`) when `drizzle-kit generate` failed to detect the schema drift. `drizzle-kit push` should be used with extreme caution due to potential data loss if schemas have significantly diverged.
+1. **Database Schema Synchronization (Drizzle):** If manual SQL changes are made to the Supabase database without updating the Drizzle schema (`src/lib/db/schema.ts`), or vice-versa, `drizzle-kit generate` might produce incorrect migration scripts or report "No Changes". This was encountered during the messaging refactor, requiring manual SQL (`ALTER TABLE`) to add missing columns (`is_read`, `thread_id`) when `drizzle-kit generate` failed to detect the schema drift. `drizzle-kit push` should be used with extreme caution due to potential data loss if schemas have significantly diverged. Additionally, significant Drizzle migrations (like a baseline) might disable RLS or drop policies, requiring manual restoration (see RLS/Policy notes in Database Setup section).
 2. **Historical Migration Files (`supabase/migrations`):** The project contains historical migration files in `supabase/migrations/` from the previous Supabase CLI workflow. These are **no longer used** for applying schema changes but serve as a reference for the database's intended structure. The payment-related migrations in this directory may have non-standard filenames and were likely never applied correctly.
 3. **Authentication Redirect Issues**: Sometimes there can be issues with redirection after login. The code now includes fallback mechanisms.
 4. **API Routes with Cookies**: Some API routes use cookies which causes warnings during build about dynamic server usage.
@@ -158,9 +158,10 @@ The application uses Supabase for authentication with the following key componen
 
 1. Run development server: `npm run dev`
 2. Modify Drizzle schema (`src/lib/db/schema.ts`) if needed.
-3. Generate SQL migration: `npx drizzle-kit generate` (may require temporary `tsconfig.json` target change to `es2016`).
+3. Generate SQL migration: `npm run drizzle:generate` (or `npx drizzle-kit generate`; ensure consistency with project scripts. May require temporary `tsconfig.json` target change to `es2016`).
 4. Review generated SQL in `./drizzle/`.
-5. Apply SQL migration manually via Supabase SQL Editor.
+5. Apply SQL migration manually via Supabase SQL Editor (for local dev, `npm run drizzle:push` can be used for rapid iteration but be cautious if schema drift is suspected).
+   **Critical Note on RLS/Policies:** After applying migrations, especially significant ones or an initial baseline, **always verify Row Level Security (RLS) status and re-apply any dropped policies.** Refer to `docs/SUPABASE_ROLE_INSTRUCTIONS.md` for detailed guidance on restoring RLS and policies.
 6. Build the project: `npm run build`
 7. Start production server: `npm start`
 8. The project uses ESLint for code quality: `npm run lint`
@@ -171,19 +172,20 @@ The database schema is managed exclusively via **Drizzle ORM**. The previous wor
 
 *   **Schema Definition:** The source of truth for the database schema is `src/lib/db/schema.ts`. All table structures and relations are defined here using Drizzle's TypeScript syntax.
 *   **Drizzle Client:** The database client instance (`db`) is initialized in `src/lib/db/index.ts` and uses the `DATABASE_URL` environment variable.
-*   **Migration Generation:** Use `drizzle-kit` to compare the schema definition (`schema.ts`) with the database state (introspected via `DATABASE_URL`) and generate SQL migration files. Command: `npx drizzle-kit generate`.
+*   **Migration Generation:** Use `drizzle-kit` to compare the schema definition (`schema.ts`) with the database state (introspected via `DATABASE_URL`) and generate SQL migration files. Command: `npm run drizzle:generate` (or `npx drizzle-kit generate` if not scripted).
     *   *Troubleshooting:* If `drizzle-kit` fails with errors related to `const` or `es5` target, temporarily change `compilerOptions.target` in `tsconfig.json` to `es2016`, run the command, and immediately change it back to `es5`.
 *   **Migration Files:** Generated SQL files are stored in the `./drizzle` directory. They contain the SQL statements needed to synchronize the database schema with the `schema.ts` definition.
-*   **Migration Application:** Generated SQL migrations **must be applied manually**. Copy the SQL content from the relevant file in `./drizzle` and execute it using the Supabase Dashboard > SQL Editor against your database.
+*   **Migration Application:** Generated SQL migrations **must be applied manually** for staging/production. Copy the SQL content from the relevant file in `./drizzle` and execute it using the Supabase Dashboard > SQL Editor against your database. For local development, `npm run drizzle:push` can be used for faster iteration by applying schema changes directly.
+    *   **Important RLS/Policy Consideration:** After any significant migration, especially a baseline generated by Drizzle, RLS may be disabled, and policies dropped. It is **CRITICAL** to manually verify and restore RLS and security policies. Detailed instructions are in `docs/SUPABASE_ROLE_INSTRUCTIONS.MD`.
 *   **Configuration:** Drizzle Kit settings are in `drizzle.config.js`.
 *   **Historical Migrations:** The `supabase/migrations/` directory contains old migration files. **Do not run `npx supabase migration up` or similar commands.** These files only serve as historical context.
 
 **Key Tables (Defined in `src/lib/db/schema.ts`):**
 
-*   `users`: Mirrors essential user data from `auth.users`, including `id`, `email`, `role`, `selected_package_id`, and `theme_preference`.
+*   `users`: Mirrors essential user data from `auth.users`, including `id`, `email`, `role`, `first_name`, `last_name`, and `theme_preference`. (Note: `selected_package_id` was removed).
 *   `providers`: Provider-specific details.
-*   `patient_profiles`: Patient-specific profile details.
-*   `appointments`: Links providers and patients, stores appointment details.
+*   `patient_profiles`: Patient-specific profile details. `user_id` column has a UNIQUE constraint referencing `users.id`.
+*   `appointments`: Links providers and patients, stores appointment details. The `type` column is now an ENUM (`appointment_type`) for values like 'consultation', 'follow-up'.
 *   `provider_weekly_schedules`: Defines provider availability.
 *   `provider_time_blocks`: Defines specific unavailable times for providers.
 *   Other tables related to messages, documents, etc., are also defined in the schema file. (Note: Treatment-related tables may be deprecated/removed due to Benefit module replacing Treatment Plans).
@@ -351,7 +353,7 @@ Find this in your Supabase Dashboard > Project Settings > Database > Connection 
     ```bash
     npx drizzle-kit generate
     ```
-    *   **Troubleshooting:** If you encounter errors related to `const` or `es5` target during generation, you may need to temporarily edit `tsconfig.json`, change `compilerOptions.target` to `es2016`, run `npx drizzle-kit generate`, and then **immediately change the target back to `es5`** in `tsconfig.json`.
+    *   **Troubleshooting:** If you encounter errors related to `const` or `es5` target during generation, you may need to temporarily edit `tsconfig.json`, change `compilerOptions.target` to `es2016`, run the command, and immediately change it back to `es5`.
 3.  **Review Migration:** A new `.sql` file will be created in the `./drizzle` directory. Carefully review this file to ensure the generated SQL commands are correct and expected.
 4.  **Apply Migration:** 
     *   Go to your Supabase project dashboard.
@@ -384,26 +386,3 @@ Find this in your Supabase Dashboard > Project Settings > Database > Connection 
     *   **TypeScript Type Mismatches:** Numerous errors due to differences between database return types (e.g., `Date` objects, nullability) and frontend type definitions (`@/types/index.ts`). Required careful alignment.
     *   **UI State/Rendering Loops:** Issues with `useEffect` dependencies causing infinite re-renders (e.g., Supabase listener dependency, fetching threads after fetching messages). Resolved by adjusting dependencies and removing redundant fetch calls.
     *   **Auto-Scrolling:** Initial attempts using `scrollIntoView` and basic `setTimeout` were unreliable. Switched to setting `scrollTop = scrollHeight` on the scroll container ref within `fetchMessages` for robust auto-scrolling. 
-
-    ## Messaging Module Refactor Details (May 2025)
-
-*   **Goal:** Refactor Patient (`/dashboard/communication`) and Provider (`/provider/messages`) pages to use Server Actions instead of direct Supabase client calls for improved security, maintainability, and consistency.
-*   **Implementation:**
-    *   Created `src/actions/messageActions.ts` to house all messaging-related server actions.
-    *   Implemented actions: `getCommunicationContactsForPatient`, `getCommunicationContactsForProvider`, `getMessagesForThread`, `sendMessage`, `createMessageWithAttachment`, `markMessagesAsRead`, `getMessageUploadSignedUrl`.
-    *   Refactored `/dashboard/communication/page.tsx` to use `getCommunicationContactsForPatient` and other relevant actions.
-    *   Refactored `/provider/messages/page.tsx` to use `getCommunicationContactsForProvider` and other relevant actions.
-    *   Added logic for patients to initiate conversations with providers they have appointments with.
-    *   Updated Supabase RLS policies (implicitly, by moving logic to server actions running with user context or service role for specific tasks like signed URLs).
-    *   Implemented optimistic UI updates for sending messages.
-    *   Fixed layout issues causing full-page scrolling; implemented container-specific scrolling for message lists.
-    *   Added default conversation loading on page load.
-    *   Implemented auto-scrolling to the bottom of the message list when conversations load.
-*   **Challenges Encountered:**
-    *   **Database Schema Drift:** Significant discrepancies between `src/lib/db/schema.ts` (Drizzle schema) and the actual Supabase database state (missing `messages` and `message_attachments` tables initially, then missing `thread_id` and `is_read` columns). `drizzle-kit generate` failed to detect these changes reliably.
-    *   **Migration Failures:** Attempts to generate/apply migrations failed due to existing tables or `drizzle-kit` not detecting changes. Required manual SQL (`ALTER TABLE`) to add missing columns.
-    *   **`drizzle-kit push` Danger:** Attempting `drizzle-kit push` revealed it would drop numerous tables/columns due to the schema drift. Aborted to prevent data loss.
-    *   **Supabase SSR Cookie Handling:** Persistent issues with `@supabase/ssr` `createServerClient` and `cookies()` in Next.js 14/15 App Router/Server Actions. Required specific async/await patterns within the helper\'s cookie methods to satisfy both runtime needs and linter checks.
-    *   **TypeScript Type Mismatches:** Numerous errors due to differences between database return types (e.g., `Date` objects, nullability) and frontend type definitions (`@/types/index.ts`). Required careful alignment.
-    *   **UI State/Rendering Loops:** Issues with `useEffect` dependencies causing infinite re-renders (e.g., Supabase listener dependency, fetching threads after fetching messages). Resolved by adjusting dependencies and removing redundant fetch calls.
-    *   **Auto-Scrolling:** Initial attempts using `scrollIntoView` and basic `setTimeout` were unreliable. Switched to setting `scrollTop = scrollHeight` on the scroll container ref within `fetchMessages` for robust auto-scrolling.

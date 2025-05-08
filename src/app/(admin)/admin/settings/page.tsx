@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import {
   Box,
   Typography,
@@ -19,8 +19,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { updateUserThemePreference } from '@/actions/userActions';
 import type { ThemeModeSetting } from '@/components/ThemeRegistry/ClientThemeProviders';
 
-export default function AdminSettingsPage() {
-  const { profile, fetchAndSetProfile } = useAuth(); // Use profile from AuthContext
+function SettingsContent() {
+  const { profile, fetchAndSetProfile } = useAuth();
   const [mode, setMode] = useState<ThemeModeSetting>(profile?.theme_preference || 'system');
   const [isSaving, setIsSaving] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' } | null>(null);
@@ -40,7 +40,7 @@ export default function AdminSettingsPage() {
       if (result.success) {
         setSnackbar({ open: true, message: 'Theme preference updated!', severity: 'success' });
         if (fetchAndSetProfile) {
-          await fetchAndSetProfile(); // Refresh profile to reflect change immediately in context
+          await fetchAndSetProfile();
         }
       } else {
         setSnackbar({ open: true, message: result.message || 'Failed to update theme.', severity: 'error' });
@@ -89,9 +89,9 @@ export default function AdminSettingsPage() {
         </FormControl>
 
         <Box sx={{ mt: 2, display: 'flex', alignItems: 'center' }}>
-          <Button 
-            variant="contained" 
-            onClick={handleThemeChange} 
+          <Button
+            variant="contained"
+            onClick={() => handleThemeChange({ target: { value: mode }})}
             disabled={isSaving || mode === (profile?.theme_preference || 'system')}
           >
             {isSaving ? <CircularProgress size={24} /> : 'Save Theme'}
@@ -102,7 +102,7 @@ export default function AdminSettingsPage() {
               autoHideDuration={6000}
               onClose={() => setSnackbar(null)}
             >
-              <Alert onClose={() => setSnackbar(null)} severity={snackbar.severity}>
+              <Alert onClose={() => setSnackbar(null)} severity={snackbar.severity} sx={{ width: '100%' }}>
                 {snackbar.message}
               </Alert>
             </Snackbar>
@@ -111,5 +111,13 @@ export default function AdminSettingsPage() {
       </Paper>
       {/* Add more settings sections here if needed */}
     </Box>
+  );
+}
+
+export default function AdminSettingsPage() {
+  return (
+    <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}><CircularProgress /></Box>}>
+      <SettingsContent />
+    </Suspense>
   );
 } 
