@@ -10,15 +10,28 @@ interface LogoProps {
   width?: number;
   height?: number;
   disableLink?: boolean;
+  collapsed?: boolean;
 }
 
 const Logo = forwardRef<HTMLDivElement, LogoProps>(
-  ({ sx, width = 240, height = 60, disableLink = false }, ref) => {
-    // The new logo has a different aspect ratio
-    const aspectRatio = 3.2; // Adjusted for the new logo
-    
-    // Calculate height based on width to maintain aspect ratio
-    const calculatedHeight = Math.round(width / aspectRatio);
+  ({ sx, width: initialWidth = 240, height: initialHeight, disableLink = false, collapsed = false }, ref) => {
+    const aspectRatio = 3.2;
+    const collapsedWidth = 40;
+    const collapsedHeight = Math.round(collapsedWidth / aspectRatio);
+
+    let renderWidth: number;
+    let renderHeight: number;
+
+    if (collapsed) {
+      renderWidth = collapsedWidth;
+      renderHeight = collapsedHeight;
+    } else if (initialHeight) {
+      renderHeight = initialHeight;
+      renderWidth = Math.round(initialHeight * aspectRatio);
+    } else {
+      renderWidth = initialWidth;
+      renderHeight = Math.round(initialWidth / aspectRatio);
+    }
     
     const logo = (
       <Box 
@@ -32,8 +45,8 @@ const Logo = forwardRef<HTMLDivElement, LogoProps>(
         <Image
           src="/images/mybabybridge-logo-new.png"
           alt="MyBabyBridge Logo"
-          width={width}
-          height={calculatedHeight}
+          width={renderWidth}
+          height={renderHeight}
           priority
           style={{ 
             objectFit: 'contain',

@@ -21,6 +21,7 @@ import {
   Divider,
 } from '@mui/material';
 import { useTheme, alpha } from '@mui/material/styles';
+import { useMediaQuery } from '@mui/material';
 import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
@@ -29,19 +30,23 @@ import {
   Settings as SettingsIcon,
   Logout as LogoutIcon,
   AccountCircle,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
 } from '@mui/icons-material';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import BusinessIcon from '@mui/icons-material/Business';
+import Logo from '@/components/Logo';
 
 const drawerWidth = 240;
+const COLLAPSED_DRAWER_WIDTH = 88;
 
 const adminNavItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/admin' },
   { text: 'Users', icon: <PeopleIcon />, path: '/admin/users' },
   { text: 'Organizations', icon: <BusinessIcon />, path: '/admin/organizations' },
   { text: 'Packages', icon: <ShoppingCartIcon />, path: '/admin/packages' },
-  // { text: 'Settings', icon: <SettingsIcon />, path: '/admin/settings' }, // Temporarily hidden
+  { text: 'Settings', icon: <SettingsIcon />, path: '/admin/settings' },
 ];
 
 export default function AdminLayout({
@@ -52,12 +57,23 @@ export default function AdminLayout({
   const router = useRouter();
   const pathname = usePathname();
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isDesktop = useMediaQuery(theme.breakpoints.up('sm'));
   const { user, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [isDrawerCollapsed, setIsDrawerCollapsed] = useState(false);
+
+  const logoHeight = isMobile ? 46 : 48;
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
+  };
+
+  const handleCollapseToggle = () => {
+    if (isDesktop) { // Only allow collapse/expand on desktop
+      setIsDrawerCollapsed(!isDrawerCollapsed);
+    }
   };
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
@@ -78,13 +94,49 @@ export default function AdminLayout({
     }
   };
 
-  const drawer = (
-    <div>
-      <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }} />
-      <Divider />
-      <List sx={{ p: 1 }}>
+  const currentEffectiveDrawerWidth = isDesktop && isDrawerCollapsed ? COLLAPSED_DRAWER_WIDTH : drawerWidth;
+
+  const drawer = (isCollapsedMode: boolean) => (
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      <Toolbar
+        sx={{
+          minHeight: { xs: 56, sm: 64 },
+          backgroundColor: theme.palette.primary!.main,
+          color: theme.palette.primary!.contrastText,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          px: isCollapsedMode && isDesktop ? 0 : 1,
+          transition: theme.transitions.create(['padding', 'justify-content'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
+        }}
+      >
+        <Link href="/admin" passHref>
+          <Logo height={logoHeight} collapsed={isCollapsedMode && isDesktop} />
+        </Link>
+      </Toolbar>
+      <List sx={{
+        p: isCollapsedMode && isDesktop ? 0.5 : 1,
+        flexGrow: 1,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        transition: theme.transitions.create('padding', {
+          easing: theme.transitions.easing.sharp,
+          duration: theme.transitions.duration.enteringScreen,
+        }),
+         '& .MuiListItemIcon-root': {
+            minWidth: 'auto',
+            justifyContent: 'center',
+          },
+      }}>
         {adminNavItems.map((item) => (
-          <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
+          <ListItem key={item.text} disablePadding sx={{
+            mb: 0.5,
+            display: 'flex',
+            justifyContent: isCollapsedMode && isDesktop ? 'center' : 'initial'
+          }}>
             <ListItemButton
               component={Link}
               href={item.path}
@@ -92,8 +144,13 @@ export default function AdminLayout({
               sx={{
                 borderRadius: theme.shape.borderRadius,
                 py: 1,
-                px: 1.5,
+                px: 1.5, // Keep consistent padding for items
                 color: theme.palette.text.secondary,
+                justifyContent: isCollapsedMode && isDesktop ? 'center' : 'flex-start',
+                transition: theme.transitions.create(['padding', 'justify-content'], {
+                    easing: theme.transitions.easing.sharp,
+                    duration: theme.transitions.duration.enteringScreen,
+                }),
                 '&:hover': {
                   backgroundColor: alpha(theme.palette.primary.main, 0.08),
                 },
@@ -112,24 +169,42 @@ export default function AdminLayout({
                   },
                 },
                 '& .MuiListItemIcon-root': {
-                  color: theme.palette.text.secondary,
-                  minWidth: 'auto',
-                  marginRight: theme.spacing(1.5),
+                  marginRight: isCollapsedMode && isDesktop ? 0 : theme.spacing(1.5),
                 },
                 '& .MuiListItemText-primary': {
                   fontSize: '0.875rem',
+                  whiteSpace: 'nowrap',
                 },
               }}
             >
               <ListItemIcon>
                 {item.icon}
               </ListItemIcon>
-              <ListItemText primary={item.text} />
+              {!(isCollapsedMode && isDesktop) && <ListItemText primary={item.text} />}
             </ListItemButton>
           </ListItem>
         ))}
       </List>
-    </div>
+      {isDesktop && (
+        <Box
+          sx={{
+            p: isDrawerCollapsed ? 1 : 2, // Use isDrawerCollapsed for the button container directly
+            mt: 'auto',
+            display: 'flex',
+            justifyContent: isDrawerCollapsed ? 'center' : 'flex-end',
+            borderTop: `1px dashed ${theme.palette.divider}`,
+            transition: theme.transitions.create(['padding', 'justify-content'], {
+                easing: theme.transitions.easing.sharp,
+                duration: theme.transitions.duration.enteringScreen,
+            }),
+          }}
+        >
+          <IconButton onClick={handleCollapseToggle} size="small">
+            {isDrawerCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+          </IconButton>
+        </Box>
+      )}
+    </Box>
   );
 
   return (
@@ -137,9 +212,15 @@ export default function AdminLayout({
       <CssBaseline />
       <AppBar
         position="fixed"
+        elevation={0}
         sx={{
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          ml: { sm: `${drawerWidth}px` },
+          width: { sm: `calc(100% - ${currentEffectiveDrawerWidth}px)` },
+          ml: { sm: `${currentEffectiveDrawerWidth}px` },
+          borderBottom: `1px solid ${alpha(theme.palette.primary.contrastText || '#fff', 0.12)}`,
+          transition: theme.transitions.create(['width', 'margin'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
         }}
       >
         <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }}>
@@ -190,7 +271,12 @@ export default function AdminLayout({
       </AppBar>
       <Box
         component="nav"
-        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+        sx={{ width: { sm: currentEffectiveDrawerWidth }, flexShrink: { sm: 0 },
+              transition: theme.transitions.create('width', {
+                easing: theme.transitions.easing.sharp,
+                duration: theme.transitions.duration.enteringScreen,
+              }),
+        }}
       >
         <Drawer
           variant="temporary"
@@ -201,20 +287,35 @@ export default function AdminLayout({
           }}
           sx={{
             display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': {
+                boxSizing: 'border-box',
+                width: drawerWidth,
+                transition: theme.transitions.create('width', {
+                    easing: theme.transitions.easing.sharp,
+                    duration: theme.transitions.duration.enteringScreen,
+                }),
+            },
           }}
         >
-          {drawer}
+          {drawer(false)}
         </Drawer>
         <Drawer
           variant="permanent"
           sx={{
             display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': {
+                boxSizing: 'border-box',
+                width: currentEffectiveDrawerWidth,
+                overflowX: 'hidden',
+                transition: theme.transitions.create('width', {
+                    easing: theme.transitions.easing.sharp,
+                    duration: theme.transitions.duration.enteringScreen,
+                }),
+            },
           }}
           open
         >
-          {drawer}
+          {drawer(isDrawerCollapsed)}
         </Drawer>
       </Box>
       <Box
@@ -222,9 +323,13 @@ export default function AdminLayout({
         sx={{
           flexGrow: 1,
           p: 3,
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          width: { sm: `calc(100% - ${currentEffectiveDrawerWidth}px)` },
           backgroundColor: theme.palette.background.default,
           minHeight: '100vh',
+          transition: theme.transitions.create(['margin', 'width'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
         }}
       >
         <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }} />
@@ -232,4 +337,4 @@ export default function AdminLayout({
       </Box>
     </Box>
   );
-} 
+}

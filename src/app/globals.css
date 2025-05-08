@@ -1,18 +1,72 @@
+/* Basic Theme Variables - Apply BEFORE Tailwind base/components */
+:root {
+  /* Default to dark theme variables */
+  --background-default: #161C24;
+  --background-paper: #212B36;
+  --text-primary: #FFFFFF;
+  --text-secondary: #919EAB;
+}
+
+html[data-theme='light'] {
+  --background-default: #F9FAFB;
+  --background-paper: #FFFFFF;
+  --text-primary: #212B36;
+  --text-secondary: #637381;
+}
+
+html[data-theme='dark'] {
+  --background-default: #161C24;
+  --background-paper: #212B36;
+  --text-primary: #FFFFFF;
+  --text-secondary: #919EAB;
+}
+
+html[data-theme='ocean'] {
+  --background-default: #E1F5FE; /* Light blue background */
+  --background-paper: #FFFFFF;
+  --text-primary: #01579B;    /* Dark blue text */
+  --text-secondary: #0277BD;
+}
+
+html[data-theme='mint'] {
+  --background-default: #E8F5E9; /* Light green background */
+  --background-paper: #FFFFFF;
+  --text-primary: #1B5E20;    /* Dark green text */
+  --text-secondary: #388E3C;
+}
+
+html[data-theme='rose'] {
+  --background-default: #FCE4EC; /* Light pink background */
+  --background-paper: #FFFFFF;
+  --text-primary: #880E4F;    /* Dark pink text */
+  --text-secondary: #C2185B;
+}
+
+html[data-theme='charcoal'] {
+  --background-default: #263238; /* Dark grey background */
+  --background-paper: #37474F;
+  --text-primary: #ECEFF1;    /* Light grey text */
+  --text-secondary: #B0BEC5;
+}
+
+html[data-theme='sunset'] {
+  --background-default: #3E2723; /* Dark brown background */
+  --background-paper: #4E342E;
+  --text-primary: #FFCCBC;    /* Light peach text */
+  --text-secondary: #FFAB91;
+}
+
+/* Apply variables to body */
+body {
+  background-color: var(--background-default) !important;
+  color: var(--text-primary) !important;
+  min-height: 100vh;
+}
+
+/* Tailwind base/components/utilities should come AFTER these variables */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-}
-
-body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-end-rgb));
-  min-height: 100vh;
-}
 
 /* Smooth scrolling behavior */
 html {

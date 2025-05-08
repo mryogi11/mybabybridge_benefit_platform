@@ -1,7 +1,7 @@
 'use client';
 import { createBrowserClient } from '@supabase/ssr';
 import type { Database } from '@/types/supabase'; // If you use generated types
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   List,
@@ -13,8 +13,10 @@ import {
   CircularProgress,
   Badge,
   useTheme,
+  useMediaQuery,
   alpha,
   Divider,
+  IconButton,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -25,6 +27,8 @@ import {
   Settings as SettingsIcon,
   ExpandLess,
   ExpandMore,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
 } from '@mui/icons-material';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
@@ -54,9 +58,10 @@ interface NavItemProps {
   onNavigate: (path: string) => void;
   isNavigating: boolean;
   currentNavPath: string | null;
+  isCollapsed: boolean;
 }
 
-function NavItem({ item, onNavigate, isNavigating, currentNavPath }: NavItemProps) {
+function NavItem({ item, onNavigate, isNavigating, currentNavPath, isCollapsed }: NavItemProps) {
   const pathname = usePathname();
   const isActive = pathname === item.path;
   const isCurrentNavTarget = isNavigating && currentNavPath === item.path;
@@ -71,10 +76,13 @@ function NavItem({ item, onNavigate, isNavigating, currentNavPath }: NavItemProp
       selected={isActive} // Let theme handle selected styles
       onClick={handleClick} 
       disabled={isCurrentNavTarget}
-      // No sx needed here if base padding matches
+      sx={{ 
+        pl: isCollapsed ? 1.5 : 2.5,
+        justifyContent: isCollapsed ? 'center' : 'flex-start',
+        transition: 'padding 0.3s ease-in-out',
+      }}
     >
-      {/* Rely on ListItemIcon override for base styling */}
-      <ListItemIcon> 
+      <ListItemIcon sx={{ minWidth: isCollapsed? 'auto' : 40, justifyContent: 'center' }}> 
         {isCurrentNavTarget ? (
           <CircularProgress size={20} color="inherit" />
         ) : item.badge ? (
@@ -85,18 +93,27 @@ function NavItem({ item, onNavigate, isNavigating, currentNavPath }: NavItemProp
           item.icon
         )}
       </ListItemIcon>
-       {/* Rely on theme override for text style */}
-      <ListItemText
-        primary={item.title}
-        primaryTypographyProps={{ variant: 'body2', fontWeight: 'inherit' }}
-      />
+      {!isCollapsed && (
+        <ListItemText
+          primary={item.title}
+          primaryTypographyProps={{ variant: 'body2', fontWeight: 'inherit', whiteSpace: 'nowrap' }}
+        />
+      )}
     </ListItemButton>
   );
 }
 
+interface ProviderSideDrawerContentProps {
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+}
+
 // Main ProviderSideDrawerContent component
-export default function ProviderSideDrawerContent() {
+export default function ProviderSideDrawerContent({ isCollapsed, onToggleCollapse }: ProviderSideDrawerContentProps) {
   const router = useRouter();
+  const theme = useTheme(); // Get the theme object
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // Check for mobile breakpoint
+  const logoBoxRef = useRef<HTMLDivElement>(null); // Ref for the Logo Box
   const [isNavigating, setIsNavigating] = useState(false);
   const [currentNavPath, setCurrentNavPath] = useState<string | null>(null);
        // Use createBrowserClient from @supabase/ssr
@@ -125,6 +142,16 @@ export default function ProviderSideDrawerContent() {
     });
   }, [router]);
 
+  // New effect specifically for logging the Logo Box height
+  useEffect(() => {
+    if (logoBoxRef.current) {
+      console.log('[ProviderSideDrawerContent] Logo Box ClientHeight:', logoBoxRef.current.clientHeight);
+      console.log('[ProviderSideDrawerContent] Logo Box OffsetHeight:', logoBoxRef.current.offsetHeight);
+    }
+  }, []); // Empty dependency array: runs once after initial mount
+
+  const logoHeight = isMobile ? 46 : 48; // Calculate responsive logo height
+
   const handleNavigation = (path: string) => {
     setIsNavigating(true);
     setCurrentNavPath(path);
@@ -138,16 +165,41 @@ export default function ProviderSideDrawerContent() {
 
   return (
     // Overall structure matching admin's SideDrawerContent
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Logo Section */}
-      <Box sx={{ px: 2.5, py: 3 }}>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Logo Section - Styled like a Toolbar top */}
+      <Box 
+        ref={logoBoxRef} // Added ref
+        sx={{
+          height: { xs: 56, sm: 64 }, // Use explicit height instead of minHeight
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: isCollapsed ? 'center' : 'flex-start', 
+          px: isCollapsed ? 0 : 2.5, 
+          py: 0, 
+          backgroundColor: theme.palette.primary.main,
+          color: theme.palette.primary.contrastText, 
+          boxSizing: 'border-box',
+          overflow: 'hidden', // Add overflow:hidden to clip potential overflow
+          transition: 'padding 0.3s ease-in-out, justify-content 0.3s ease-in-out',
+        }}
+      >
         <Link href="/provider/dashboard" passHref>
-          <Logo />
+          {isCollapsed ? <Logo height={logoHeight} collapsed /> : <Logo height={logoHeight} />}
         </Link>
       </Box>
 
       {/* Navigation List */}
-      <List component="nav" sx={{ flexGrow: 1, px: 2 }}>
+      <List component="nav" sx={{ 
+          flexGrow: 1, 
+          px: isCollapsed ? 0.5 : 2,
+          overflowY: 'auto', 
+          overflowX: 'hidden',
+          transition: 'padding 0.3s ease-in-out',
+          '& .MuiListItemIcon-root': {
+            minWidth: 'auto',
+            justifyContent: 'center',
+          },
+        }}>
         {providerMenuItems.map((item) => (
           <NavItem
             key={item.title}
@@ -155,41 +207,60 @@ export default function ProviderSideDrawerContent() {
             onNavigate={handleNavigation}
             isNavigating={isNavigating}
             currentNavPath={currentNavPath}
+            isCollapsed={isCollapsed}
            />
         ))}
       </List>
 
       <Divider />
 
-      <List component="nav">
+      <List component="nav" sx={{ 
+          px: isCollapsed ? 0.5 : 2,
+          transition: 'padding 0.3s ease-in-out',
+          '& .MuiListItemIcon-root': {
+            minWidth: 'auto',
+            justifyContent: 'center',
+          },
+        }}>
         {/* Settings Link */}
-        <ListItemButton component={Link} href="/provider/settings">
-          <ListItemIcon>
+        <ListItemButton component={Link} href="/provider/settings" sx={{ pl: isCollapsed ? 1.5 : 2.5, justifyContent: isCollapsed ? 'center' : 'flex-start' }}>
+          <ListItemIcon sx={{ minWidth: isCollapsed? 'auto' : 40, justifyContent: 'center' }}>
             <SettingsIcon />
           </ListItemIcon>
-          <ListItemText primary="Settings" />
+          {!isCollapsed && <ListItemText primary="Settings" primaryTypographyProps={{ whiteSpace: 'nowrap' }} />}
         </ListItemButton>
 
         {/* Availability Link */}
-        <ListItemButton component={Link} href="/provider/availability">
-          <ListItemIcon>
+        <ListItemButton component={Link} href="/provider/availability" sx={{ pl: isCollapsed ? 1.5 : 2.5, justifyContent: isCollapsed ? 'center' : 'flex-start' }}>
+          <ListItemIcon sx={{ minWidth: isCollapsed? 'auto' : 40, justifyContent: 'center' }}>
             <EventAvailableIcon />
           </ListItemIcon>
-          <ListItemText primary="Manage Availability" />
+          {!isCollapsed && <ListItemText primary="Manage Availability" primaryTypographyProps={{ whiteSpace: 'nowrap' }} />}
         </ListItemButton>
 
         {/* Logout Button */}
-        <ListItemButton onClick={handleLogout}>
-          <ListItemIcon>
+        <ListItemButton onClick={handleLogout} sx={{ pl: isCollapsed ? 1.5 : 2.5, justifyContent: isCollapsed ? 'center' : 'flex-start' }}>
+          <ListItemIcon sx={{ minWidth: isCollapsed? 'auto' : 40, justifyContent: 'center' }}>
             <ExitToAppIcon />
           </ListItemIcon>
-          <ListItemText primary="Logout" />
+          {!isCollapsed && <ListItemText primary="Logout" primaryTypographyProps={{ whiteSpace: 'nowrap' }}/>}
         </ListItemButton>
       </List>
 
-      {/* Optional: Footer Section (matching admin drawer if needed) */}
-      <Box sx={{ px: 2, py: 2, mt: 'auto' }}>
-        {/* Example placeholder */}
+      {/* Collapse Toggle Button */}
+      <Box 
+        sx={{ 
+          p: isCollapsed ? 1 : 2, 
+          mt: 'auto', 
+          display: 'flex', 
+          justifyContent: isCollapsed ? 'center' : 'flex-end',
+          borderTop: `1px dashed ${theme.palette.divider}`,
+          transition: 'padding 0.3s ease-in-out, justify-content 0.3s ease-in-out',
+        }}
+      >
+        <IconButton onClick={onToggleCollapse} size="small">
+          {isCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+        </IconButton>
       </Box>
     </Box>
   );

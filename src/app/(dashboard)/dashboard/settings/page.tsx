@@ -18,7 +18,10 @@ import {
   InputAdornment,
   IconButton,
   Divider,
-  Grid
+  Grid,
+  Select,
+  MenuItem,
+  FormControl
 } from '@mui/material';
 import { 
   Notifications, 
@@ -301,21 +304,23 @@ export default function SettingsPage() {
           </Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
-              <TextField
-                select
-                label="Theme"
-                value={localThemeSetting}
-                onChange={handleThemeChange}
-                fullWidth
-                margin="normal"
-                SelectProps={{
-                  native: true,
-                }}
-              >
-                <option value="system">System Default</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-              </TextField>
+              <FormControl fullWidth>
+                <Select
+                  value={localThemeSetting}
+                  onChange={handleThemeChange}
+                  displayEmpty
+                  inputProps={{ 'aria-label': 'Without label' }}
+                >
+                  <MenuItem value="system">System Default</MenuItem>
+                  <MenuItem value="light">Light</MenuItem>
+                  <MenuItem value="dark">Dark</MenuItem>
+                  <MenuItem value="ocean">Ocean</MenuItem>
+                  <MenuItem value="mint">Mint</MenuItem>
+                  <MenuItem value="rose">Rose</MenuItem>
+                  <MenuItem value="charcoal">Charcoal</MenuItem>
+                  <MenuItem value="sunset">Sunset</MenuItem>
+                </Select>
+              </FormControl>
             </Grid>
           </Grid>
         </TabPanel>

@@ -153,7 +153,7 @@ After significant migrations (especially an initial Drizzle baseline), Row Level
 *   **Admin - User Activity Logs / Metrics**: *Implementation status needs verification.* PRD requires viewing logs and a metrics dashboard. Partially covered by basic Admin Analytics, but full PRD requirements pending.
 *   **Provider - Profile Management**: *Implementation status needs verification.* PRD requires UI for managing professional details, visibility. Implemented at `/provider/profile` allowing providers to manage details like specialization, bio, education, certifications.
 *   **Notifications**: *Implementation status needs verification.* `notifications` table exists, but triggers and dedicated UI likely needed.
-*   **Dynamic Theme Switching**: Users can select between Light, Dark, and System themes via the Settings page. Preference is saved to the user's profile (`theme_preference` column in `users` table).
+*   **Dynamic Theme Switching**: Users can select between Light, Dark, System, Ocean, Mint, Rose, Charcoal, and Sunset themes via their respective Settings page (e.g., Patient Dashboard Settings, Provider Settings, Admin Settings). Preference is saved to the user's profile (`theme_preference` column in `users` table).
 
 *(Note: See 'Recent Updates & Fixes (Appointments)' section below for details on recent appointment module work)*
 

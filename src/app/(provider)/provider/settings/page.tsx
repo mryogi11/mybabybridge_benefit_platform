@@ -68,11 +68,15 @@ export default function ProviderSettingsPage() {
             label="Theme"
             onChange={handleThemeChange as any}
           >
-            {themeModeEnum.enumValues.map((themeValue) => (
-              <MenuItem key={themeValue} value={themeValue}>
-                {themeValue.charAt(0).toUpperCase() + themeValue.slice(1)}
-              </MenuItem>
-            ))}
+            <MenuItem value="light">Light</MenuItem>
+            <MenuItem value="dark">Dark</MenuItem>
+            <MenuItem value="system">System Default</MenuItem>
+            {/* Add New Themes */}
+            <MenuItem value="ocean">Ocean</MenuItem>
+            <MenuItem value="mint">Mint</MenuItem>
+            <MenuItem value="rose">Rose</MenuItem>
+            <MenuItem value="charcoal">Charcoal</MenuItem>
+            <MenuItem value="sunset">Sunset</MenuItem>
           </Select>
         </FormControl>
         {isSavingTheme && <CircularProgress size={24} sx={{ ml: 2 }} />}

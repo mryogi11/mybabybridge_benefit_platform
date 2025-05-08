@@ -195,11 +195,11 @@ For better user experience, the application uses optimistic updates for common o
 
 ### Theme Management
 
-1. **Theme Context:** `ClientThemeProviders` uses React Context to manage the current theme mode (`light`, `dark`, `system`).
-2. **Persistence:** The user's preferred theme is stored in the `users` table (`theme_preference` column) and loaded via `AuthContext`. Changes are saved using the `updateThemePreference` server action.
-3. **Default:** Defaults to `dark` mode if no preference is set or for logged-out users.
+1. **Theme Context:** `ClientThemeProviders` (in `src/components/ThemeRegistry/ClientThemeProviders.tsx`) uses React Context to manage the current theme mode. Available modes include: `light`, `dark`, `system`, `ocean`, `mint`, `rose`, `charcoal`, and `sunset`.
+2. **Persistence:** The user's preferred theme is stored in the `users` table (`theme_preference` column, which is a `theme_mode` enum defined in `src/lib/db/schema.ts`) and loaded via `AuthContext`. Changes are saved using the `updateUserThemePreference` server action (in `src/actions/userActions.ts`).
+3. **Default:** Defaults to `dark` mode if no preference is set or for logged-out users (see `setInitialThemeScript` in `src/app/layout.tsx` and initial state in `ClientThemeProviders.tsx`).
 4. **System Preference:** Uses `useMediaQuery` to detect OS preference when 'system' mode is selected.
-5. **UI:** `ThemeRegistry` applies the theme using MUI's `ThemeProvider`. Settings page allows user selection.
+5. **UI:** `ThemeRegistry` applies the theme using MUI's `ThemeProvider`. Settings pages for Patients (`src/app/(dashboard)/dashboard/settings/page.tsx`), Providers (`src/app/(provider)/provider/settings/page.tsx`), and Admins (`src/app/(admin)/admin/settings/page.tsx`) allow user selection from the available themes.
 
 ## Pages and Routes
 

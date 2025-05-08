@@ -13,6 +13,7 @@ import {
   Badge,
   useTheme,
   alpha,
+  IconButton,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -22,6 +23,8 @@ import {
   Message as MessageIcon,
   ExpandLess,
   ExpandMore,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
   // Import icons for potential sub-menus if needed
   // Settings as SettingsIcon, 
   // AccountCircle as AccountCircleIcon,
@@ -65,9 +68,10 @@ interface NavItemProps {
   onNavigate: (path: string) => void;
   isNavigating: boolean;
   currentNavPath: string | null;
+  isCollapsed: boolean;
 }
 
-function NavItem({ item, depth = 0, onNavigate, isNavigating, currentNavPath }: NavItemProps) {
+function NavItem({ item, depth = 0, onNavigate, isNavigating, currentNavPath, isCollapsed }: NavItemProps) {
   const pathname = usePathname();
   const isActive = item.path && pathname === item.path;
   const isChildActive = item.children?.some((child: MenuItemType) => child.path && pathname === child.path);
@@ -96,12 +100,12 @@ function NavItem({ item, depth = 0, onNavigate, isNavigating, currentNavPath }: 
         onClick={handleClick} 
         disabled={isCurrentNavTarget}
         sx={{ 
-          // Keep only dynamic padding based on depth
-          pl: 2.5 + depth * 1.5, 
+          pl: isCollapsed ? 1.5 : (2.5 + depth * 1.5), // Adjust padding when collapsed
+          justifyContent: isCollapsed ? 'center' : 'flex-start', // Center icon when collapsed
+          transition: 'padding 0.3s ease-in-out', // Smooth transition for padding
         }}
       >
-        {/* Rely on ListItemIcon override for base styling */}
-        <ListItemIcon> 
+        <ListItemIcon sx={{ minWidth: isCollapsed? 'auto' : 40, justifyContent: 'center' }}>  // Center icon
           {isCurrentNavTarget ? (
             <CircularProgress size={20} color="inherit" />
           ) : item.badge ? (
@@ -112,15 +116,16 @@ function NavItem({ item, depth = 0, onNavigate, isNavigating, currentNavPath }: 
             item.icon
           )}
         </ListItemIcon>
-        {/* Rely on theme override for text style */}
-        <ListItemText
-          primary={item.title}
-          primaryTypographyProps={{ variant: 'body2', fontWeight: 'inherit' }} 
-        />
-        {item.children && item.children.length > 0 && (open ? <ExpandLess /> : <ExpandMore />)}
+        {!isCollapsed && ( // Conditionally render ListItemText
+          <ListItemText
+            primary={item.title}
+            primaryTypographyProps={{ variant: 'body2', fontWeight: 'inherit', whiteSpace: 'nowrap' }} 
+          />
+        )}
+        {!isCollapsed && item.children && item.children.length > 0 && (open ? <ExpandLess /> : <ExpandMore />)}
       </ListItemButton>
 
-      {item.children && item.children.length > 0 && (
+      {!isCollapsed && item.children && item.children.length > 0 && (
         <Collapse in={open} timeout="auto" unmountOnExit>
           <List component="div" disablePadding>
             {item.children.map((child: MenuItemType) => (
@@ -131,6 +136,7 @@ function NavItem({ item, depth = 0, onNavigate, isNavigating, currentNavPath }: 
                 onNavigate={onNavigate}
                 isNavigating={isNavigating}
                 currentNavPath={currentNavPath}
+                isCollapsed={isCollapsed} // Pass down isCollapsed
               />
             ))}
           </List>
@@ -140,8 +146,12 @@ function NavItem({ item, depth = 0, onNavigate, isNavigating, currentNavPath }: 
   );
 }
 
+interface SideDrawerContentProps {
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+}
 
-export default function SideDrawerContent() {
+export default function SideDrawerContent({ isCollapsed, onToggleCollapse }: SideDrawerContentProps) {
   const router = useRouter();
   const [isNavigating, setIsNavigating] = useState(false);
   const [currentNavPath, setCurrentNavPath] = useState<string | null>(null);
@@ -173,17 +183,38 @@ export default function SideDrawerContent() {
       }, 500);
   };
 
+  const theme = useTheme(); // Get theme for styling the toggle button
+
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' /* Prevent scrollbars during transition */ }}>
       {/* Logo Section */}
-      <Box sx={{ px: 2.5, py: 3 }}>
+      <Box sx={{ 
+          px: isCollapsed ? 0 : 2.5, 
+          py: 3, 
+          display: 'flex', 
+          justifyContent: isCollapsed ? 'center' : 'flex-start',
+          alignItems: 'center', // Vertically center logo if needed
+          transition: 'padding 0.3s ease-in-out, justify-content 0.3s ease-in-out',
+          height: 64, // Fixed height for logo area
+          boxSizing: 'border-box',
+        }}>
         <Link href="/dashboard" passHref>
-          <Logo />
+          {isCollapsed ? <Logo height={30} collapsed /> : <Logo />} 
         </Link>
       </Box>
 
       {/* Navigation List */}
-      <List component="nav" sx={{ flexGrow: 1, px: 2 }}>
+      <List component="nav" sx={{ 
+          flexGrow: 1, 
+          px: isCollapsed ? 0.5 : 2,  // Adjust padding when collapsed
+          overflowY: 'auto', 
+          overflowX: 'hidden',
+          transition: 'padding 0.3s ease-in-out',
+           '& .MuiListItemIcon-root': { // Ensure icons are centered when collapsed
+            minWidth: 'auto',
+            justifyContent: 'center',
+          },
+        }}>
         {menuItems.map((item) => (
           <NavItem
             key={item.title}
@@ -191,16 +222,25 @@ export default function SideDrawerContent() {
             onNavigate={handleNavigation}
             isNavigating={isNavigating}
             currentNavPath={currentNavPath}
+            isCollapsed={isCollapsed} // Pass isCollapsed
            />
         ))}
       </List>
 
-      {/* Optional: Footer or User Info Section in Drawer */}
-      <Box sx={{ px: 2, py: 2, mt: 'auto' }}>
-        {/* Example: Footer Content */}
-        {/* <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-          MyBabyBridge © 2024
-        </Typography> */}
+      {/* Collapse Toggle Button */}
+      <Box 
+        sx={{ 
+          p: isCollapsed ? 1 : 2, 
+          mt: 'auto', 
+          display: 'flex', 
+          justifyContent: isCollapsed ? 'center' : 'flex-end',
+          borderTop: `1px dashed ${theme.palette.divider}`,
+          transition: 'padding 0.3s ease-in-out, justify-content 0.3s ease-in-out',
+        }}
+      >
+        <IconButton onClick={onToggleCollapse} size="small">
+          {isCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+        </IconButton>
       </Box>
     </Box>
   );

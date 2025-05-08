@@ -47,6 +47,7 @@
 - Heading: "Which organization sponsors your fertility benefit?"
 - Subheading: "This may be your employer or health insurance company"
 - Search field with organization name autocomplete
+- The selected organization's ID is stored using the `setSponsoringOrganization` function from the `BenefitVerificationContext`.
 - "I'm not sure" text link below the search field
 - Same progress indicator updated to show current step
 
@@ -58,6 +59,8 @@
   - Last name
   - Date of birth (with dropdown for month, text fields for day and year)
   - Phone number with country code selection
+  - Address fields (line 1, city, state, zip, country)
+- Address details collected here are saved to the `users` table. For users on the non-employer path, this is handled by the `updateBasicProfile` action in `src/actions/benefitActions.ts`. For users on the employer path, address details (if collected for verification) are handled by the `submitVerificationInfo` action.
 - "Next" button in brand color
 - Progress indicator updated
 
@@ -90,8 +93,10 @@
 - Summary of selected package
 - Details of employer coverage vs. personal upgrade (if applicable)
 - Payment details (only if upgraded beyond employer coverage)
+  - If payment is required, the `createPaymentIntent` action (in `src/actions/stripeActions.ts`) is called. This action uses `await getServerStripeClient()` to initialize the Stripe client for creating Stripe customers and payment intents.
 - Clear "Complete Setup" button
 - Option to save payment information for future
+- After successful setup (and payment, if applicable), the user is redirected to their main user dashboard (`/dashboard`).
 
 ## Implementation Guidelines
 
@@ -167,7 +172,7 @@ A crucial piece of state management within the benefit verification flow is the 
 
 This column tracks the user's current stage and outcome in the verification process. It is an enum with the following possible values:
 
-*   `'not_started'`: The user has not yet begun the benefit verification process. Users in this state will be automatically redirected from the main dashboard (`src/app/(dashboard)/dashboard/page.tsx`) to Step 1 (`/step1`) of the flow.
+*   `'not_started'`: The user has not yet begun the benefit verification process. Users in this state will be automatically redirected from the main dashboard (`src/app/(dashboard)/dashboard/page.tsx`, which checks `profile.benefit_status` via `useAuth`) to Step 1 (`/step1`) of the flow upon their first login or subsequent visits if the status remains `'not_started'`.
 *   `'in_progress'`: The user has started the flow but has not yet completed all steps or received a final verification outcome. The `BenefitVerificationContext` (`src/components/benefit-verification/BenefitVerificationContext.tsx`) manages navigation between steps while the status is `in_progress`.
 *   `'verified'`: The user has successfully completed the verification process and their benefits have been confirmed (currently simulated). Step 3 (`src/app/(benefit-verification)/step3/page.tsx`) uses this status to determine navigation to subsequent steps (like Step 5). The final outcome page (Step 5, `src/app/(benefit-verification)/step5/page.tsx`) will display confirmation based on this status.
 *   `'not_verified'`: The user completed the process, but their benefits could not be verified (currently simulated). Step 3 and Step 5 will adapt their presentation and navigation based on this status.
@@ -189,15 +194,17 @@ Understanding `benefit_status` is key to tracing the user's journey through the 
 
 *   **Multi-Step Benefit Flow (Steps 1-6):** Full UI, navigation, state management (`BenefitVerificationContext`), and server actions implemented for the entire user flow.
     *   **Step 1:** Benefit source selection (`updateBenefitSource`).
-    *   **Step 2:** Organization search & selection (`searchOrganizations`, `updateSponsoringOrganization`).
-    *   **Step 3:** Personal information collection (using `submitVerificationInfo` for employer path, `updateBasicProfile` for non-employer path).
+    *   **Step 2:** Organization search & selection (`searchOrganizations`, `updateSponsoringOrganization` from context).
+    *   **Step 3:** Personal information collection (using `submitVerificationInfo` for employer path, `updateBasicProfile` for non-employer path – both actions now correctly save address details to the `users` table).
     *   **Step 4 (Implicit in Step 3):** Work email used for basic verification in `submitVerificationInfo`.
     *   **Step 5:** Package viewing (`getBenefitPackages`) and selection (`updateSelectedPackage`).
-    *   **Step 6 (Confirmation/Payment):** Displays selected package (`getUserWithSelectedPackage`), initializes Stripe Elements for paid packages (`createPaymentIntent`), handles Payment Element submission, and finalizes setup (`completeBenefitSetup`).
+    *   **Step 6 (Confirmation/Payment):** Displays selected package (`getUserWithSelectedPackage`), initializes Stripe Elements for paid packages (`createPaymentIntent` which correctly uses `await getServerStripeClient()`), handles Payment Element submission, and finalizes setup (`completeBenefitSetup`), redirecting to `/dashboard` upon completion.
 *   **Employer & Non-Employer Paths:** Logic handles both verification through an employer and direct profile updates/package selection for other paths.
 *   **Basic Email Verification:** Verification logic checks submitted work email against `organization_approved_emails` table for the employer path.
 *   **Base Package Assignment:** Default employer package assigned on successful employer verification.
 *   **Admin Management:** Basic UI and server actions for managing organizations and approved emails.
+*   **Middleware Simplification:** The middleware (`src/middleware.ts`) has been simplified to primarily handle authentication checks (verifying a valid user session). It no longer performs database queries for `benefit_status` directly, addressing previous runtime error concerns in Edge environments.
+*   **Layout-Based Benefit Status Checks:** Routing based on `benefit_status` is now handled by Server Component Layouts (e.g., `src/app/(dashboard)/layout.tsx`, `src/app/(benefit-verification)/layout.tsx`). These layouts fetch the user's `benefit_status` and perform appropriate redirects (e.g., to `/step1` if not verified, or to `/dashboard` if already verified), ensuring correct application flow post-authentication.
 *   **Layout-Based Status Checks:** Initial checks implemented in layouts/pages to redirect users based on authentication and benefit status (e.g., redirecting `verified` users to dashboard, redirecting `not_started` users to `/step1`).
 
 ### Pending Items / Potential Enhancements (Review and Prioritize):
@@ -219,14 +226,6 @@ Understanding `benefit_status` is key to tracing the user's journey through the 
 *   [ ] **Testing:** Conduct thorough end-to-end testing of all benefit paths, payment scenarios, and edge cases.
 
 ## Upcoming Refactoring & Features
-
-### Middleware Simplification
-
-**Goal:** Address runtime errors and improve separation of concerns.
-
-*   **Problem:** Current middleware (`src/middleware.ts`) attempts database queries to check `benefit_status`, causing runtime errors because the required Node.js modules (`net`) are unavailable in the default Edge Runtime.
-*   **Solution:** The middleware will be simplified to **only** handle authentication checks (verifying a valid user session). It will no longer query the database or make routing decisions based on `benefit_status`.
-*   **Reasoning:** This fixes the runtime errors and delegates status-based routing to components better suited for database access (Server Component Layouts).
 
 ### Admin Package Management
 

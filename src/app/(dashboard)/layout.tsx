@@ -25,7 +25,8 @@ import {
   useTheme,
   alpha,
   Tooltip,
-  Backdrop
+  Backdrop,
+  useMediaQuery
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -47,6 +48,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client'; // Keep for auth checks
 import { usePageLoading } from '@/contexts/LoadingContext'; // <-- ADD THIS IMPORT
+import Logo from '@/components/Logo'; // Import Logo
 
 // Helper function to check if the loggedIn cookie exists
 const hasLoggedInCookie = () => {
@@ -85,12 +87,15 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // Add breakpoint check
   const { isLoadingPage } = usePageLoading(); // <-- ADD THIS LINE TO GET THE STATE
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [hasManuallyCheckedCookie, setHasManuallyCheckedCookie] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorElUser, setAnchorElUser] = useState<null | HTMLElement>(null); // Renamed from anchorEl for clarity
   const [isLoggingOut, setIsLoggingOut] = useState(false); // Added logout loading state
+
+  const logoHeight = isMobile ? 46 : 48; // Calculate logo height
 
   // --- Start: Existing Auth Check Logic ---
   useEffect(() => {
@@ -226,13 +231,21 @@ export default function DashboardLayout({
 
   const drawer = (
     <div>
-      {/* Add a Logo or Title here if desired */}
-       <Toolbar sx={{ minHeight: { xs: 56, sm: 64 }, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-         <Typography variant="h6" noWrap component="div" color="primary">
-           MyBabyBridge
-         </Typography>
+      {/* Apply theme colors, center content, ensure height, add Logo */}
+       <Toolbar sx={{ 
+         minHeight: { xs: 56, sm: 64 }, 
+         display: 'flex', 
+         alignItems: 'center', 
+         justifyContent: 'center',
+         backgroundColor: theme.palette.primary.main, // Add theme background
+         color: theme.palette.primary.contrastText, // Add theme text color
+        }}>
+         {/* Remove Typography, Add Logo */}
+         <Link href="/dashboard" passHref>
+            <Logo height={logoHeight} />
+         </Link>
        </Toolbar>
-      <Divider />
+      {/* <Divider /> // Temporarily comment out Divider */}
       <List sx={{ p: 1 }}>
         {patientNavItems.map((item) => (
           <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
@@ -306,18 +319,15 @@ export default function DashboardLayout({
       <CssBaseline />
       <AppBar
         position="fixed"
+        elevation={0} // Add elevation={0}
         sx={{
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           ml: { sm: `${drawerWidth}px` },
-          boxShadow: 'none', // Flat app bar
-          // backgroundColor: 'background.paper', // Use paper background
-          borderBottom: `1px solid ${theme.palette.divider}`, // Add a subtle border
-          // color: 'text.primary' // Adjust text color if needed
+          // Relying on global MuiAppBar override for colors. Add border.
+           borderBottom: `1px solid ${alpha(theme.palette.primary.contrastText || '#fff', 0.12)}`,
         }}
-        color="inherit" // Use inherit to allow background control via sx
-        elevation={0} // Ensure no shadow
       >
-        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }}>
+        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 }, justifyContent: 'space-between' }}>
           <IconButton
             color="inherit"
             aria-label="open drawer"
@@ -421,7 +431,10 @@ export default function DashboardLayout({
           variant="permanent"
           sx={{
             display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth, borderRight: `1px solid ${theme.palette.divider}` }, // Match AppBar border
+            '& .MuiDrawer-paper': { 
+                boxSizing: 'border-box', 
+                width: drawerWidth, 
+             }, 
           }}
           open
         >

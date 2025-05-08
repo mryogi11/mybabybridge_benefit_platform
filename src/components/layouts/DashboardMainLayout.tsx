@@ -29,12 +29,14 @@ import { useRouter, usePathname } from 'next/navigation';
 import SideDrawerContent from './SideDrawerContent'; // Import the drawer content
 
 const DRAWER_WIDTH = 280;
+const COLLAPSED_DRAWER_WIDTH = 88; // Standard for icon-only navigation
 
 export default function DashboardMainLayout({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
   const isMdUp = useMediaQuery(theme.breakpoints.up('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [isDrawerCollapsed, setIsDrawerCollapsed] = useState(false); // New state for collapse
 
   // User Menu State & Handlers (Moved from Navigation.tsx)
   const [anchorElUser, setAnchorElUser] = useState<null | HTMLElement>(null);
@@ -62,6 +64,10 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
       setIsClosing(false);
   };
 
+  const handleCollapseToggle = () => { // New handler for collapse
+    setIsDrawerCollapsed(!isDrawerCollapsed);
+  };
+
   const handleLogout = async () => {
       try {
       await signOut();
@@ -77,15 +83,17 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
       handleCloseUserMenu(); // Close menu after navigation
   }
 
+  const currentDrawerWidth = isMdUp && isDrawerCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH;
+
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex', transition: 'all 0.3s ease-in-out' }}>
       <CssBaseline />
       <AppBar
         position="fixed"
         elevation={0}
         sx={{
-          width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
-          ml: { md: `${DRAWER_WIDTH}px` },
+          width: { md: `calc(100% - ${currentDrawerWidth}px)` }, // Use currentDrawerWidth
+          ml: { md: `${currentDrawerWidth}px` }, // Use currentDrawerWidth
           backgroundColor: alpha(theme.palette.background.default, 0.8), // Adjusted for minimal feel
           backdropFilter: 'blur(6px)',
           borderBottom: `1px dashed ${theme.palette.divider}`,
@@ -175,7 +183,7 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
       {/* Drawer */}
       <Box
         component="nav"
-        sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}
+        sx={{ width: { md: currentDrawerWidth }, flexShrink: { md: 0 }, transition: 'width 0.3s ease-in-out' }} // Use currentDrawerWidth and add transition
         aria-label="mailbox folders"
       >
         {/* Mobile Drawer */}
@@ -191,12 +199,19 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
             display: { xs: 'block', md: 'none' },
             '& .MuiDrawer-paper': {
                 boxSizing: 'border-box',
-                width: DRAWER_WIDTH,
-                borderRight: `1px dashed ${theme.palette.divider}`
+                width: DRAWER_WIDTH, // Mobile drawer is not collapsable, keeps original width
+                borderRight: `1px dashed ${theme.palette.divider}`,
+                transition: theme.transitions.create('width', { // Add transition
+                  easing: theme.transitions.easing.sharp,
+                  duration: theme.transitions.duration.enteringScreen,
+                }),
              },
           }}
         >
-          <SideDrawerContent />
+          <SideDrawerContent 
+            isCollapsed={false} // Mobile drawer is not collapsable
+            onToggleCollapse={() => {}} // No toggle needed for mobile
+          />
         </Drawer>
 
         {/* Desktop Drawer */}
@@ -206,13 +221,21 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
             display: { xs: 'none', md: 'block' },
             '& .MuiDrawer-paper': {
                 boxSizing: 'border-box',
-                width: DRAWER_WIDTH,
-                borderRight: `1px dashed ${theme.palette.divider}`
+                width: currentDrawerWidth, // Use currentDrawerWidth
+                borderRight: `1px dashed ${theme.palette.divider}`,
+                overflowX: 'hidden', // Hide content when collapsing
+                transition: theme.transitions.create('width', { // Add transition
+                  easing: theme.transitions.easing.sharp,
+                  duration: theme.transitions.duration.enteringScreen,
+                }),
             },
           }}
-          open
+          open // Permanent drawer is always open on desktop
         >
-          <SideDrawerContent />
+          <SideDrawerContent 
+            isCollapsed={isDrawerCollapsed} 
+            onToggleCollapse={handleCollapseToggle} 
+          />
         </Drawer>
       </Box>
 
@@ -222,9 +245,13 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
         sx={{
           flexGrow: 1,
           p: 3,
-          width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
+          width: { md: `calc(100% - ${currentDrawerWidth}px)` }, // Use currentDrawerWidth
           minHeight: '100vh',
           backgroundColor: theme.palette.grey[100], // Or another light background
+          transition: theme.transitions.create(['margin', 'width'], { // Add transition
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
         }}
       >
         <Toolbar /> {/* Offset content below AppBar */}

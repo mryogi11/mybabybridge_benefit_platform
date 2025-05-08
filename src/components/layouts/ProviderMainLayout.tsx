@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   AppBar,
   Box,
@@ -28,12 +28,15 @@ import { useRouter } from 'next/navigation';
 import ProviderSideDrawerContent from './ProviderSideDrawerContent'; // Import the PROVIDER drawer content
 
 const DRAWER_WIDTH = 280;
+const COLLAPSED_DRAWER_WIDTH = 88; // Standard for icon-only navigation
 
 export default function ProviderMainLayout({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
   const isMdUp = useMediaQuery(theme.breakpoints.up('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [isDrawerCollapsed, setIsDrawerCollapsed] = useState(false); // New state for collapse
+  const appBarToolbarRef = useRef<HTMLDivElement>(null); // Ref for AppBar Toolbar
 
   // User Menu State & Handlers
   const [anchorElUser, setAnchorElUser] = useState<null | HTMLElement>(null);
@@ -52,46 +55,58 @@ export default function ProviderMainLayout({ children }: { children: React.React
     }
   };
 
-   const handleDrawerClose = () => {
-      setIsClosing(true);
-      setMobileOpen(false);
+  const handleDrawerClose = () => {
+    setIsClosing(true);
+    setMobileOpen(false);
   };
 
   const handleDrawerTransitionEnd = () => {
-      setIsClosing(false);
+    setIsClosing(false);
+  };
+
+  const handleCollapseToggle = () => { // New handler for collapse
+    setIsDrawerCollapsed(!isDrawerCollapsed);
   };
 
   const handleLogout = async () => {
-      try {
+    try {
       await signOut();
       router.push('/login');
-      } catch (error) {
+    } catch (error) {
       console.error('Logout error:', error);
-      }
-      handleCloseUserMenu();
+    }
+    handleCloseUserMenu();
   };
 
   const handleNavigate = (path: string) => {
-      router.push(path);
-      handleCloseUserMenu();
-  }
+    router.push(path);
+    handleCloseUserMenu();
+  };
+
+  useEffect(() => {
+    if (appBarToolbarRef.current) {
+      console.log('[ProviderMainLayout] AppBar Toolbar ClientHeight:', appBarToolbarRef.current.clientHeight);
+      console.log('[ProviderMainLayout] AppBar Toolbar OffsetHeight:', appBarToolbarRef.current.offsetHeight);
+    }
+  }, []); // Log once on mount
+
+  const currentDrawerWidth = isMdUp && isDrawerCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH;
 
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex', transition: 'all 0.3s ease-in-out' }}>
       <CssBaseline />
       <AppBar
         position="fixed"
         elevation={0}
         sx={{
-          width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
-          ml: { md: `${DRAWER_WIDTH}px` },
-          backgroundColor: alpha(theme.palette.background.default, 0.8),
-          backdropFilter: 'blur(6px)',
-          borderBottom: `1px dashed ${theme.palette.divider}`,
-          color: theme.palette.text.primary,
+          width: { md: `calc(100% - ${currentDrawerWidth}px)` },
+          ml: { md: `${currentDrawerWidth}px` },
+          backgroundColor: theme.palette.primary.main,
+          color: theme.palette.primary.contrastText,
+          borderBottom: `1px solid ${alpha(theme.palette.primary.contrastText || '#fff', 0.12)}`,
         }}
       >
-        <Toolbar sx={{ justifyContent: 'space-between' }}>
+        <Toolbar sx={{ justifyContent: 'space-between' }} ref={appBarToolbarRef}>
           <IconButton
             color="inherit"
             aria-label="open drawer"
@@ -174,7 +189,7 @@ export default function ProviderMainLayout({ children }: { children: React.React
       {/* Drawer */}
       <Box
         component="nav"
-        sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}
+        sx={{ width: { md: currentDrawerWidth }, flexShrink: { md: 0 }, transition: 'width 0.3s ease-in-out' }}
       >
         {/* Mobile Drawer */}
         <Drawer
@@ -188,11 +203,18 @@ export default function ProviderMainLayout({ children }: { children: React.React
             '& .MuiDrawer-paper': {
                 boxSizing: 'border-box',
                 width: DRAWER_WIDTH,
-                borderRight: `1px dashed ${theme.palette.divider}`
+                borderRight: `1px dashed ${theme.palette.divider}`,
+                transition: theme.transitions.create('width', {
+                  easing: theme.transitions.easing.sharp,
+                  duration: theme.transitions.duration.enteringScreen,
+                }),
              },
           }}
         >
-          <ProviderSideDrawerContent /> {/* Use Provider Content */}
+          <ProviderSideDrawerContent 
+            isCollapsed={false}
+            onToggleCollapse={() => {}}
+          /> 
         </Drawer>
 
         {/* Desktop Drawer */}
@@ -202,13 +224,21 @@ export default function ProviderMainLayout({ children }: { children: React.React
             display: { xs: 'none', md: 'block' },
             '& .MuiDrawer-paper': {
                 boxSizing: 'border-box',
-                width: DRAWER_WIDTH,
-                borderRight: `1px dashed ${theme.palette.divider}`
+                width: currentDrawerWidth,
+                overflowX: 'hidden',
+                borderRight: `1px dashed ${theme.palette.divider}`,
+                transition: theme.transitions.create('width', {
+                  easing: theme.transitions.easing.sharp,
+                  duration: theme.transitions.duration.enteringScreen,
+                }),
             },
           }}
           open
         >
-          <ProviderSideDrawerContent /> {/* Use Provider Content */}
+          <ProviderSideDrawerContent 
+            isCollapsed={isDrawerCollapsed}
+            onToggleCollapse={handleCollapseToggle}
+          /> 
         </Drawer>
       </Box>
 
@@ -218,9 +248,13 @@ export default function ProviderMainLayout({ children }: { children: React.React
         sx={{
           flexGrow: 1,
           p: 3,
-          width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
+          width: { md: `calc(100% - ${currentDrawerWidth}px)` },
           minHeight: '100vh',
           backgroundColor: theme.palette.background.default,
+          transition: theme.transitions.create(['margin', 'width'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
         }}
       >
         <Toolbar /> {/* Offset content below AppBar */}

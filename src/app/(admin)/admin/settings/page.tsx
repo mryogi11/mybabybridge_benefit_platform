@@ -19,7 +19,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { updateUserThemePreference } from '@/actions/userActions';
 import type { ThemeModeSetting } from '@/components/ThemeRegistry/ClientThemeProviders';
 
-function SettingsContent() {
+// Original component content starts here
+function AdminSettingsPageComponent() {
   const { profile, fetchAndSetProfile } = useAuth();
   const [mode, setMode] = useState<ThemeModeSetting>(profile?.theme_preference || 'system');
   const [isSaving, setIsSaving] = useState(false);
@@ -85,6 +86,11 @@ function SettingsContent() {
             <MenuItem value="light">Light</MenuItem>
             <MenuItem value="dark">Dark</MenuItem>
             <MenuItem value="system">System Default</MenuItem>
+            <MenuItem value="ocean">Ocean</MenuItem>
+            <MenuItem value="mint">Mint</MenuItem>
+            <MenuItem value="rose">Rose</MenuItem>
+            <MenuItem value="charcoal">Charcoal</MenuItem>
+            <MenuItem value="sunset">Sunset</MenuItem>
           </Select>
         </FormControl>
 
@@ -113,11 +119,13 @@ function SettingsContent() {
     </Box>
   );
 }
+// Original component content ends here
 
+// New default export wrapping the original component with Suspense
 export default function AdminSettingsPage() {
   return (
     <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}><CircularProgress /></Box>}>
-      <SettingsContent />
+      <AdminSettingsPageComponent />
     </Suspense>
   );
-} 
+}

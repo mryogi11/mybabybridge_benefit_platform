@@ -24,7 +24,7 @@ export const benefitSourceEnum = pgEnum('benefit_source', ['employer_or_plan', '
 export const benefitStatusEnum = pgEnum('benefit_status', ['not_started', 'pending_verification', 'verified', 'declined', 'no_benefit']);
 export const packageTierEnum = pgEnum('package_tier', ['basic', 'silver', 'gold', 'platinum']);
 export const appointmentStatusEnum = pgEnum('appointment_status', ['scheduled', 'completed', 'cancelled', 'pending', 'confirmed']);
-export const themeModeEnum = pgEnum('theme_mode', ['light', 'dark', 'system']);
+export const themeModeEnum = pgEnum('theme_mode', ['light', 'dark', 'system', 'ocean', 'mint', 'rose', 'charcoal', 'sunset']);
 export const verificationStatusEnum = pgEnum('verification_status', ['pending', 'success', 'failed']);
 
 // --- START: Added Appointment Type Enum ---
