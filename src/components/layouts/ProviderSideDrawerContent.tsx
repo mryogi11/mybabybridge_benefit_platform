@@ -106,10 +106,15 @@ function NavItem({ item, onNavigate, isNavigating, currentNavPath, isCollapsed }
 interface ProviderSideDrawerContentProps {
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  setIsLoadingPage: (isLoading: boolean) => void;
 }
 
 // Main ProviderSideDrawerContent component
-export default function ProviderSideDrawerContent({ isCollapsed, onToggleCollapse }: ProviderSideDrawerContentProps) {
+export default function ProviderSideDrawerContent({ 
+    isCollapsed, 
+    onToggleCollapse, 
+    setIsLoadingPage
+}: ProviderSideDrawerContentProps) {
   const router = useRouter();
   const theme = useTheme(); // Get the theme object
   const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // Check for mobile breakpoint
@@ -151,16 +156,20 @@ export default function ProviderSideDrawerContent({ isCollapsed, onToggleCollaps
   }, []); // Empty dependency array: runs once after initial mount
 
   const logoHeight = isMobile ? 46 : 48; // Calculate responsive logo height
+  const pathname = usePathname(); // Get current pathname
 
   const handleNavigation = (path: string) => {
-    setIsNavigating(true);
-    setCurrentNavPath(path);
+    if (pathname !== path) { // Check if already on the path
+        setIsLoadingPage(true); // Use the passed-in setter
+    }
     router.push(path);
-    // Consider removing timeout if route transitions are fast enough
-    setTimeout(() => {
-        setIsNavigating(false);
-        setCurrentNavPath(null);
-    }, 500); 
+    // No longer manage isNavigating and currentNavPath here, as loader is global
+    // setIsNavigating(true);
+    // setCurrentNavPath(path);
+    // setTimeout(() => {
+    //     setIsNavigating(false);
+    //     setCurrentNavPath(null);
+    // }, 500); 
   };
 
   return (
@@ -223,7 +232,7 @@ export default function ProviderSideDrawerContent({ isCollapsed, onToggleCollaps
           },
         }}>
         {/* Settings Link */}
-        <ListItemButton component={Link} href="/provider/settings" sx={{ pl: isCollapsed ? 1.5 : 2.5, justifyContent: isCollapsed ? 'center' : 'flex-start' }}>
+        <ListItemButton onClick={() => handleNavigation('/provider/settings')} sx={{ pl: isCollapsed ? 1.5 : 2.5, justifyContent: isCollapsed ? 'center' : 'flex-start' }}>
           <ListItemIcon sx={{ minWidth: isCollapsed? 'auto' : 40, justifyContent: 'center' }}>
             <SettingsIcon />
           </ListItemIcon>
@@ -231,19 +240,11 @@ export default function ProviderSideDrawerContent({ isCollapsed, onToggleCollaps
         </ListItemButton>
 
         {/* Availability Link */}
-        <ListItemButton component={Link} href="/provider/availability" sx={{ pl: isCollapsed ? 1.5 : 2.5, justifyContent: isCollapsed ? 'center' : 'flex-start' }}>
+        <ListItemButton onClick={() => handleNavigation('/provider/availability')} sx={{ pl: isCollapsed ? 1.5 : 2.5, justifyContent: isCollapsed ? 'center' : 'flex-start' }}>
           <ListItemIcon sx={{ minWidth: isCollapsed? 'auto' : 40, justifyContent: 'center' }}>
             <EventAvailableIcon />
           </ListItemIcon>
           {!isCollapsed && <ListItemText primary="Manage Availability" primaryTypographyProps={{ whiteSpace: 'nowrap' }} />}
-        </ListItemButton>
-
-        {/* Logout Button */}
-        <ListItemButton onClick={handleLogout} sx={{ pl: isCollapsed ? 1.5 : 2.5, justifyContent: isCollapsed ? 'center' : 'flex-start' }}>
-          <ListItemIcon sx={{ minWidth: isCollapsed? 'auto' : 40, justifyContent: 'center' }}>
-            <ExitToAppIcon />
-          </ListItemIcon>
-          {!isCollapsed && <ListItemText primary="Logout" primaryTypographyProps={{ whiteSpace: 'nowrap' }}/>}
         </ListItemButton>
       </List>
 

@@ -43,16 +43,29 @@
         *   [VP] TODO: Link new provider creation to an actual `users` table entry / Supabase Auth user.
         *   [VP] Advanced features (credentials management, monitoring as per PRD) are pending.
     *   [VP] **User Activity Logs / Platform Metrics Dashboard:** Implement mechanisms and UI as per PRD/Analytics section.
+    *   [✅] **Settings (`/admin/admin/settings`):** Theme selection, profile information editing (first/last name), and password change are functional. Review for any other common admin-specific settings if needed.
 *   **Provider Module:**
     *   [✅] **Profile Management (`/provider/profile`):** View/edit core profile fields functional (client-side Supabase calls).
     *   [✅] **Patient List (`/provider/patients`):** Functional, uses `getPatientsForProvider` server action.
     *   [✅] **Patient Communication:** Linked to Secure Messaging feature (functional).
-    *   [🚧] **Settings (`/provider/settings`):** Theme selection functional. Password change and detailed notification preferences are UI placeholders and need backend logic.
+    *   [🚧] **Settings (`/provider/settings`):**
+        *   [✅] Theme selection functional.
+        *   [✅] Password change functional.
+        *   [VP] Implement Notification Preferences (Currently UI section hidden, placeholder links removed, requires backend and UI reinstatement).
+        *   [VP] Review if Payment Settings link/section is needed for Providers (Currently UI hidden/removed).
 *   **Patient Module:**
-    *   [✅] **Dashboard (`/dashboard`):** Functional, page loader implemented. Displays upcoming appointments.
+    *   [✅] **Dashboard (`/dashboard`):** Functional, page loader implemented. Displays upcoming appointments. "Profile" link removed from side drawer, access via user menu.
     *   [VP] **Dashboard Refinement:** Enhance to show current benefit package status/details more prominently.
-    *   [✅] **Profile Management (`/dashboard/profile`):** Placeholder UI exists, needs full implementation for viewing/editing.
+    *   [VP] **Profile Management (`/dashboard/profile`):** Placeholder UI exists, needs full implementation for viewing/editing.
     *   [✅] **Communication:** Linked to Secure Messaging feature (functional).
+    *   [🚧] **Settings (`/dashboard/settings`):**
+        *   [✅] Theme selection functional.
+        *   [✅] Password change functional.
+        *   [VP] Implement Notification Preferences (Currently UI hidden, requires backend and UI reinstatement).
+        *   [VP] Implement Language & Region settings (Currently UI hidden, requires backend and UI reinstatement).
+        *   [VP] Implement Accessibility settings (Currently UI hidden, requires backend and UI reinstatement).
+        *   [VP] Implement Two-Factor Authentication (Currently UI hidden, requires backend and UI reinstatement).
+        *   [VP] Implement Profile Visibility settings (Currently UI hidden, requires backend and UI reinstatement).
 
 ### Authentication & Authorization
 
@@ -68,7 +81,12 @@
 *   [VP] **Standardize Error Handling:** Improve consistency in Server Action error reporting and create more user-facing friendly error messages.
 *   [ ] **Update Documentation:** Keep `README.md`, `PRD.md`, `HANDOVER.md`, `CODE_INDEX.md`, and this `TODO.md` updated as work progresses. *(Ongoing)*
 *   [VP] **Testing:** Implement unit, integration, and end-to-end tests (Jest, Cypress mentioned in PRD). *(Helper scripts for test users exist, but no formal test suites).*
-*   [VP] **Page Loader for Admin/Provider Roles:** Verify/Implement page loader for Admin and Provider main navigation if their layouts/navigation components differ from Patient dashboard and don't use `LoadingContext` yet. Admin layout has a custom drawer.
+*   [✅] **Page Loader for Admin/Provider Roles:** (Implemented and verified across all dashboards)
+
+## Recently Completed UI/UX Enhancements (May 2025)
+*   [✅] **Collapsible Side Drawers:** Implemented for Patient, Provider, and Admin dashboards, providing a consistent, space-saving UI feature on desktop.
+*   [✅] **Standardized Profile Dropdown Menus:** The user profile dropdown (avatar click) UI is now consistent across Patient, Provider, and Admin dashboards, including user info, profile link, and styled logout.
+*   [✅] **Global Page Loader Extended:** Ensured the main navigation page loader is functional and consistent across Patient, Provider, and Admin dashboards.
 
 ---
 *Previous content below might be outdated.*

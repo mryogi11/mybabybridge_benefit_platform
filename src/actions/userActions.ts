@@ -1,47 +1,30 @@
 'use server';
 
-// Remove auth-helpers import
-// import { createServerActionClient } from '@supabase/auth-helpers-nextjs';
-import { createServerClient } from '@supabase/ssr'; // Use ssr
+import { createServerClient, type CookieOptions } from '@supabase/ssr'; // Corrected CookieOptions import
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
-import type { User } from '@/types'; // <<< IMPORT User type
-import type { Database } from '@/types/supabase'; // Assuming Database type
-// Removed Database import temporarily - Please provide correct path later
-// import { Database } from '@/lib/supabase/database.types'; 
+import type { User } from '@/types';
+import type { Database } from '@/types/supabase';
 import { z } from 'zod';
-// Remove incorrect auth import
-// import { auth } from '@/lib/auth/auth'; 
 import { db } from '@/lib/db';
 import { users, themeModeEnum } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { ThemeModeSetting } from '@/components/ThemeRegistry/ClientThemeProviders'; // Import the type
-import { CookieOptions } from 'next/headers';
 
-// Reuse the NewUserData interface definition or redefine if needed
-// It's better to import it if possible to avoid duplication
+// Interface for NewUserData
 interface NewUserData {
     first_name: string;
     last_name: string;
     email: string;
     password?: string;
-    role: User['role']; // <<< USE User['role']
+    role: User['role'];
     specialization?: string;
     bio?: string;
     experience_years?: number;
 }
 
 export async function createUserAction(userData: NewUserData): Promise<{ success: boolean; error?: string }> {
-    // Removed unused server action client based on ssr
-    // const cookieStore = cookies();
-    // const supabase = createServerClient<Database>(
-    //     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    //     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    //     { /* cookies config */ }
-    // );
-
-    // Admin client using Service Role remains the same
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -51,9 +34,9 @@ export async function createUserAction(userData: NewUserData): Promise<{ success
     }
 
     const supabaseAdmin = createClient<Database>(supabaseUrl!, serviceKey!, {
-        auth: { 
-            autoRefreshToken: false, 
-            persistSession: false 
+        auth: {
+            autoRefreshToken: false,
+            persistSession: false
         }
     });
 
@@ -65,14 +48,13 @@ export async function createUserAction(userData: NewUserData): Promise<{ success
     }
 
     try {
-        let newUserId: string | null = null; // Declare userId variable
+        let newUserId: string | null = null;
 
-        // Step 1: Attempt to create the user in Supabase Auth
         console.log("[Server Action] Using Supabase Admin client for auth.admin.createUser...");
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email: userData.email,
             password: userData.password,
-            email_confirm: true, 
+            email_confirm: true,
             user_metadata: {
                 role: userData.role,
                 first_name: userData.first_name,
@@ -81,46 +63,33 @@ export async function createUserAction(userData: NewUserData): Promise<{ success
         });
 
         if (authError) {
-            // Check for specific Supabase error code or message
             const isExistingUserError = authError.message.includes('User already exists') || (authError as any).code === 'email_exists';
-
             if (isExistingUserError) {
                 console.warn("[Server Action] Auth user already exists for email:", userData.email, ". Retrieving existing ID.");
-                // Attempt to find the user in auth.users via admin API to get the ID
-                // Fetch users (potentially paginated - consider adding pagination if user base is large)
-                const { data: { users: allUsers }, error: listError } = await supabaseAdmin.auth.admin.listUsers(); 
-
+                const { data: { users: allUsers }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
                 if (listError) {
                     console.error("[Server Action] Supabase admin listUsers Error:", listError);
                     throw new Error(listError.message || "Failed to list users.");
                 }
-
-                // Filter the results manually to find the user in auth.users
                 const existingAuthUser = allUsers.find(u => u.email === userData.email);
-
                 if (!existingAuthUser) {
                     console.error(`[Server Action] Existing user with email ${userData.email} not found in auth.users.`);
                     throw new Error(`User with email ${userData.email} not found in authentication users.`);
                 }
-                
                 newUserId = existingAuthUser.id;
                 console.log("[Server Action] Found existing auth user ID:", newUserId);
 
-                // Now, check if this user ID exists in public.users
                 const { data: existingPublicUserData, error: publicUserError } = await supabaseAdmin
                     .from('users')
                     .select('id')
                     .eq('id', newUserId)
                     .maybeSingle();
-                
                 if (publicUserError) {
-                     console.error("[Server Action] Error checking public.users for existing user:", publicUserError);
-                     throw new Error(`Failed to check public.users table. ${publicUserError.message}`);
+                    console.error("[Server Action] Error checking public.users for existing user:", publicUserError);
+                    throw new Error(`Failed to check public.users table. ${publicUserError.message}`);
                 }
-
-                // If user doesn't exist in public.users yet, proceed with upsert (warn is helpful)
                 if (!existingPublicUserData) {
-                     console.warn("[Server Action] Existing auth user found, but no corresponding row in public.users. Proceeding with upsert.");
+                    console.warn("[Server Action] Existing auth user found, but no corresponding row in public.users. Proceeding with upsert.");
                 }
             } else {
                 console.error("[Server Action] Supabase Auth Error:", authError);
@@ -130,61 +99,52 @@ export async function createUserAction(userData: NewUserData): Promise<{ success
                 throw new Error(authError.message || "Failed to create user in Auth.");
             }
         } else if (authData?.user) {
-            newUserId = authData.user.id; // Assign new ID
+            newUserId = authData.user.id;
             console.log("[Server Action] Auth user created successfully:", newUserId);
         }
 
-        // Ensure we have a user ID before proceeding
         if (!newUserId) {
             console.error("[Server Action] Could not obtain user ID (new or existing).");
             throw new Error("Failed to get user ID for Auth user.");
         }
 
         console.log("[Server Action] Using User ID for upsert:", newUserId);
-
-        // Step 2: Upsert into the public 'users' table using the Admin Client
-        // Ensure only columns that exist in the 'users' table are included
-        const { error: usersTableError } = await supabaseAdmin // Use admin client
+        const { error: usersTableError } = await supabaseAdmin
             .from('users')
             .upsert({
-                id: newUserId, // Use the obtained ID
+                id: newUserId,
                 email: userData.email,
                 role: userData.role,
                 first_name: userData.first_name,
                 last_name: userData.last_name,
-            }, { onConflict: 'id' }); // Specify the conflict column
+            }, { onConflict: 'id' });
 
         if (usersTableError) {
             console.error("[Server Action] Supabase users table upsert Error:", usersTableError);
             throw new Error(usersTableError.message || "Failed to upsert user into public users table.");
         }
-
         console.log("[Server Action] User upserted into public.users successfully.");
 
-        // Step 3: If the role is 'provider', upsert into the 'providers' table using the Admin Client
         if (userData.role === 'provider') {
             console.log("[Server Action] User role is provider, attempting to upsert into providers table...");
-            const providerPayload = { // Construct payload explicitly
-                 user_id: newUserId, 
-                 first_name: userData.first_name,
-                 last_name: userData.last_name,
-                 specialization: userData.specialization,
-                 bio: userData.bio,
-                 experience_years: userData.experience_years,
-             };
-             console.log("[Server Action] Payload for providers upsert:", providerPayload); // <<< ADDED LOG
-             const { error: providerTableError } = await supabaseAdmin // Use admin client
+            const providerPayload = {
+                user_id: newUserId,
+                first_name: userData.first_name,
+                last_name: userData.last_name,
+                specialization: userData.specialization,
+                bio: userData.bio,
+                experience_years: userData.experience_years,
+            };
+            console.log("[Server Action] Payload for providers upsert:", providerPayload);
+            const { error: providerTableError } = await supabaseAdmin
                 .from('providers')
-                .upsert(providerPayload, { onConflict: 'user_id' }); // Specify the conflict column
-
+                .upsert(providerPayload, { onConflict: 'user_id' });
             if (providerTableError) {
                 console.error("[Server Action] Supabase providers table upsert Error:", providerTableError);
                 throw new Error(providerTableError.message || "Failed to upsert provider details.");
             }
             console.log("[Server Action] Provider details upserted successfully for user:", newUserId);
-        }
-        // Step 3b: If the role is 'patient', upsert into the 'patient_profiles' table
-        else if (userData.role === 'patient') {
+        } else if (userData.role === 'patient') {
             console.log("[Server Action] User role is patient, attempting to upsert into patient_profiles table...");
             const { error: patientProfileTableError } = await supabaseAdmin
                 .from('patient_profiles')
@@ -192,27 +152,23 @@ export async function createUserAction(userData: NewUserData): Promise<{ success
                     user_id: newUserId,
                     first_name: userData.first_name,
                     last_name: userData.last_name,
-                    email: userData.email // Include email if it's part of patient_profiles schema
-                    // Add other relevant patient fields if available in userData and schema
-                }, { onConflict: 'user_id'}); // Ensure conflict column is correct
-            
+                    email: userData.email
+                }, { onConflict: 'user_id' });
             if (patientProfileTableError) {
                 console.error("[Server Action] Supabase patient_profiles table upsert Error:", patientProfileTableError);
                 throw new Error(patientProfileTableError.message || "Failed to upsert patient details.");
             }
             console.log("[Server Action] Patient profile details upserted successfully for user:", newUserId);
         }
-
         console.log("[Server Action] User creation/update process completed successfully for:", newUserId);
         return { success: true };
-
     } catch (error: any) {
         console.error("[Server Action] Error during user creation/update:", error);
         return { success: false, error: error.message || "An unexpected server error occurred." };
     }
 }
 
-// Helper to get authenticated user (similar to one in benefitActions)
+// Helper to get authenticated user
 async function getAuthenticatedUser() {
     const cookieStore = await cookies();
     const supabaseAuthClient = createServerClient<Database>(
@@ -221,14 +177,31 @@ async function getAuthenticatedUser() {
         {
             cookies: {
                 get(name: string) { return cookieStore.get(name)?.value; },
-                set(name: string, value: string, options: CookieOptions) { try { cookieStore.set({ name, value, ...options }); } catch (e) { /* ignore */ } },
-                remove(name: string, options: CookieOptions) { try { cookieStore.set({ name, value: '', ...options }); } catch (e) { /* ignore */ } },
+                set(name: string, value: string, options: CookieOptions) { 
+                    try { 
+                        cookieStore.set(name, value, options); 
+                    } catch (e) { 
+                        // The `set` method was called from a Server Component.
+                        // This can be ignored if you have middleware refreshing
+                        // user sessions.
+                    } 
+                },
+                remove(name: string, options: CookieOptions) { 
+                    try { 
+                        cookieStore.delete(name, options); 
+                    } catch (e) { 
+                        // The `delete` method was called from a Server Component.
+                        // This can be ignored if you have middleware refreshing
+                        // user sessions.
+                    } 
+                },
             },
         }
     );
     const { data: { user }, error } = await supabaseAuthClient.auth.getUser();
     if (error || !user) {
-        throw new Error("User is not authenticated.");
+        console.error("[User Action - getAuthenticatedUser] Error or no user:", error);
+        throw new Error("User is not authenticated or session is invalid.");
     }
     return user;
 }
@@ -248,16 +221,132 @@ export async function updateUserThemePreference(theme: string): Promise<{
             .set({ theme_preference: validatedTheme, updated_at: new Date() })
             .where(eq(users.id, authUser.id));
 
-        console.log(`User ${authUser.id} updated theme preference to ${validatedTheme}`);
-        return { success: true, message: 'Theme preference updated successfully.', newTheme: validatedTheme };
-    } catch (error: any) {
-        console.error('Error updating theme preference:', error);
-        let errorMessage = 'Failed to update theme preference.';
+        revalidatePath('/admin/settings');
+        revalidatePath('/profile');
+        revalidatePath('/'); // Revalidate root layout as well for theme changes
+
+        console.log(`[User Action] User ${authUser.id} theme preference updated to ${validatedTheme}`);
+        return { success: true, message: "Theme preference updated successfully.", newTheme: validatedTheme };
+    } catch (error) {
+        console.error("[User Action] Error updating theme preference:", error);
         if (error instanceof z.ZodError) {
-            errorMessage = 'Invalid theme value provided.';
-        } else if (error.message) {
-            errorMessage = error.message;
+            return { success: false, message: `Invalid theme value: ${error.errors.map(e => e.message).join(', ')}` };
         }
-        return { success: false, message: errorMessage };
+        return { success: false, message: (error as Error).message || "Failed to update theme preference." };
     }
-} 
+}
+
+// Schema for admin profile updates
+const AdminProfileUpdateSchema = z.object({
+    first_name: z.string().min(1, "First name cannot be empty."),
+    last_name: z.string().min(1, "Last name cannot be empty."),
+    // email: z.string().email("Invalid email address.").optional(), // Email updates need careful consideration
+});
+
+export type AdminProfileUpdateData = z.infer<typeof AdminProfileUpdateSchema>;
+
+export async function updateAdminProfile(
+    data: AdminProfileUpdateData
+): Promise<{ success: boolean; error?: string; data?: AdminProfileUpdateData }> {
+    try {
+        const authUser = await getAuthenticatedUser();
+
+        // Double-check role from DB for critical operations if user_metadata isn't fully trusted
+        const userRecord = await db.query.users.findFirst({ where: eq(users.id, authUser.id) });
+        if (userRecord?.role !== 'admin') {
+            console.warn(`[User Action] Unauthorized attempt to update admin profile by user ${authUser.id}. DB role: ${userRecord?.role}`);
+            return { success: false, error: "Unauthorized: Insufficient privileges." };
+        }
+
+        const validatedData = AdminProfileUpdateSchema.parse(data);
+        console.log(`[User Action] Attempting to update admin profile for user ${authUser.id} with data:`, validatedData);
+
+        const updatePayload: Partial<typeof users.$inferInsert> = {
+            first_name: validatedData.first_name,
+            last_name: validatedData.last_name,
+            updated_at: new Date(),
+        };
+
+        await db.update(users)
+            .set(updatePayload)
+            .where(eq(users.id, authUser.id));
+
+        console.log(`[User Action] Admin profile for user ${authUser.id} updated successfully.`);
+
+        revalidatePath('/admin/settings');
+        // Revalidate other paths where admin's first/last name might be displayed
+        revalidatePath('/admin'); 
+
+        return { success: true, data: validatedData };
+
+    } catch (error: any) {
+        console.error(`[User Action] Error updating admin profile for user ${authUser.id}:`, error);
+        if (error instanceof z.ZodError) {
+            return { success: false, error: error.errors.map(e => e.message).join(', ') };
+        }
+        return { success: false, error: error.message || "An unexpected error occurred while updating the profile." };
+    }
+}
+
+// Schema for password update
+const PasswordUpdateSchema = z.object({
+    // currentPassword: z.string().min(1, "Current password is required."), // Not strictly needed for supabase.auth.updateUser by the logged-in user
+    newPassword: z.string().min(8, "New password must be at least 8 characters long."),
+});
+
+export async function updateUserPassword(
+    data: z.infer<typeof PasswordUpdateSchema>
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const cookieStore = await cookies();
+        const supabase = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                cookies: {
+                    get(name: string) { return cookieStore.get(name)?.value; },
+                    set(name: string, value: string, options: CookieOptions) { 
+                        try { cookieStore.set(name, value, options); } catch (e) { /* ignore */ } 
+                    },
+                    remove(name: string, options: CookieOptions) { 
+                        try { cookieStore.delete(name, options); } catch (e) { /* ignore */ } 
+                    },
+                },
+            }
+        );
+
+        const { data: { user } , error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+            console.error('[User Action - updateUserPassword] User not authenticated:', userError);
+            return { success: false, error: "User not authenticated. Please log in again." };
+        }
+
+        const validatedData = PasswordUpdateSchema.parse(data);
+        console.log(`[User Action] Attempting to update password for user ${user.id}`);
+
+        const { error: updateError } = await supabase.auth.updateUser({
+            password: validatedData.newPassword,
+        });
+
+        if (updateError) {
+            console.error(`[User Action] Supabase error updating password for user ${user.id}:`, updateError);
+            // Provide more specific error messages if possible
+            let errorMessage = updateError.message;
+            if (updateError.message.includes("New password should be different from the old password.")) {
+                errorMessage = "New password must be different from your current password.";
+            }
+            // Add other common Supabase auth error message checks here if needed
+            return { success: false, error: errorMessage || "Failed to update password." };
+        }
+
+        console.log(`[User Action] Password updated successfully for user ${user.id}`);
+        return { success: true };
+
+    } catch (error: any) {
+        console.error(`[User Action] Error updating password:`, error);
+        if (error instanceof z.ZodError) {
+            return { success: false, error: error.errors.map(e => e.message).join(', ') };
+        }
+        return { success: false, error: error.message || "An unexpected error occurred while updating password." };
+    }
+}

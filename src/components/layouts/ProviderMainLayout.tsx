@@ -19,13 +19,16 @@ import {
   ListItemIcon,
   Badge,
   alpha,
+  Backdrop,
+  CircularProgress,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import { AccountCircle, Logout, Settings } from '@mui/icons-material';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import ProviderSideDrawerContent from './ProviderSideDrawerContent'; // Import the PROVIDER drawer content
+import { usePageLoading } from '@/contexts/LoadingContext'; // Added import
 
 const DRAWER_WIDTH = 280;
 const COLLAPSED_DRAWER_WIDTH = 88; // Standard for icon-only navigation
@@ -43,6 +46,8 @@ export default function ProviderMainLayout({ children }: { children: React.React
   const [anchorElNotifications, setAnchorElNotifications] = useState<null | HTMLElement>(null);
   const { user, profile, signOut } = useAuth();
   const router = useRouter();
+  const pathname = usePathname(); // Added usePathname hook
+  const { isLoadingPage, setIsLoadingPage } = usePageLoading(); // Added page loading context
 
   const handleOpenUserMenu = (event: React.MouseEvent<HTMLElement>) => setAnchorElUser(event.currentTarget);
   const handleCloseUserMenu = () => setAnchorElUser(null);
@@ -79,6 +84,9 @@ export default function ProviderMainLayout({ children }: { children: React.React
   };
 
   const handleNavigate = (path: string) => {
+    if (pathname !== path) { // Used pathname from usePathname hook
+        setIsLoadingPage(true);
+    }
     router.push(path);
     handleCloseUserMenu();
   };
@@ -171,10 +179,6 @@ export default function ProviderMainLayout({ children }: { children: React.React
                 <ListItemIcon><AccountCircle fontSize="small" /></ListItemIcon>
                 Profile
               </MenuItem>
-              <MenuItem onClick={() => handleNavigate('/provider/settings')}>
-                 <ListItemIcon><Settings fontSize="small" /></ListItemIcon>
-                 Settings
-              </MenuItem>
               <Divider sx={{ borderStyle: 'dashed' }} />
                {/* Keep local sx for error color as it's specific */}
               <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
@@ -214,6 +218,7 @@ export default function ProviderMainLayout({ children }: { children: React.React
           <ProviderSideDrawerContent 
             isCollapsed={false}
             onToggleCollapse={() => {}}
+            setIsLoadingPage={setIsLoadingPage}
           /> 
         </Drawer>
 
@@ -238,6 +243,7 @@ export default function ProviderMainLayout({ children }: { children: React.React
           <ProviderSideDrawerContent 
             isCollapsed={isDrawerCollapsed}
             onToggleCollapse={handleCollapseToggle}
+            setIsLoadingPage={setIsLoadingPage}
           /> 
         </Drawer>
       </Box>
@@ -249,16 +255,35 @@ export default function ProviderMainLayout({ children }: { children: React.React
           flexGrow: 1,
           p: 3,
           width: { md: `calc(100% - ${currentDrawerWidth}px)` },
-          minHeight: '100vh',
-          backgroundColor: theme.palette.background.default,
-          transition: theme.transitions.create(['margin', 'width'], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.enteringScreen,
-          }),
+          mt: { // Dynamically calculate based on AppBar Toolbar height
+            // This might need adjustment if toolbar height is variable across screen sizes
+            xs: '56px', // Standard mobile toolbar height
+            sm: '64px', // Standard desktop toolbar height
+          },
+          position: 'relative', // Important for Backdrop positioning
+          transition: 'padding-left 0.3s ease-in-out', // Smooth transition for content area
         }}
       >
-        <Toolbar /> {/* Offset content below AppBar */}
+        {/* Removed Toolbar spacer */}
         {children}
+        {/* PAGE LOADER START */}
+        <Backdrop
+          sx={{
+            position: 'absolute', // Position relative to the parent Box
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            color: (theme) => theme.palette.mode === 'dark' ? theme.palette.grey[300] : theme.palette.grey[700],
+            backgroundColor: (theme) => alpha(theme.palette.background.default, 0.3),
+            backdropFilter: 'blur(3px)',
+            zIndex: (theme) => theme.zIndex.drawer + 10, // Ensure it's above content but below modals if any
+          }}
+          open={isLoadingPage}
+        >
+          <CircularProgress color="inherit" />
+        </Backdrop>
+        {/* PAGE LOADER END */}
       </Box>
     </Box>
   );

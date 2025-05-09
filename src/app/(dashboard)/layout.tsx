@@ -43,6 +43,8 @@ import {
   School as EducationIcon,            // Added
   Feedback as FeedbackIcon,           // Added
   CardGiftcard as CardGiftcardIcon, // Added for Packages specifically
+  ChevronLeft as ChevronLeftIcon, // For collapse button
+  ChevronRight as ChevronRightIcon, // For collapse button
 } from '@mui/icons-material';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
@@ -63,6 +65,7 @@ const setLoggedInCookie = () => {
 };
 
 const drawerWidth = 240;
+const COLLAPSED_DRAWER_WIDTH = 88; // Standard for icon-only navigation
 
 const patientNavItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
@@ -73,7 +76,7 @@ const patientNavItems = [
   { text: 'Documents', icon: <DocumentsIcon />, path: '/dashboard/documents' },
   { text: 'Education', icon: <EducationIcon />, path: '/dashboard/education' },
   { text: 'Payments', icon: <PaymentIcon />, path: '/dashboard/payments' },
-  { text: 'Profile', icon: <ProfileIcon />, path: '/dashboard/profile' },
+  // { text: 'Profile', icon: <ProfileIcon />, path: '/dashboard/profile' }, // This line is commented out
   { text: 'Settings', icon: <SettingsIcon />, path: '/dashboard/settings' },
   { text: 'Feedback', icon: <FeedbackIcon />, path: '/dashboard/feedback' },
 ];
@@ -88,12 +91,14 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // Add breakpoint check
+  const isDesktop = useMediaQuery(theme.breakpoints.up('sm')); // For desktop-specific collapse behavior
   const { isLoadingPage } = usePageLoading(); // <-- ADD THIS LINE TO GET THE STATE
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [hasManuallyCheckedCookie, setHasManuallyCheckedCookie] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorElUser, setAnchorElUser] = useState<null | HTMLElement>(null); // Renamed from anchorEl for clarity
   const [isLoggingOut, setIsLoggingOut] = useState(false); // Added logout loading state
+  const [isDrawerCollapsed, setIsDrawerCollapsed] = useState(false); // State for drawer collapse
 
   const logoHeight = isMobile ? 46 : 48; // Calculate logo height
 
@@ -200,6 +205,12 @@ export default function DashboardLayout({
     setMobileOpen(!mobileOpen);
   };
 
+  const handleCollapseToggle = () => {
+    if (isDesktop) { // Collapse only on desktop
+      setIsDrawerCollapsed(!isDrawerCollapsed);
+    }
+  };
+
   const handleUserMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorElUser(event.currentTarget);
   };
@@ -229,24 +240,30 @@ export default function DashboardLayout({
     // Note: We don't set isLoggingOut back to false as we are navigating away.
   };
 
+  const effectiveDrawerWidth = isDesktop && isDrawerCollapsed ? COLLAPSED_DRAWER_WIDTH : drawerWidth;
+
   const drawer = (
-    <div>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Apply theme colors, center content, ensure height, add Logo */}
        <Toolbar sx={{ 
          minHeight: { xs: 56, sm: 64 }, 
          display: 'flex', 
          alignItems: 'center', 
-         justifyContent: 'center',
-         backgroundColor: theme.palette.primary.main, // Add theme background
-         color: theme.palette.primary.contrastText, // Add theme text color
+         // Adjust justifyContent and padding for collapsed state on desktop
+         justifyContent: isDesktop && isDrawerCollapsed ? 'center' : 'flex-start',
+         px: isDesktop && isDrawerCollapsed ? 0 : 2, 
+         backgroundColor: theme.palette.primary.main, 
+         color: theme.palette.primary.contrastText,
+         transition: theme.transitions.create(['justify-content', 'padding'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+         }),
         }}>
-         {/* Remove Typography, Add Logo */}
          <Link href="/dashboard" passHref>
-            <Logo height={logoHeight} />
+            <Logo height={logoHeight} collapsed={isDesktop && isDrawerCollapsed} />
          </Link>
        </Toolbar>
-      {/* <Divider /> // Temporarily comment out Divider */}
-      <List sx={{ p: 1 }}>
+      <List sx={{ p: 1, flexGrow: 1, overflowY: 'auto' }}>
         {patientNavItems.map((item) => (
           <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
             <ListItemButton
@@ -256,29 +273,39 @@ export default function DashboardLayout({
               sx={{
                 borderRadius: theme.shape.borderRadius,
                 py: 1,
-                px: 1.5,
+                px: isDesktop && isDrawerCollapsed ? 1.5 : 1.5, // Adjust padding if needed for collapsed
+                justifyContent: isDesktop && isDrawerCollapsed ? 'center' : 'flex-start',
                 color: theme.palette.text.secondary,
+                transition: theme.transitions.create(['padding', 'justify-content'], {
+                    easing: theme.transitions.easing.sharp,
+                    duration: theme.transitions.duration.enteringScreen,
+                }),
                 '&:hover': {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.04), // Lighter hover
+                  backgroundColor: alpha(theme.palette.primary.main, 0.04), 
                 },
                 '&.Mui-selected': {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.08), // Lighter selected
+                  backgroundColor: alpha(theme.palette.primary.main, 0.08), 
                   color: theme.palette.primary.main,
-                  fontWeight: 'fontWeightMedium', // Medium weight
+                  fontWeight: 'fontWeightMedium', 
                   '&:hover': {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.12), // Lighter selected hover
+                    backgroundColor: alpha(theme.palette.primary.main, 0.12), 
                   },
                   '& .MuiListItemIcon-root': {
                     color: theme.palette.primary.main,
                   },
                   '& .MuiListItemText-primary': {
-                    fontWeight: 'fontWeightMedium', // Medium weight
+                    fontWeight: 'fontWeightMedium', 
                   },
                 },
                 '& .MuiListItemIcon-root': {
                   color: theme.palette.text.secondary,
                   minWidth: 'auto',
-                  marginRight: theme.spacing(1.5),
+                  marginRight: isDesktop && isDrawerCollapsed ? 0 : theme.spacing(1.5),
+                  justifyContent: 'center',
+                  transition: theme.transitions.create(['margin'], {
+                      easing: theme.transitions.easing.sharp,
+                      duration: theme.transitions.duration.enteringScreen,
+                  }),
                 },
                 '& .MuiListItemText-primary': {
                   fontSize: '0.875rem',
@@ -288,28 +315,33 @@ export default function DashboardLayout({
               <ListItemIcon>
                 {item.icon}
               </ListItemIcon>
-              <ListItemText primary={item.text} />
+              {/* Hide text when collapsed on desktop */}
+              {(!isDrawerCollapsed || !isDesktop) && <ListItemText primary={item.text} />}
             </ListItemButton>
           </ListItem>
         ))}
       </List>
-       {/* Optional: Add Settings/Logout directly in the drawer */}
-      {/* <Divider sx={{ mt: 'auto' }} />
-       <List sx={{ p: 1 }}>
-         <ListItem disablePadding sx={{ mb: 0.5 }}>
-           <ListItemButton component={Link} href="/dashboard/settings" selected={pathname === '/dashboard/settings'} sx={listItemSx}>
-             <ListItemIcon sx={iconSx}><SettingsIcon /></ListItemIcon>
-             <ListItemText primary="Settings" />
-           </ListItemButton>
-         </ListItem>
-         <ListItem disablePadding>
-           <ListItemButton onClick={handleLogout} sx={listItemSx}>
-             <ListItemIcon sx={iconSx}><LogoutIcon /></ListItemIcon>
-             <ListItemText primary="Logout" />
-           </ListItemButton>
-         </ListItem>
-       </List> */}
-    </div>
+      {/* Collapse Toggle Button - Only on Desktop */}
+      {isDesktop && (
+        <Box
+          sx={{
+            p: isDrawerCollapsed ? 1 : 2,
+            mt: 'auto',
+            display: 'flex',
+            justifyContent: isDrawerCollapsed ? 'center' : 'flex-end',
+            borderTop: `1px solid ${theme.palette.divider}`,
+            transition: theme.transitions.create(['padding', 'justify-content'], {
+                easing: theme.transitions.easing.sharp,
+                duration: theme.transitions.duration.enteringScreen,
+            }),
+          }}
+        >
+          <IconButton onClick={handleCollapseToggle} size="small">
+            {isDrawerCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+          </IconButton>
+        </Box>
+      )}
+    </Box>
   );
   // --- End: New Side Drawer Logic ---
 
@@ -319,12 +351,16 @@ export default function DashboardLayout({
       <CssBaseline />
       <AppBar
         position="fixed"
-        elevation={0} // Add elevation={0}
+        elevation={0} 
         sx={{
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          ml: { sm: `${drawerWidth}px` },
-          // Relying on global MuiAppBar override for colors. Add border.
+          // Adjust width and ml for collapsed state on desktop
+          width: { sm: `calc(100% - ${effectiveDrawerWidth}px)` },
+          ml: { sm: `${effectiveDrawerWidth}px` },
            borderBottom: `1px solid ${alpha(theme.palette.primary.contrastText || '#fff', 0.12)}`,
+           transition: theme.transitions.create(['width', 'margin'], {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.enteringScreen,
+           }),
         }}
       >
         <Toolbar sx={{ minHeight: { xs: 56, sm: 64 }, justifyContent: 'space-between' }}>
@@ -368,39 +404,42 @@ export default function DashboardLayout({
             </IconButton>
           </Tooltip>
           <Menu
+            sx={{ mt: '45px' }} // Match Provider positioning
+            id="menu-appbar-patient" // Add an ID
             anchorEl={anchorElUser}
             open={Boolean(anchorElUser)}
             onClose={handleUserMenuClose}
             anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            // Keep slotProps for now, can be removed if global theme handles Paper styling adequately
             slotProps={{
                 paper: {
                     sx: {
-                        mt: 1.5,
+                        mt: 1.5, // This mt might conflict with sx={{ mt: '45px' }} on Menu. Let's keep outer one.
                         borderRadius: '4px',
-                        boxShadow: theme.shadows[3], // Use theme shadow
+                        boxShadow: theme.shadows[3], 
                         minWidth: 180,
                     },
                 },
             }}
           >
+            {/* User Info Box */}
+            <Box sx={{ my: 1.5, px: 2.5 }}>
+              <Typography variant="subtitle2" noWrap>
+                {profile?.first_name || user?.email?.split('@')[0]} {profile?.last_name || ''}
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }} noWrap>
+                {user?.email}
+              </Typography>
+            </Box>
+            <Divider sx={{ borderStyle: 'dashed' }} />
             <MenuItem component={Link} href="/dashboard/profile" onClick={handleUserMenuClose} sx={{ py: 1, px: 2 }}>
-              <ListItemIcon sx={{ minWidth: 'auto', mr: 1.5 }}>
-                <ProfileIcon fontSize="small" />
-              </ListItemIcon>
+              <ListItemIcon sx={{ minWidth: 'auto', mr: 1.5 }}><ProfileIcon fontSize="small" /></ListItemIcon>
               <Typography variant="body2">Profile</Typography>
             </MenuItem>
-            <MenuItem component={Link} href="/dashboard/settings" onClick={handleUserMenuClose} sx={{ py: 1, px: 2 }}>
-              <ListItemIcon sx={{ minWidth: 'auto', mr: 1.5 }}>
-                <SettingsIcon fontSize="small" />
-              </ListItemIcon>
-              <Typography variant="body2">Settings</Typography>
-            </MenuItem>
-            <Divider />
-            <MenuItem onClick={handleLogout} sx={{ py: 1, px: 2 }}>
-              <ListItemIcon sx={{ minWidth: 'auto', mr: 1.5 }}>
-                <LogoutIcon fontSize="small" />
-              </ListItemIcon>
+            <Divider sx={{ borderStyle: 'dashed' }} />
+            <MenuItem onClick={handleLogout} sx={{ py: 1, px: 2, color: 'error.main' }}>
+              <ListItemIcon sx={{ minWidth: 'auto', mr: 1.5, color: 'error.main' }}><LogoutIcon fontSize="small" /></ListItemIcon>
               <Typography variant="body2">Logout</Typography>
             </MenuItem>
           </Menu>
@@ -408,8 +447,14 @@ export default function DashboardLayout({
       </AppBar>
       <Box
         component="nav"
-        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
-        aria-label="mailbox folders" // Added aria-label
+        // Adjust width for collapsed state on desktop
+        sx={{ width: { sm: effectiveDrawerWidth }, flexShrink: { sm: 0 },
+            transition: theme.transitions.create('width', {
+                easing: theme.transitions.easing.sharp,
+                duration: theme.transitions.duration.enteringScreen,
+            }),
+        }}
+        aria-label="mailbox folders" 
       >
         {/* Mobile Drawer */}
         <Drawer
@@ -417,7 +462,7 @@ export default function DashboardLayout({
           open={mobileOpen}
           onClose={handleDrawerToggle}
           ModalProps={{
-            keepMounted: true, // Better open performance on mobile.
+            keepMounted: true, 
           }}
           sx={{
             display: { xs: 'block', sm: 'none' },
@@ -433,7 +478,12 @@ export default function DashboardLayout({
             display: { xs: 'none', sm: 'block' },
             '& .MuiDrawer-paper': { 
                 boxSizing: 'border-box', 
-                width: drawerWidth, 
+                width: effectiveDrawerWidth, // Use effectiveDrawerWidth
+                overflowX: 'hidden', // Prevent horizontal scroll when collapsing
+                transition: theme.transitions.create('width', {
+                    easing: theme.transitions.easing.sharp,
+                    duration: theme.transitions.duration.enteringScreen,
+                }),
              }, 
           }}
           open
@@ -446,15 +496,19 @@ export default function DashboardLayout({
         sx={{
           flexGrow: 1,
           p: { xs: 2, sm: 3 }, 
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          // Adjust width for collapsed state on desktop
+          width: { sm: `calc(100% - ${effectiveDrawerWidth}px)` },
           mt: { xs: '56px', sm: '64px' }, 
-          position: 'relative', // <-- ENSURE THIS IS PRESENT OR ADD IT
+          position: 'relative', 
           backgroundColor: theme.palette.background.default, 
           overflowX: 'hidden', 
+          transition: theme.transitions.create('width', {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
         }}
       >
         {/* Remove the Toolbar spacer here as mt handles the space */}
-        {/* <Toolbar /> */}
         {children}
         {/* PAGE LOADER START */}
         <Backdrop

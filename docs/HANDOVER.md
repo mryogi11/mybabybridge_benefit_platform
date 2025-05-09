@@ -132,14 +132,49 @@ The application uses Supabase for authentication with the following key componen
 
 ### Global Page Loading Strategy
 - **Purpose**: To enhance the user experience during page navigation (primarily via the main side-drawer menu) by providing immediate visual feedback. This reduces perceived latency when navigating between sections of the application.
-- **Key Components & Logic**:\
-    - `src/contexts/LoadingContext.tsx`: Defines and provides the global `isLoadingPage` state and the `setIsLoadingPage` function to control it.\
-    - `src/app/layout.tsx`: Wraps the entire application with `LoadingContext.Provider` to make the loading state accessible globally.\
-    - `src/components/globals/PageChangeHandler.tsx`: A client component that utilizes the `usePathname` and `useSearchParams` hooks. It listens for route changes and automatically sets `isLoadingPage` to `false` once navigation is complete.\
-    - Navigation Components (e.g., `src/components/Navigation.tsx`): When a navigation action is initiated (e.g., a menu item click), `setIsLoadingPage(true)` is called immediately before `router.push()` to activate the loader.
-- **Integration & UI Display**:\
-    - The actual loader UI (typically an MUI `Backdrop` component containing a `CircularProgress` indicator) is implemented within the role-specific layout files (e.g., `src/app/(dashboard)/layout.tsx`, `src/app/(admin)/layout.tsx`, `src/app/(provider)/layout.tsx`). These layouts consume the `isLoadingPage` state from `LoadingContext` and conditionally render the loader.
-- **Scope**: Implemented for main navigation across patient, provider, and admin dashboards, assuming they utilize the `Navigation.tsx` component or a similar mechanism that integrates with `LoadingContext`.
+- **Key Components & Logic**:
+    - `src/contexts/LoadingContext.tsx`: Defines and provides the global `isLoadingPage` state and the `setIsLoadingPage` function to control it.
+    - `src/app/layout.tsx`: Wraps the entire application with `LoadingContext.Provider` to make the loading state accessible globally.
+    - `src/components/globals/PageChangeHandler.tsx`: A client component that utilizes the `usePathname` and `useSearchParams` hooks. It listens for route changes and automatically sets `isLoadingPage` to `false` once navigation is complete.
+    - Navigation Components (e.g., `patientNavItems` in `src/app/(dashboard)/layout.tsx`, `adminNavItems` in `src/app/(admin)/layout.tsx`, and `ProviderSideDrawerContent.tsx` for Provider layout): When a navigation action is initiated (e.g., a menu item click), `setIsLoadingPage(true)` is called immediately before `router.push()` to activate the loader.
+- **Integration & UI Display**:
+    - The actual loader UI (typically an MUI `Backdrop` component containing a `CircularProgress` indicator) is implemented within the role-specific layout files (`src/app/(dashboard)/layout.tsx`, `src/app/(admin)/layout.tsx`, and `src/components/layouts/ProviderMainLayout.tsx` which is used by `src/app/(provider)/layout.tsx`). These layouts consume the `isLoadingPage` state from `LoadingContext` and conditionally render the loader.
+- **Scope**: Implemented and verified for main navigation across Patient, Provider, and Admin dashboards.
+
+### Collapsible Side Drawers
+- **Functionality**: The side drawers for Patient, Provider, and Admin dashboards are now collapsible on desktop views. This allows users to expand or shrink the drawer to an icon-only view, providing more screen real estate for main content.
+- **Implementation**:
+    - Managed by state within the respective layout files (`src/app/(dashboard)/layout.tsx`, `src/app/(admin)/layout.tsx`, and `src/components/layouts/ProviderMainLayout.tsx` for the provider).
+    - A toggle button (Chevron icon) is present at the bottom of the drawer on desktop.
+    - Drawer items (icons and text) and the main content area's width adjust smoothly with transitions.
+- **Consistency**: Implemented across all three main user roles for a uniform experience.
+
+### Consistent Profile Dropdown Menus
+- **Standardization**: The user profile dropdown menu (accessed by clicking the user avatar in the top app bar) has been standardized across Patient, Provider, and Admin dashboards.
+- **Structure**:
+    - Displays user's full name and email.
+    - Provides a link to their respective "Profile" or "Profile Settings" page.
+    - Includes a "Logout" option.
+    - Uses consistent dashed dividers and styling for icons and text, including an error color for the Logout action.
+- **Implementation**: Achieved by updating the `Menu` component structure within `src/app/(dashboard)/layout.tsx`, `src/app/(admin)/layout.tsx`, and `src/components/layouts/ProviderMainLayout.tsx`.
+
+### User Settings Pages
+- **Goal**: To provide users (Patients, Providers, Admins) with a dedicated area to manage their account settings, including appearance (theme), security (password), and profile information.
+- **Implementation Across Roles**:
+    - **Patient Settings (`src/app/(dashboard)/dashboard/settings/page.tsx`)**:
+        - Functional: Theme selection, Password change.
+        - UI Cleanup: Placeholder sections for Notifications, Language/Region, Accessibility, 2FA, and Profile Visibility have been hidden with `TODO` comments in the code for future implementation.
+        - The direct "Profile" link from the main side drawer menu has been removed; profile access is now consolidated within the user avatar dropdown menu.
+    - **Provider Settings (`src/app/(provider)/provider/settings/page.tsx`)**:
+        - Functional: Theme selection, Password change.
+        - UI Cleanup: The placeholder "Notification Preferences" section and direct links for "Payment Settings" and detailed "Notifications" have been commented out/removed, with `TODO` comments for future review and implementation.
+    - **Admin Settings (`src/app/(admin)/admin/settings/page.tsx`)**:
+        - Functional: Theme selection, Profile Information editing (first name, last name), Password change.
+- **Key Actions & Components**:
+    - Utilizes the `updateUserPassword` server action (from `src/actions/userActions.ts`) for password changes across all roles.
+    - Leverages `updateUserThemePreference` (from `src/actions/userActions.ts`) for theme changes.
+    - Admin profile updates use `updateAdminProfile` (from `src/actions/userActions.ts`).
+    - MUI components (`TextField`, `Button`, `Select`, `Snackbar`, etc.) are used for the UI, consistent with the rest of the application.
 
 ## Known Issues and Challenges
 
@@ -251,34 +286,17 @@ This project implements a comprehensive fertility care platform with multiple us
 
 The codebase is structured to be maintainable and scalable, with clear separation of concerns between components, contexts, and API routes. Continue following the established patterns when adding new features or modifying existing ones. 
 
-## Recent Changes and Updates (as of April 2025)
+## Project Status (as of May 2025)
 
-The platform has undergone significant UI/UX improvements focused on brand consistency, performance optimization, and user experience enhancements. Key updates include:
-
-1. **Brand Refresh**: Implemented new logo and consistent color scheme across all pages
-2. **Authentication Experience**: Redesigned login and registration pages with improved layout and branding
-3. **Welcome Page**: Enhanced with family imagery, testimonials, and professional styling
-4. **Profile Features**: Added Gravatar support and improved profile management
-5. **Performance**: Reduced page load times and added visual feedback during transitions
-6. **Mobile Responsiveness**: Improved adaptability across different device sizes
-
-These changes have significantly enhanced the platform's professional appearance and user experience, establishing a strong foundation for future feature development. 
-
-## Project Status
-
-*   **Overall:** Development in progress. Core authentication and basic layouts for Admin and Provider are functional. Admin user listing and creation (including detailed provider creation via Server Action) is implemented. Provider login and dashboard access issues have been resolved.
-*   **Auth:** Supabase Auth is used. Basic sign-up/sign-in/sign-out works. Role handling is implemented via `users` table.
-*   **Database:** Supabase Postgres. Schema is managed via **Drizzle ORM** (`src/lib/db/schema.ts`) and manual application of migrations generated by `drizzle-kit` (stored in `./drizzle`). Historical Supabase CLI migrations exist in `supabase/migrations` but are **not used**.
-*   **Admin Module:** User list page with search/filter implemented. User creation dialog allows adding all roles, including providers with specific details. Edit/Delete functionality is pending.
-*   **Provider Module:** Basic layout and sidebar navigation implemented. Dashboard is accessible after login. Appointments page shows provider's schedule with status updates (complete/cancel). Patient list, Profile, Messages, Settings need content/functionality.
-*   **Patient Module:** Layout exists. Appointments page allows viewing, booking (via modal with provider availability), and cancelling appointments. Profile, Messages, Settings need content/functionality.
-*   **Appointments:** 
-    *   Patient can view appointments, book new ones (selecting provider, date, time slot based on Drizzle-fetched availability), and cancel.
-    *   Provider can view their appointments and update status (Complete, Cancel).
-    *   Calendars on patient/provider dashboards and booking modal visually indicate booked (blue), available (blue border - modal only), and cancelled-only (orange) dates.
-*   **UI/UX:** Using Material UI (MUI) with a custom Minimal theme, aiming for consistency. 
-    *   **Visual Target:** Component styling aims to emulate the Minimal UI Kit free demo ([https://free.minimals.cc/](https://free.minimals.cc/)). Theme overrides are used to centralize styles.
-*   **Payments:** Stripe integration is planned but not started.
+*   **Overall:** Development is ongoing and active. Core infrastructure (Next.js 15, Supabase, Drizzle, MUI) is stable. Key features like Benefit Verification (UI/basic logic), Secure Messaging (Server Actions), and Appointment Management are largely functional. Recent work focused on UI/UX consistency (collapsible drawers, standardized profile menus, global page loader) and implementing user settings pages (theme, password, profile info) for all roles. Development server and production builds are stable.
+*   **Auth:** Supabase Auth is used. Sign-up/sign-in/sign-out works. Role handling is implemented via the `users` table.
+*   **Database:** Supabase Postgres. Schema is managed via **Drizzle ORM** (`src/lib/db/schema.ts`). Migrations are generated by `drizzle-kit` (stored in `./drizzle`) and applied manually. Historical Supabase CLI migrations (`supabase/migrations`) are **not used**.
+*   **Admin Module:** User listing, creation (including provider details via Server Action), and role updates are functional. Settings page allows theme, profile (name), and password updates. Other areas like Package Management, Organization Management, and detailed Provider Management have varying levels of completion (some APIs exist, UI may be pending or use client-side Supabase).
+*   **Provider Module:** Dashboard, Appointments (view, status update), Patient List, and Secure Messaging are functional. Settings page allows theme and password updates; other settings are placeholder/hidden. Profile and Availability management uses client-side Supabase calls.
+*   **Patient Module:** Dashboard, Appointments (view, book, cancel via Server Actions), Secure Messaging are functional. Settings page allows theme and password updates; other settings are placeholder/hidden. Profile management is a placeholder. Educational resources UI is functional but uses client-side Supabase.
+*   **UI/UX:** Using Material UI (MUI) with a custom theme. Recent enhancements include global page loading, collapsible side drawers, and consistent profile dropdowns for all roles.
+*   **Payments:** Stripe integration is partially implemented for the Benefit Verification flow. Webhook handling for payment confirmation is a critical pending item.
+*   **Benefit Verification:** Multi-step UI and basic logic are in place. Stripe Payment Intent creation is functional. Needs robust webhook handling and potentially more advanced verification logic.
 
 ## Key Code Locations
 
@@ -310,7 +328,7 @@ These changes have significantly enhanced the platform's professional appearance
 ## Handover Checklist
 
 *   [x] Environment variables (`.env.local`) configured correctly.
-*   [x] Database schema applied via `npx supabase db reset --linked` using corrected migrations.
+*   [x] Database schema applied (via Drizzle workflow).
 *   [x] Clear understanding of the current feature set and limitations.
 *   [ ] Familiarity with the key code locations listed above.
 *   [ ] Review `TODO.md` for pending tasks and priorities.

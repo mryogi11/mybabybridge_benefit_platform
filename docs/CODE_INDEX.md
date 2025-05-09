@@ -8,11 +8,15 @@ This document provides a comprehensive index of the MyBabyBridge codebase, organ
 src/
 ├── app/                    # Main application code with Next.js App Router
 │   ├── (admin)/            # Admin-specific pages
+│   │   ├── layout.tsx      # Admin dashboard layout (collapsible side drawer, consistent profile menu, page loader)
+│   │   └── admin/
+│   │       └── settings/   # Admin account settings (theme, profile info, password)
 │   ├── (auth)/             # Authentication-related pages
 │   │   ├── login/          # Login page
 │   │   └── register/       # Registration page
 │   ├── (benefit-verification)/ # Benefit Verification flow steps
 │   ├── (dashboard)/        # User dashboard pages (Uses side-drawer layout)
+│   │   ├── layout.tsx      # Patient dashboard layout (collapsible side drawer, consistent profile menu, page loader)
 │   │   └── dashboard/      # Dashboard content pages
 │   │       ├── analytics/         # Analytics dashboards
 │   │       ├── appointments/      # Appointment management
@@ -26,9 +30,12 @@ src/
 │   │       ├── payments/          # Payment management
 │   │       ├── profile/           # User profile
 │   │       ├── provider/          # Provider information
-│   │       ├── settings/          # User settings
+│   │       ├── settings/          # Patient account settings (theme, password); other placeholders hidden
 │   │       └── treatments/        # (Deprecated) Treatment information -> see packages
 │   ├── (provider)/         # Provider-specific pages (Uses side-drawer layout)
+│   │   ├── layout.tsx      # Provider dashboard wrapper (uses ProviderMainLayout)
+│   │   └── provider/
+│   │       └── settings/   # Provider account settings (theme, password)
 │   └── api/                # API routes
 ├── components/             # Reusable UI components
 │   ├── auth/               # Authentication-related components
@@ -37,7 +44,7 @@ src/
 │   ├── LoadingProvider.tsx # DEPRECATED - Global page loading managed by LoadingContext.tsx and PageChangeHandler.tsx
 │   ├── Logo.tsx            # Logo component
 │   ├── MilestoneNotes.tsx  # (Review/Remove if unused) Treatment milestone notes
-│   ├── Navigation.tsx      # Side-drawer navigation component (triggers global page loader via LoadingContext)
+│   ├── Navigation.tsx      # Side-drawer navigation component (triggers global page loader via LoadingContext) - Primarily for Patient dashboard structure before full layout refactor.
 │   ├── Notifications.tsx   # Notifications component
 │   ├── SkeletonLoader.tsx  # Loading skeleton component for content areas
 │   └── ThemeRegistry/      # MUI v5 theme and Emotion cache setup
@@ -45,6 +52,8 @@ src/
 │       └── ThemeRegistry.tsx      # Main wrapper component for theme context + cache
 │   ├── globals/            # Global utility components
 │       └── PageChangeHandler.tsx # Client component using router hooks to set isLoadingPage (from LoadingContext) to false on route changes.
+│   ├── layouts/            # Shared or role-specific layout components
+│       └── ProviderMainLayout.tsx # Core layout for Provider dashboard (collapsible side drawer, consistent profile menu, page loader)
 ├── contexts/               # React context providers
 │   ├── AuthContext.tsx     # Authentication context (includes user profile, role, theme preference)
 │   ├── LoadingContext.tsx    # Manages global page loading state (isLoadingPage, setIsLoadingPage) used for full-page transitions.
@@ -206,7 +215,7 @@ For better user experience, the application uses optimistic updates for common o
 2. **Persistence:** The user's preferred theme is stored in the `users` table (`theme_preference` column, which is a `theme_mode` enum defined in `src/lib/db/schema.ts`) and loaded via `AuthContext`. Changes are saved using the `updateUserThemePreference` server action (in `src/actions/userActions.ts`).
 3. **Default:** Defaults to `dark` mode if no preference is set or for logged-out users (see `setInitialThemeScript` in `src/app/layout.tsx` and initial state in `ClientThemeProviders.tsx`).
 4. **System Preference:** Uses `useMediaQuery` to detect OS preference when 'system' mode is selected.
-5. **UI:** `ThemeRegistry` applies the theme using MUI's `ThemeProvider`. Settings pages for Patients (`src/app/(dashboard)/dashboard/settings/page.tsx`), Providers (`src/app/(provider)/provider/settings/page.tsx`), and Admins (`src/app/(admin)/admin/settings/page.tsx`) allow user selection from the available themes.
+5. **UI:** `ThemeRegistry` applies the theme using MUI's `ThemeProvider`. Settings pages for Patients (`src/app/(dashboard)/dashboard/settings/page.tsx`), Providers (`src/app/(provider)/provider/settings/page.tsx`), and Admins (`src/app/(admin)/admin/settings/page.tsx`) allow user selection from the available themes and password changes. Admin settings also allow profile name updates.
 
 ## Pages and Routes
 
@@ -219,7 +228,7 @@ For better user experience, the application uses optimistic updates for common o
 #### Dashboard Pages
 
 - **Dashboard Home**: Main dashboard with overview and quick access via side-drawer navigation.
-- **Profile**: User profile information and management
+- **Profile**: User profile information and management (Patient profile access is via user menu, side drawer link removed).
 - **Appointments**: Appointment scheduling and history
 - **Benefit Verification**: Multi-step flow for benefit verification and package selection.
 - **Packages**: Available benefit/treatment packages.
@@ -227,7 +236,7 @@ For better user experience, the application uses optimistic updates for common o
 - **Notifications**: User notifications center
 - **Education**: Educational resources for patients
 - **Documents**: Document management and sharing
-- **Settings**: User preferences and account settings (including Theme Selection).
+- **Settings (`/dashboard/settings`)**: Patient preferences and account settings (Theme Selection, Password Change). Other placeholder settings are hidden.
 
 #### Provider Pages
 
@@ -235,11 +244,13 @@ For better user experience, the application uses optimistic updates for common o
 - **Patient Management**: Provider tools for managing patient information
 - **Schedule Management**: Provider appointment scheduling tools
 - **Messages**: Provider secure messaging interface (`/provider/messages/page.tsx`) for communicating with patients. Uses Server Actions (`src/actions/messageActions.ts`) and Supabase Realtime.
+- **Settings (`/provider/settings`)**: Provider preferences and account settings (Theme Selection, Password Change). Other placeholder settings are hidden.
 
 #### Admin Pages
 
 - **Admin Dashboard**: Administrative dashboard
 - **User Management**: Admin tools for managing users (reflects `users` table structure including first/last names).
+- **Settings (`/admin/settings`)**: Admin preferences and account settings (Theme Selection, Profile Info Update, Password Change).
 
 ## Server Actions (`src/actions/*`)
 

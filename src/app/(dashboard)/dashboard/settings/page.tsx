@@ -21,7 +21,9 @@ import {
   Grid,
   Select,
   MenuItem,
-  FormControl
+  FormControl,
+  CircularProgress,
+  SelectChangeEvent
 } from '@mui/material';
 import { 
   Notifications, 
@@ -33,6 +35,7 @@ import {
   Accessibility
 } from '@mui/icons-material';
 import { useThemeMode } from '@/components/ThemeRegistry/ClientThemeProviders';
+import { updateUserPassword } from '@/actions/userActions';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -62,6 +65,9 @@ export default function SettingsPage() {
   const [tabValue, setTabValue] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const { modeSetting, setModeSetting } = useThemeMode();
   const [settings, setSettings] = useState({
     emailNotifications: true,
@@ -80,6 +86,7 @@ export default function SettingsPage() {
     message: '',
     severity: 'success' as 'success' | 'info' | 'warning' | 'error',
   });
+  const [isPasswordChanging, setIsPasswordChanging] = useState(false);
 
   useEffect(() => {
     setLocalThemeSetting(modeSetting);
@@ -93,10 +100,10 @@ export default function SettingsPage() {
     setSettings({ ...settings, [name]: event.target.checked });
   };
 
-  const handleThemeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newMode = event.target.value as 'light' | 'dark' | 'system';
+  const handleThemeChange = (event: SelectChangeEvent<typeof localThemeSetting>) => {
+    const newMode = event.target.value as typeof localThemeSetting;
     setLocalThemeSetting(newMode);
-    setModeSetting(newMode);
+    setModeSetting(newMode as 'light' | 'dark' | 'system' | 'ocean' | 'mint' | 'rose' | 'charcoal' | 'sunset');
   };
 
   const handleSaveSettings = async () => {
@@ -132,6 +139,58 @@ export default function SettingsPage() {
     });
   };
 
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmNewPassword) {
+      setSnackbar({
+        open: true,
+        message: 'New passwords do not match.',
+        severity: 'error',
+      });
+      return;
+    }
+    if (!currentPassword || !newPassword) {
+        setSnackbar({
+            open: true,
+            message: 'All password fields are required.',
+            severity: 'error',
+        });
+        return;
+    }
+
+    setIsPasswordChanging(true);
+    try {
+      const result = await updateUserPassword({
+        newPassword,
+      });
+
+      if (result.success) {
+        setSnackbar({
+          open: true,
+          message: 'Password updated successfully!',
+          severity: 'success',
+        });
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmNewPassword('');
+      } else {
+        setSnackbar({
+          open: true,
+          message: result.error || 'Failed to update password. Please ensure your current password is correct.',
+          severity: 'error',
+        });
+      }
+    } catch (error) {
+      console.error('Error changing password:', error);
+      setSnackbar({
+        open: true,
+        message: 'An unexpected error occurred. Please try again.',
+        severity: 'error',
+      });
+    } finally {
+      setIsPasswordChanging(false);
+    }
+  };
+
   return (
     <Box>
       <Typography variant="h4" gutterBottom>
@@ -158,6 +217,8 @@ export default function SettingsPage() {
         </Tabs>
 
         <TabPanel value={tabValue} index={0}>
+          {/* TODO: Implement Notification Preferences backend and UI interaction */}
+          {/*
           <Typography variant="h6" gutterBottom>
             Notification Preferences
           </Typography>
@@ -199,18 +260,25 @@ export default function SettingsPage() {
               label="Appointment Reminders"
             />
           </FormGroup>
+          */}
+          <Typography variant="body2" color="text.secondary">
+            Notification preferences will be available in a future update.
+          </Typography>
         </TabPanel>
 
         <TabPanel value={tabValue} index={1}>
           <Typography variant="h6" gutterBottom>
             Security Settings
           </Typography>
-          <Box sx={{ mb: 3 }}>
+          <Box sx={{ mb: 3 }} component="form" onSubmit={(e) => { e.preventDefault(); handleChangePassword(); }}>
             <TextField
-              label="Change Password"
+              label="Current Password"
               type={showPassword ? 'text' : 'password'}
               fullWidth
               margin="normal"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
@@ -226,14 +294,33 @@ export default function SettingsPage() {
               }}
             />
             <TextField
+              label="New Password"
+              type={showPassword ? 'text' : 'password'}
+              fullWidth
+              margin="normal"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+            />
+            <TextField
               label="Confirm New Password"
               type={showPassword ? 'text' : 'password'}
               fullWidth
               margin="normal"
+              value={confirmNewPassword}
+              onChange={(e) => setConfirmNewPassword(e.target.value)}
+              required
+              error={newPassword !== confirmNewPassword && confirmNewPassword !== ''}
+              helperText={newPassword !== confirmNewPassword && confirmNewPassword !== '' ? "Passwords do not match" : ""}
             />
+            <Button type="submit" variant="contained" sx={{ mt: 2 }} disabled={isPasswordChanging || !currentPassword || !newPassword || newPassword !== confirmNewPassword}>
+              {isPasswordChanging ? <CircularProgress size={24} /> : 'Change Password'}
+            </Button>
           </Box>
           <Divider sx={{ my: 2 }} />
           <FormGroup>
+            {/* TODO: Implement Two-Factor Authentication */}
+            {/*
             <FormControlLabel
               control={
                 <Switch
@@ -243,6 +330,9 @@ export default function SettingsPage() {
               }
               label="Two-Factor Authentication"
             />
+            */}
+            {/* TODO: Implement Profile Visibility settings */}
+            {/*
             <FormControlLabel
               control={
                 <Switch
@@ -252,10 +342,16 @@ export default function SettingsPage() {
               }
               label="Profile Visibility"
             />
+            */}
           </FormGroup>
+           <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            Additional security settings like Two-Factor Authentication will be available in a future update.
+          </Typography>
         </TabPanel>
 
         <TabPanel value={tabValue} index={2}>
+          {/* TODO: Implement Language & Region settings persistence */}
+          {/*
           <Typography variant="h6" gutterBottom>
             Language & Region
           </Typography>
@@ -296,9 +392,14 @@ export default function SettingsPage() {
               </TextField>
             </Grid>
           </Grid>
+          */}
+          <Typography variant="body2" color="text.secondary">
+            Language and region settings will be available in a future update.
+          </Typography>
         </TabPanel>
 
         <TabPanel value={tabValue} index={3}>
+          {/* Appearance (Theme) settings are functional and should remain */}
           <Typography variant="h6" gutterBottom>
             Appearance
           </Typography>
@@ -326,6 +427,8 @@ export default function SettingsPage() {
         </TabPanel>
 
         <TabPanel value={tabValue} index={4}>
+          {/* TODO: Implement Accessibility settings persistence */}
+          {/*
           <Typography variant="h6" gutterBottom>
             Accessibility
           </Typography>
@@ -357,9 +460,15 @@ export default function SettingsPage() {
               <option value="large">Large</option>
             </TextField>
           </Box>
+          */}
+          <Typography variant="body2" color="text.secondary">
+            Accessibility settings will be available in a future update.
+          </Typography>
         </TabPanel>
       </Card>
 
+      {/* TODO: Re-enable Save Settings button when other settings are implemented */}
+      {/*
       <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
         <Button
           variant="contained"
@@ -369,6 +478,7 @@ export default function SettingsPage() {
           {isSaving ? 'Saving...' : 'Save Settings'}
         </Button>
       </Box>
+      */}
 
       <Snackbar
         open={snackbar.open}
