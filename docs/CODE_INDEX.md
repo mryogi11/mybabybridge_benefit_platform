@@ -34,17 +34,21 @@ src/
 │   ├── auth/               # Authentication-related components
 │   ├── AppointmentCard.tsx # Appointment display component
 │   ├── BenefitPackageCard.tsx # Benefit Package display component
-│   ├── LoadingProvider.tsx # Loading state manager
+│   ├── LoadingProvider.tsx # DEPRECATED - Global page loading managed by LoadingContext.tsx and PageChangeHandler.tsx
 │   ├── Logo.tsx            # Logo component
 │   ├── MilestoneNotes.tsx  # (Review/Remove if unused) Treatment milestone notes
-│   ├── Navigation.tsx      # Side-drawer navigation component
+│   ├── Navigation.tsx      # Side-drawer navigation component (triggers global page loader via LoadingContext)
 │   ├── Notifications.tsx   # Notifications component
-│   ├── SkeletonLoader.tsx  # Loading skeleton component
+│   ├── SkeletonLoader.tsx  # Loading skeleton component for content areas
 │   └── ThemeRegistry/      # MUI v5 theme and Emotion cache setup
 │       ├── ClientThemeProviders.tsx # Context provider for theme mode (light/dark/system)
 │       └── ThemeRegistry.tsx      # Main wrapper component for theme context + cache
+│   ├── globals/            # Global utility components
+│       └── PageChangeHandler.tsx # Client component using router hooks to set isLoadingPage (from LoadingContext) to false on route changes.
 ├── contexts/               # React context providers
-│   └── AuthContext.tsx     # Authentication context (includes user profile, role, theme preference)
+│   ├── AuthContext.tsx     # Authentication context (includes user profile, role, theme preference)
+│   ├── LoadingContext.tsx    # Manages global page loading state (isLoadingPage, setIsLoadingPage) used for full-page transitions.
+│   ├── BenefitVerificationContext.tsx # Manages state for the multi-step benefit verification flow
 ├── lib/                    # Utility libraries
 │   ├── db/                 # Drizzle ORM client and schema
 │   │   ├── index.ts        # Drizzle client initialization
@@ -63,6 +67,8 @@ src/
 ## Key Database Schema Definitions (`src/lib/db/schema.ts`)
 
 The database schema is defined in `src/lib/db/schema.ts` and managed using Drizzle ORM. Migrations are generated using `drizzle-kit` (e.g., `npm run drizzle:generate`) and applied (e.g., `npm run drizzle:push` for local dev, or manual SQL execution for staging/production). See `README.md` and `docs/SUPABASE_ROLE_INSTRUCTIONS.md` for more on the migration process and RLS/Policy considerations.
+
+**Developer Note on DB Logging:** `src/lib/db/index.ts` now includes detailed console logs during Postgres client and Drizzle ORM initialization (e.g., `[db/index.ts] SUCCESS: Drizzle instance created.`). This is helpful for debugging database connectivity during development.
 
 Key tables include:
 
@@ -97,14 +103,15 @@ Key tables include:
 ### UI Components
 
 - **Logo.tsx**: Brand logo component used throughout the application
-- **Navigation.tsx**: Main side-drawer navigation component for dashboard sections
+- **Navigation.tsx**: Main side-drawer navigation component for dashboard sections. Triggers the global page loader via `LoadingContext`.
 - **ThemeRegistry/ClientThemeProviders.tsx**: Manages the theme mode (light/dark/system) via React Context.
 - **ThemeRegistry/ThemeRegistry.tsx**: Sets up Emotion cache and applies the selected MUI theme.
-- **SkeletonLoader.tsx**: Loading skeleton for improved user experience during data loading
+- **SkeletonLoader.tsx**: Loading skeleton for improved user experience during data loading within page content.
 - **Notifications.tsx**: Notification display and management component
 - **AppointmentCard.tsx**: Reusable card for displaying appointment information
 - **BenefitPackageCard.tsx**: Card component for displaying benefit package information
-- **LoadingProvider.tsx**: Global loading state provider
+- **LoadingProvider.tsx**: DEPRECATED. Global page loading state is managed by `src/contexts/LoadingContext.tsx` and its Provider in `src/app/layout.tsx`. The display is handled by role-specific layouts, and `src/components/globals/PageChangeHandler.tsx` resets the loading state.
+- **PageChangeHandler.tsx** (`src/components/globals/PageChangeHandler.tsx`): A client component that utilizes `usePathname` and `useSearchParams`. It listens for route changes and automatically sets `isLoadingPage` (from `LoadingContext`) to `false` once navigation is complete, hiding the global page loader.
 
 ## Data Flow and State Management
 
@@ -126,7 +133,7 @@ The application uses a combination of React Context API and local component stat
    - When a user logs in, the credentials are sent to Supabase Auth
    - The AuthContext stores the returned session and user data
    - AuthContext provides the user state to all components that need it
-   - The middleware checks the auth state for protected routes
+   - The middleware (`src/middleware.ts`) is now simplified to primarily check for a valid user session. Routing logic based on user status (e.g., `benefit_status`) is delegated to Server Component Layouts to improve reliability and resolve Edge runtime issues.
    - Session is synchronized between tabs using authSync.ts
 
 2. **Data Caching Strategy**:
@@ -362,6 +369,8 @@ The MyBabyBridge application is structured around a modular, component-based arc
 3. **Server Components with Client Islands**: The application leverages Next.js 14's hybrid rendering approach, using server components for static content and client components ('use client') for interactive elements.
 
 4. **Performance-First Approach**: Recent optimizations have focused on perceived performance through skeleton loaders, data caching, and visual feedback during state transitions.
+
+5. **Simplified Middleware**: The application middleware (`src/middleware.ts`) has been refactored to focus solely on session validation. This change addressed previous runtime errors in Edge environments by delegating user status-based routing logic to layout-level Server Components, which enhances separation of concerns and overall system reliability.
 
 ### Development Workflow
 

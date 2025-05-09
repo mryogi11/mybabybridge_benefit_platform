@@ -1,225 +1,75 @@
-# 📋Project TODO List
+# ��Project TODO List
 
-This document tracks the features and tasks for the MyBabyBridge platform.
-*Updated based on PRD/README review and recent debugging (April 2025).*
+*Updated based on detailed review and verification (May 2025). Items marked [VP] are Verified Pending.*
 
 ## Pending Features / Implementation Status
 
 ### Major Features (Pending / Incomplete)
 
-*   [✅] **Benefit Verification Module:** *(Steps 1-6 Completed)*
-    *   [ ] Implement "No Work Email" alternative verification flow (Step 4) - *(Need to clarify if this is still required)*.
-    *   [ ] Review/Refine Stripe Integration for package purchase in Step 6.
-    *   [ ] *(Ref: `docs/BENEFIT_MODULE_GUIDE.md`)*
-*   [✅] **Secure Messaging:** *(Core functionality implemented)*
-    *   [ ] Implement UI for patient-provider communication.
-    *   [ ] Implement backend logic (Server Actions/API) for sending/receiving messages.
-    *   [ ] Handle message storage and retrieval.
-    *   [ ] Implement real-time updates (e.g., via Supabase Realtime).
-    *   [ ] Refine UI/UX, potentially consolidate patient path (`/dashboard/communication` vs `/dashboard/messages` placeholder).
-    *   [ ] Convert direct Supabase calls to Server Actions for consistency.
+*   [✅] **Benefit Verification Module:** *(Steps 1-6 UI/Logic Largely Completed)*
+    *   [VP] **Stripe Webhook for Payment Confirmation:** Implement and test Stripe Webhook handler for robust payment status updates and `benefit_status` finalization. *(Critical for reliable payment processing)*
+    *   [VP] **"No Work Email" Alternative Flow (Employer Path):** Implement if still required per product decision. *(Step 4 context)*
+    *   [VP] **Robust Verification Logic:** Enhance/replace basic email list check if more advanced verification (e.g., HRIS) is needed.
+    *   [ ] Review/Refine Stripe error handling and user feedback in Step 6.
+    *   *(Ref: `docs/BENEFIT_MODULE_GUIDE.md`)*
+*   [✅] **Secure Messaging:** *(Core functionality refactored and implemented using Server Actions)*
+    *   [ ] Consider minor UI/UX refinements if feedback arises.
 *   [🚧] **Payments (Stripe Integration):**
-    *   [✅] Verify/complete Stripe Payment Intent creation logic (used in Benefit Step 6).
-    *   [ ] Implement and test Stripe Webhook handler (`/api/webhooks/stripe` or similar path).
-    *   [ ] Handle subscription management (linking status to `PatientPackages` table or user profile based on webhook events).
-    *   [ ] Implement/fix API routes for managing payment methods/subscriptions (currently placeholders/mock data).
-*   [🚧] **Analytics Module:** *(Partially implemented across different roles)*
-    *   [🚧] **Admin Analytics (`/admin/analytics`):** Basic UI exists with charts. Data fetching is client-side, inefficient, incomplete (revenue commented out), uses mock data (success rates), and lacks full PRD features (e.g., logs, detailed metrics). Needs significant rework.
-    *   [✅] **Provider Analytics (`/provider/analytics`):** Functional dashboard using RPCs for aggregated data (revenue, success, progress, appointments).
-    *   [✅] **Patient Analytics (`/dashboard/analytics`):** Functional dashboard using dedicated `analytics_metrics` table (engagement, treatment, appointments).
-    *   [✅] **Provider Education Analytics (`/dashboard/provider/education/analytics`):** Functional dashboard for resource/category engagement.
-    *   [ ] **Treatment Plan Analytics (`/provider/treatment-plans/[id]/analytics`):** Placeholder exists, needs implementation.
-    *   [ ] Design and implement Admin dashboard UI for analytics.
-    *   [ ] Implement data collection/aggregation for required metrics (e.g., Revenue, User Activity, Package Selection).
-    *   [ ] Develop backend logic/API endpoints for fetching analytics data.
-    *   [ ] Implement chart/visualization components.
-*   [ ] **Educational Resources:**
-    *   [ ] Determine content management strategy (e.g., CMS, markdown files, database table).
-    *   [ ] Implement UI for displaying curated content to patients.
-    *   [ ] Develop logic for fetching/serving content.
-*   [ ] **Notifications:**
-    *   [ ] Implement triggers for key events (appointments, benefits, messages etc.).
-    *   [ ] Set up mechanism for sending email notifications.
-    *   [ ] Develop in-app notification display system (beyond basic dashboard list).
-    *   [ ] Implement read/unread status management.
+    *   [✅] Stripe Payment Intent creation logic functional (Benefit Step 6).
+    *   [VP] **Stripe Webhook Handler:** *(Same as critical item in Benefit Verification)*.
+    *   [VP] Subscription management logic (if applicable beyond one-time payments).
+    *   [VP] Review/Implement API routes for managing payment methods/subscriptions (currently placeholders/mock data in some docs).
+*   [🚧] **Analytics Module:**
+    *   [VP] **Admin Analytics (`/admin/analytics`):** Needs significant rework. Currently uses client-side Supabase calls, mock data (success rates), revenue data is commented out/non-functional. Full PRD features (logs, detailed metrics, server-side aggregation) are pending.
+    *   [✅] **Provider Analytics (`/provider/analytics`):** Functional dashboard using RPCs.
+    *   [✅] **Patient Analytics (`/dashboard/analytics`):** Functional dashboard using `analytics_metrics` table.
+    *   [✅] **Provider Education Analytics (`/dashboard/provider/education/analytics`):** Functional dashboard.
+    *   [VP] **Treatment Plan Analytics (`/provider/treatment-plans/[id]/analytics`):** Placeholder exists, needs implementation.
+*   [✅] **Educational Resources:**
+    *   UI for displaying content to patients (`/dashboard/education`) and provider CRUD (`/dashboard/provider/education`) is **functional**, using client-side Supabase calls and tables (`education_categories`, `education_resources`).
+    *   [ ] Content curation strategy and populating with comprehensive "curated content" as per PRD.
+    *   [ ] Consider refactoring data access to Server Actions for consistency.
+*   [🚧] **Notifications:**
+    *   [✅] In-app notification display UI (`src/components/Notifications.tsx` - bell icon, `src/app/(dashboard)/dashboard/notifications/page.tsx` - dedicated page) is partially implemented.
+    *   [🚧] Dedicated notifications page uses **mock data**. Real-time updates for bell icon via Supabase subscription are set up.
+    *   [VP] **Notification Triggers:** Implement backend logic to create notifications for key events (appointments, benefits, messages etc.).
+    *   [VP] **Email Notification System:** Design and implement email sending for notifications.
+    *   [VP] User preferences for notifications need to be fully implemented (currently UI placeholders in some settings pages).
 
 ### Module-Specific Tasks
 
 *   **Admin Module:**
-    *   [ ] **Provider Management:** Implement UI and APIs for Provider CRUD, credentials management, monitoring (as per PRD).
-    *   [ ] **User Activity Logs:** Implement mechanism for logging and viewing admin-relevant user actions.
-    *   [ ] **Platform Metrics Dashboard:** Implement dashboard UI described in PRD/Analytics section.
+    *   [🚧] **Provider Management (`/admin/providers`):** Basic CRUD for provider profiles (name, specialization, etc.) via client-side Supabase calls exists.
+        *   [VP] TODO: Link new provider creation to an actual `users` table entry / Supabase Auth user.
+        *   [VP] Advanced features (credentials management, monitoring as per PRD) are pending.
+    *   [VP] **User Activity Logs / Platform Metrics Dashboard:** Implement mechanisms and UI as per PRD/Analytics section.
 *   **Provider Module:**
-    *   [✅] **Profile Management:** Implement UI for providers to manage professional details, visibility settings (as per PRD).
-    *   [✅] **Patient Communication:** Linked to Secure Messaging feature.
+    *   [✅] **Profile Management (`/provider/profile`):** View/edit core profile fields functional (client-side Supabase calls).
+    *   [✅] **Patient List (`/provider/patients`):** Functional, uses `getPatientsForProvider` server action.
+    *   [✅] **Patient Communication:** Linked to Secure Messaging feature (functional).
+    *   [🚧] **Settings (`/provider/settings`):** Theme selection functional. Password change and detailed notification preferences are UI placeholders and need backend logic.
 *   **Patient Module:**
-    *   [🚧] **Dashboard Refinement:** Enhance dashboard beyond upcoming appointments (e.g., displaying current benefit package status/details).
-    *   [ ] **Profile Management:** Implement UI for patients to view/edit their profile.
-    *   [✅] **Communication:** Linked to Secure Messaging feature.
+    *   [✅] **Dashboard (`/dashboard`):** Functional, page loader implemented. Displays upcoming appointments.
+    *   [VP] **Dashboard Refinement:** Enhance to show current benefit package status/details more prominently.
+    *   [✅] **Profile Management (`/dashboard/profile`):** Placeholder UI exists, needs full implementation for viewing/editing.
+    *   [✅] **Communication:** Linked to Secure Messaging feature (functional).
 
 ### Authentication & Authorization
 
-*   [ ] **Social Login:** Implement Google/Facebook login integration (as per PRD).
-*   [ ] **Staff Role:** Define and implement permissions/access for the 'staff' role if distinct from 'admin'.
-*   [ ] **Security Review:** Conduct thorough review of RLS policies and API/Server Action authorization checks.
+*   [VP] **Social Login:** Implement Google/Facebook login (as per PRD).
+*   [VP] **Staff Role:** Define and implement permissions/access if distinct from 'admin'.
+*   [ ] **Security Review:** Conduct ongoing thorough reviews of RLS policies and API/Server Action authorization checks.
 
 ## Technical Debt / Improvements
 
-*   [ ] **Refactor to Server Actions:** Convert remaining direct Supabase client calls (Provider Availability management, Provider Appointment complete/edit) to Server Actions.
-*   [ ] **Improve Data Fetching:** Enhance Server Actions (`getAppointmentsForUser`, etc.) to efficiently join related data (patient/provider names) needed by the UI.
-*   [ ] **Refine Type Safety:** Review usage of `as any` and ensure types (e.g., `ProviderDashboardAppointmentData`) accurately reflect fetched data, especially with complex joins.
-*   [ ] **Standardize Error Handling:** Improve consistency in Server Action error reporting and user-facing error messages.
-*   [ ] **Update Documentation:** Keep `README.md`, `PRD.md`, `HANDOVER.md`, `CODE_INDEX.md`, and this `TODO.md` updated as work progresses.
-*   [ ] **Testing:** Implement unit, integration, and end-to-end tests (Jest, Cypress mentioned in PRD).
+*   [VP] **Refactor to Server Actions:** Convert remaining direct client-side Supabase calls to Server Actions. (Identified in Admin Analytics, Education module, Admin Provider Mgmt, Provider Profile, Provider Availability).
+*   [VP] **Improve Data Fetching:** Optimize Server Actions to efficiently join/return related data where needed.
+*   [VP] **Refine Type Safety:** Review widespread usage of `as any` and ensure types accurately reflect fetched data.
+*   [VP] **Standardize Error Handling:** Improve consistency in Server Action error reporting and create more user-facing friendly error messages.
+*   [ ] **Update Documentation:** Keep `README.md`, `PRD.md`, `HANDOVER.md`, `CODE_INDEX.md`, and this `TODO.md` updated as work progresses. *(Ongoing)*
+*   [VP] **Testing:** Implement unit, integration, and end-to-end tests (Jest, Cypress mentioned in PRD). *(Helper scripts for test users exist, but no formal test suites).*
+*   [VP] **Page Loader for Admin/Provider Roles:** Verify/Implement page loader for Admin and Provider main navigation if their layouts/navigation components differ from Patient dashboard and don't use `LoadingContext` yet. Admin layout has a custom drawer.
 
 ---
 *Previous content below might be outdated.*
-<!-- 
-OUTDATED CONTENT:
-
-**Completed Features ✅**
-
-*   [x] **Core Authentication:** User sign-up, sign-in, sign-out (Supabase Auth).
-*   [x] **Basic User Roles:** Setup for Admin, Provider, Patient roles in DB.
-*   [x] **Database Schema:** Initial setup for Users, Providers, Patients, Appointments, Messages (Supabase Postgres).
-*   [x] **Database Logic:** Appointment notifications, RLS policies setup.
-*   [x] **Basic Admin Dashboard Layout:** Sidebar, Main content area.
-*   [x] **Basic Provider Dashboard Layout:** Sidebar, Main content area.
-*   [x] **Basic Patient Dashboard Layout:** (Assuming similar structure)
-*   [x] **Admin User Management Page:** Display list of users from DB.
-*   [x] **Admin User Management Page:** Styling refinement (Minimal Theme, DataGrid).
-*   [x] **Admin User Management Page:** Add Quick Filter (Search) to DataGrid Toolbar.
-*   [x] **Admin User Management Page:** Add User Dialog (Basic Info + Role).
-*   [x] **Admin User Management Page:** Add User functionality (including Providers with details via Server Action).
-*   [x] **Provider Login/Dashboard Access:** Correct redirect and session handling.
-*   [x] **Provider Navigation:** Sidebar links setup.
-*   [x] **Patient Appointment History:** Page exists and fetches data.
-*   [x] **Provider Appointment History:** Page exists and fetches data.
-*   [x] **Admin Module - Organizations:**
-    *   [x] Display list of organizations (`/admin/organizations`).
-    *   [x] Create new organizations (UI + `POST /api/admin/organizations`).
-    *   [x] View/Edit organization details (`/admin/organizations/[orgId]`).
-    *   [x] Update organizations (UI + `PUT /api/admin/organizations/[orgId]`).
-    *   [x] Delete organizations (UI + `DELETE /api/admin/organizations/[orgId]`).
-    *   [x] Manage approved emails for an organization (UI + `POST/DELETE /api/admin/organizations/emails`).
-
-**Pending Features ⏳ / In Progress 🚧**
-
-*   [✅] **Patient Module - Appointments:**
-    *   [✅] View upcoming appointments (Page exists, fetches data, displays calendar/list, has detail view).
-    *   [✅] Cancel appointments (Functionality exists in detail view).
-    *   [✅] Schedule new appointments (Modal exists, connects to server action, fetches provider availability, shows slots).
-    *   [ ] Edit appointments (Modal exists but needs connection/logic).
-    *   [✅] Calendar Styling (Booked = blue bg, Cancelled-only = orange bg).
-    *   [✅] Booking Modal Calendar Styling (Booked=blue bg, Cancelled-only=orange bg, Available=blue border).
-*   [✅] **Provider Module - Appointments:**
-    *   [✅] View upcoming/past appointments (Page exists, fetches data, displays calendar/list).
-    *   [ ] Schedule new appointments (Functionality **TODO**).
-    *   [✅] Cancel/Complete appointments (Functionality exists via menu).
-    *   [✅] Calendar Styling (Booked = blue bg, Cancelled-only = orange bg).
-*   [🚧] **Provider Module - Profile Management:**
-    *   [🚧] View/Edit own profile details (Specialization, Bio, Experience, Education, Certifications).
-    *   [🚧] Upload/Manage profile picture.
-*   [🚧] **Provider Module - Patient Management:**
-    *   [🚧] View assigned patient list (Page exists, needs UI/fetch logic).
-    *   [🚧] View individual patient details (read-only?).
-*   [🚧] **Provider Module - Messaging:**
-    *   [🚧] View/Send secure messages to patients (Page exists, needs UI/fetch logic).
-    *   [🚧] View/Send messages to admin/staff?
-*   [🚧] **Provider Module - Settings:**
-    *   [🚧] Account settings (password change, etc.) (Page exists, needs functionality).
-    *   [🚧] Notification preferences (Page exists, needs functionality).
-*   [🚧] **Patient Module:** (Core functionality pending)
-    *   [🚧] Dashboard view (Partial: shows upcoming appointments).
-    *   [🚧] Profile management.
-    *   [🚧] View assigned provider(s).
-    *   [🚧] Secure messaging.
-    *   [🚧] View medical records/documents?
-    *   [🚧] Payment/Billing information?
-*   [🚧] **Admin Module - Enhanced User Management:**
-    *   [🚧] Edit existing user details (including role change, provider details).
-    *   [🚧] Delete users (handle related data cascade/archival).
-    *   [🚧] Suspend/Activate users.
-*   [🚧] **Admin Module - Platform Settings:**
-    *   [🚧] Manage platform-wide settings (if any).
-*   [🚧] **Security & Permissions:**
-    *   [🚧] Refine Row Level Security (RLS) policies for all tables (Initial policies exist, need review).
-    *   [🚧] Implement proper authorization checks in API routes/Server Actions.
-*   [🚧] **Payment Integration:**
-    *   [🚧] Integrate Stripe/other provider for patient payments.
-    *   [🚧] Link payments to appointments/services.
-*   [🚧] **Deployment:**
-    *   [🚧] Setup production environment (Vercel/other).
-    *   [🚧] Configure domain, SSL.
-*   [🚧] **Testing:**
-    *   [🚧] Unit tests.
-    *   [🚧] Integration tests.
-    *   [🚧] End-to-end tests.
-*   [🚧] **Documentation:**
-    *   [✅] Update `HANDOVER.md` & `TODO.md` as features are completed.
-    *   [🚧] Add comprehensive code comments where necessary.
-    *   [🚧] User guide documentation?
-
-**UI Connectivity Tasks 🔗**
-
-*Track pages/sections that exist but need proper links/navigation integration.* 
-
-*   **Patient Dashboard:**
-    *   [✅] `/dashboard` (Accessible via login)
-    *   [🚧] `/profile` (Needs linking from patient nav)
-    *   [✅] `/appointments` (Linked from dashboard, page implemented)
-    *   [🚧] `/messages` (Needs linking from patient nav)
-    *   [🚧] `/settings` (Needs linking from patient nav)
-*   **Provider Portal:**
-    *   [✅] `/provider/dashboard` (Accessible via login & sidebar)
-    *   [x] `/provider/profile` (Linked in sidebar, page exists, functionality **TODO**)
-    *   [x] `/provider/patients` (Linked in sidebar, page exists, functionality **TODO**)
-    *   [✅] `/provider/appointments` (Linked in sidebar, page implemented)
-    *   [x] `/provider/messages` (Linked in sidebar, page exists, functionality **TODO**)
-    *   [x] `/provider/settings` (Linked via user menu, page exists, functionality **TODO**)
-*   **Admin Portal:**
-    *   [x] `/admin` (Accessible via login)
-    *   [x] `/admin/users` (Accessible via sidebar)
-    *   [x] `/admin/providers` (Accessible via sidebar)
-    *   [x] `/admin/analytics` (Accessible via sidebar)
-    *   [🚧] `/admin/settings` (Needs sidebar link & page)
-
-## Priorities (High to Low)
-
-1.  **Refine Appointment Error Handling:** Improve user feedback for various error scenarios (booking, fetching slots, etc.).
-2.  **Implement Appointment Editing:** Connect edit modal logic for Patient/Provider.
-3.  **Implement Provider Appointment Scheduling:** Allow providers to book appointments.
-4.  **Provider Module Core:** Implement Profile, Patient list, Messaging pages.
-5.  **Patient Module Core:** Implement basic Dashboard refinement, Profile, Messaging pages.
-6.  **Admin User Editing/Deletion:** Complete user management functionality.
-7.  **Security Refinement:** Thoroughly review and test RLS policies.
-8.  **Payment Integration:** Connect billing functionality.
-9.  **Testing:** Implement basic test coverage.
-10. **Deployment Prep:** Configure environments.
-
-*Self-reflect and critique: Prioritization might shift based on client feedback or technical blockers.*
-
-## Completed
-
-*   Core Auth & User Roles (Patient, Provider, Admin, Staff)
-*   Database Schema Setup & Migration to Drizzle ORM
-*   Drizzle ORM Client & Migration Workflow Setup
-*   Supabase Project Linking & Basic Config
-*   Auth Trigger Function (`handle_new_user`)
-*   RLS Policies (Basic select/insert for users/profiles/appointments)
-*   Admin User Creation Page
-*   Patient Appointment Page (View, Book, Cancel, Calendar Styling)
-*   Provider Appointment Page (View, Update Status, Calendar Styling)
-*   Appointment Booking Modal (Provider/Date/Slot selection, Availability Fetching, Calendar Styling)
-*   Provider Availability Management Page (Basic UI + Weekly Schedule Add)
-*   Fixes for appointment booking/fetching logic (Server Actions & Supabase Client Hints).
-
-## Backlog / Future Enhancements
-
-*   Provider configurable timezone.
-*   Refactor Supabase joins in `appointmentActions.ts` (currently simplified due to errors).
-*   Patient ability to cancel/reschedule appointments.
-*   Notifications for appointment changes.
-*   More robust validation for availability/booking logic.
-
--->
+<!-- (Previous content remains commented out) -->

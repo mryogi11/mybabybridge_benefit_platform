@@ -147,12 +147,26 @@ After significant migrations (especially an initial Drizzle baseline), Row Level
 *   **Benefit Verification & Package Selection**: Implemented user-facing flow (Steps 1-6) allowing users to identify their benefit source (Employer, Partner/Parent, None), verify eligibility (currently via work email for employer path), provide personal info, select a benefit package, and complete setup (including Stripe payment for non-sponsored packages). Handles both employer-sponsored and direct purchase paths.
 *   **Secure Messaging**: Refactored Patient (`/dashboard/communication`) and Provider (`/provider/messages`) messaging modules to use Server Actions (`src/actions/messageActions.ts`) for improved security and maintainability. Implemented logic for initiating conversations based on appointments (patients) and handling existing threads. Includes real-time updates via Supabase and database storage.
 *   **Payments (Stripe)**: Integrated Stripe Elements for package purchases in the benefit flow (Step 6). Webhook handling and full subscription management require review/completion. Stripe Elements integrated for payment *initiation* (Step 6 via `createPaymentIntent`). Critical **webhook handling** for payment confirmation/subscription updates is **missing**. APIs for managing payment methods/subscriptions are placeholders.
-*   **Analytics**: *Implementation status needs verification.* PRD outlines detailed requirements for an admin analytics module. Dashboards exist for Admin (`/admin/analytics`), Provider (`/provider/analytics`), and Patient (`/dashboard/analytics`) with varying levels of completion. Provider/Patient analytics use RPCs/dedicated tables. Admin analytics are basic, use client-side aggregation, and lack full PRD features. Education-specific analytics (`/dashboard/provider/education/analytics`) also exist. Treatment plan analytics are pending.
-*   **Educational Resources**: *Implementation status needs verification.* PRD requires curated content.
-*   **Admin - Provider Management**: *Implementation status needs verification.* PRD requires admin functionality for provider CRUD, credentials, monitoring. Basic CRUD UI/API exists (`/admin/providers`), but advanced features from PRD (credentials, monitoring) are likely pending.
+*   **Analytics**: *Implementation status needs verification; PRD outlines detailed requirements.*
+    *   Admin (`/admin/analytics`): Basic UI with charts exists; uses client-side Supabase calls, mock data for success rates, revenue data non-functional. Lacks full PRD features (server-side aggregation, logs, detailed metrics).
+    *   Provider (`/provider/analytics`) & Patient (`/dashboard/analytics`): More functional dashboards using RPCs/dedicated tables respectively.
+    *   Education-specific analytics (`/dashboard/provider/education/analytics`) also exist.
+    *   Treatment plan analytics are pending.
+*   **Educational Resources**: *Implementation status needs verification; PRD requires curated content.*
+    *   Functional UI for patients to view content (`/dashboard/education`) and providers to manage it (`/dashboard/provider/education`) exists, using client-side Supabase calls to `education_categories` and `education_resources` tables.
+    *   Patient progress tracking is implemented.
+    *   Content curation and population as per PRD are ongoing.
+*   **Admin - Provider Management**: *Implementation status needs verification; PRD requires admin functionality for provider CRUD, credentials, monitoring.*
+    *   Basic CRUD UI/API (`/admin/providers`) for provider profiles (name, specialization, etc.) exists, using client-side Supabase calls.
+    *   Linking new providers to Auth users needs to be finalized (currently a TODO).
+    *   Advanced features from PRD (credentials, monitoring) are likely pending.
 *   **Admin - User Activity Logs / Metrics**: *Implementation status needs verification.* PRD requires viewing logs and a metrics dashboard. Partially covered by basic Admin Analytics, but full PRD requirements pending.
-*   **Provider - Profile Management**: *Implementation status needs verification.* PRD requires UI for managing professional details, visibility. Implemented at `/provider/profile` allowing providers to manage details like specialization, bio, education, certifications.
-*   **Notifications**: *Implementation status needs verification.* `notifications` table exists, but triggers and dedicated UI likely needed.
+*   **Provider - Profile Management**: *Implementation status needs verification; PRD requires UI for managing professional details, visibility.*
+    *   Implemented at `/provider/profile` allowing providers to manage details like specialization, bio, education, certifications (uses client-side Supabase calls).
+*   **Notifications**: *Implementation status needs verification; `notifications` table exists, but full system pending.*
+    *   In-app UI (bell icon via `src/components/Notifications.tsx`, dedicated page `/dashboard/notifications/page.tsx` which uses mock data) is partially implemented.
+    *   Real-time updates for bell icon via Supabase subscription exist.
+    *   Backend triggers for creating notifications for key events and email notification system are pending.
 *   **Dynamic Theme Switching**: Users can select between Light, Dark, System, Ocean, Mint, Rose, Charcoal, and Sunset themes via their respective Settings page (e.g., Patient Dashboard Settings, Provider Settings, Admin Settings). Preference is saved to the user's profile (`theme_preference` column in `users` table).
 
 *(Note: See 'Recent Updates & Fixes (Appointments)' section below for details on recent appointment module work)*

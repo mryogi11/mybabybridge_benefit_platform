@@ -130,6 +130,17 @@ The application uses Supabase for authentication with the following key componen
     - Theme settings UI is available on the user's Settings page.
 - **Logout Experience**: Added a full-screen loading overlay (`Backdrop` with `CircularProgress`) triggered immediately on logout click in the dashboard layout to provide feedback while the sign-out process completes.
 
+### Global Page Loading Strategy
+- **Purpose**: To enhance the user experience during page navigation (primarily via the main side-drawer menu) by providing immediate visual feedback. This reduces perceived latency when navigating between sections of the application.
+- **Key Components & Logic**:\
+    - `src/contexts/LoadingContext.tsx`: Defines and provides the global `isLoadingPage` state and the `setIsLoadingPage` function to control it.\
+    - `src/app/layout.tsx`: Wraps the entire application with `LoadingContext.Provider` to make the loading state accessible globally.\
+    - `src/components/globals/PageChangeHandler.tsx`: A client component that utilizes the `usePathname` and `useSearchParams` hooks. It listens for route changes and automatically sets `isLoadingPage` to `false` once navigation is complete.\
+    - Navigation Components (e.g., `src/components/Navigation.tsx`): When a navigation action is initiated (e.g., a menu item click), `setIsLoadingPage(true)` is called immediately before `router.push()` to activate the loader.
+- **Integration & UI Display**:\
+    - The actual loader UI (typically an MUI `Backdrop` component containing a `CircularProgress` indicator) is implemented within the role-specific layout files (e.g., `src/app/(dashboard)/layout.tsx`, `src/app/(admin)/layout.tsx`, `src/app/(provider)/layout.tsx`). These layouts consume the `isLoadingPage` state from `LoadingContext` and conditionally render the loader.
+- **Scope**: Implemented for main navigation across patient, provider, and admin dashboards, assuming they utilize the `Navigation.tsx` component or a similar mechanism that integrates with `LoadingContext`.
+
 ## Known Issues and Challenges
 
 1. **Database Schema Synchronization (Drizzle):** If manual SQL changes are made to the Supabase database without updating the Drizzle schema (`src/lib/db/schema.ts`), or vice-versa, `drizzle-kit generate` might produce incorrect migration scripts or report "No Changes". This was encountered during the messaging refactor, requiring manual SQL (`ALTER TABLE`) to add missing columns (`is_read`, `thread_id`) when `drizzle-kit generate` failed to detect the schema drift. `drizzle-kit push` should be used with extreme caution due to potential data loss if schemas have significantly diverged. Additionally, significant Drizzle migrations (like a baseline) might disable RLS or drop policies, requiring manual restoration (see RLS/Policy notes in Database Setup section).
