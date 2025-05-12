@@ -1,6 +1,6 @@
 # MyBabyBridge Fertility Care Platform
 
-A comprehensive fertility care platform for connecting patients with providers, managing benefits, and providing educational resources.
+A comprehensive fertility care platform for connecting patients with providers, managing benefits, and providing knowledge base.
 
 ## Deployment to Vercel
 
@@ -366,4 +366,4 @@ This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-opti
 *   **UI Fixes:**
     *   Resolved React hydration error (`<div> cannot be a descendant of <p>`) in the appointment details dialog by setting `component="div"` on the relevant MUI `Typography` component.
     *   Enabled clicking on dates with appointments in the provider calendar view by removing the `disabled` prop.
-    *   Made action menu items (Cancel, Complete) in the provider appointments page conditionally disabled based on the current appointment status. 
+    *   Made action menu items (Cancel, Complete) in the provider appointments page conditionally disabled based on the current appointment status.
