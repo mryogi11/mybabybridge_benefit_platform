@@ -1,10 +1,22 @@
 import EventNoteIcon from '@mui/icons-material/EventNote';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import PeopleIcon from '@mui/icons-material/People';
 import { ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
 import Link from 'next/link';
 
 export default function AdminSideDrawerContent() {
   return (
     <>
+      {/* Analytics Link */}
+      <ListItem disablePadding>
+        <ListItemButton component={Link} href="/admin/analytics">
+          <ListItemIcon>
+            <BarChartIcon />
+          </ListItemIcon>
+          <ListItemText primary="Analytics" />
+        </ListItemButton>
+      </ListItem>
+
       {/* Appointments Management Link */}
       <ListItem disablePadding>
         <ListItemButton component={Link} href="/admin/appointments">
@@ -15,11 +27,11 @@ export default function AdminSideDrawerContent() {
         </ListItemButton>
       </ListItem>
 
-      {/* Existing items like Users, Providers etc. */}
+      {/* Users Management Link */}
       <ListItem disablePadding>
         <ListItemButton component={Link} href="/admin/users">
           <ListItemIcon>
-            <EventNoteIcon />
+            <PeopleIcon />
           </ListItemIcon>
           <ListItemText primary="Users" />
         </ListItemButton>

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createActivityLog } from '@/lib/actions/loggingActions';
 
 // Initialize Supabase admin client with service role key
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -19,6 +20,12 @@ export async function POST(request: Request) {
 
     // Validate required fields
     if (!email || !password || !first_name || !last_name || !role) {
+      await createActivityLog({
+        actionType: 'USER_CREATE_VALIDATION_FAILURE',
+        status: 'FAILURE',
+        description: 'User creation request missing required fields.',
+        details: { email, first_name, last_name, role }
+      });
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -37,7 +44,12 @@ export async function POST(request: Request) {
     });
 
     if (authError) {
-      console.error('Error creating auth user:', authError);
+      await createActivityLog({
+        actionType: 'USER_CREATE_AUTH_FAILURE',
+        status: 'FAILURE',
+        description: `Failed to create user in Supabase Auth. Error: ${authError.message}`,
+        details: { email, first_name, last_name, role, error: authError.message }
+      });
       return NextResponse.json(
         { error: authError.message },
         { status: 500 }
@@ -57,7 +69,12 @@ export async function POST(request: Request) {
       });
 
     if (userError) {
-      console.error('Error upserting into users table:', userError);
+      await createActivityLog({
+        actionType: 'USER_CREATE_DB_FAILURE',
+        status: 'FAILURE',
+        description: `Failed to upsert user in DB. Error: ${userError.message}`,
+        details: { email, first_name, last_name, role, error: userError.message }
+      });
       // Attempt to delete the auth user if we couldn't add/update the users table record
       await supabase.auth.admin.deleteUser(authUser.user.id);
       return NextResponse.json(
@@ -77,13 +94,24 @@ export async function POST(request: Request) {
           });
 
       if (providerError) {
-        // Log the error, but proceed with user creation success for now.
-        // Consider more robust error handling (e.g., deleting the user or returning a specific warning).
-        console.warn(`User ${authUser.user.id} created, but failed to create corresponding provider profile record:`, providerError);
+        await createActivityLog({
+          actionType: 'PROVIDER_PROFILE_CREATE_FAILURE',
+          status: 'FAILURE',
+          description: `User ${authUser.user.id} created, but failed to create provider profile. Error: ${providerError.message}`,
+          details: { userId: authUser.user.id, error: providerError.message }
+        });
       }
     }
 
     // Return success response
+    await createActivityLog({
+      userId: authUser.user.id,
+      userEmail: email,
+      actionType: 'USER_CREATE',
+      status: 'SUCCESS',
+      description: `User ${authUser.user.id} created successfully via admin API.`,
+      details: { email, first_name, last_name, role }
+    });
     return NextResponse.json({
       success: true,
       user: {
@@ -95,6 +123,12 @@ export async function POST(request: Request) {
       }
     });
   } catch (error: any) {
+    await createActivityLog({
+      actionType: 'USER_CREATE_FAILURE',
+      status: 'FAILURE',
+      description: `Error in create user API. Error: ${error.message}`,
+      details: { error: error.message }
+    });
     console.error('Error in create user API:', error);
     return NextResponse.json(
       { error: error.message || 'An error occurred' },

@@ -51,6 +51,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client'; // Keep for auth checks
 import { usePageLoading } from '@/contexts/LoadingContext'; // <-- ADD THIS IMPORT
 import Logo from '@/components/Logo'; // Import Logo
+import { createActivityLog } from '@/lib/actions/loggingActions'; // Corrected import path
 
 // Helper function to check if the loggedIn cookie exists
 const hasLoggedInCookie = () => {
@@ -232,6 +233,16 @@ export default function DashboardLayout({
       }
       // Redirect AFTER signOut completes
       router.push('/login'); 
+      // Add activity log after successful logout
+      if (user) {
+        await createActivityLog({
+          userId: user.id,
+          userEmail: user.email,
+          actionType: 'USER_LOGOUT',
+          status: 'SUCCESS',
+          description: 'User logged out via DashboardLayout.'
+        });
+      }
     } catch (error) {
       console.error('Error logging out:', error);
       // Optionally redirect even if signout fails, or show an error

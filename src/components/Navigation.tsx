@@ -38,6 +38,7 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePageLoading } from '@/contexts/LoadingContext';
 import Logo from './Logo';
+import { createActivityLog } from '@/services/activityLogService';
 
 const pages = [
   { title: 'Dashboard', path: '/dashboard', icon: <DashboardIcon fontSize="small" /> },
@@ -119,6 +120,16 @@ export default function Navigation() {
     try {
       await signOut();
       router.push('/login');
+      // Add activity log after successful logout
+      if (user) {
+        await createActivityLog({
+          userId: user.id,
+          userEmail: user.email,
+          actionType: 'USER_LOGOUT',
+          status: 'SUCCESS',
+          description: 'User logged out via Navigation.'
+        });
+      }
     } catch (error) {
       console.error('Logout error:', error);
     }

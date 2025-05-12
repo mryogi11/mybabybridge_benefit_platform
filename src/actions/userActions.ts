@@ -11,6 +11,7 @@ import { users, themeModeEnum } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { ThemeModeSetting } from '@/components/ThemeRegistry/ClientThemeProviders'; // Import the type
+import { createActivityLog } from '@/lib/actions/loggingActions'; // Added import
 
 // Interface for NewUserData
 interface NewUserData {
@@ -225,10 +226,29 @@ export async function updateUserThemePreference(theme: string): Promise<{
         revalidatePath('/profile');
         revalidatePath('/'); // Revalidate root layout as well for theme changes
 
-        console.log(`[User Action] User ${authUser.id} theme preference updated to ${validatedTheme}`);
+        await createActivityLog({
+          userId: authUser.id,
+          userEmail: authUser.email, // Assuming getAuthenticatedUser() returns email
+          actionType: 'THEME_PREFERENCE_UPDATE',
+          targetEntityType: 'USER_SETTINGS',
+          targetEntityId: authUser.id,
+          details: { oldTheme: /* need a way to get old theme if desired */ null, newTheme: validatedTheme },
+          status: 'SUCCESS',
+          description: `User updated theme preference to ${validatedTheme}.`
+        });
+
         return { success: true, message: "Theme preference updated successfully.", newTheme: validatedTheme };
     } catch (error) {
         console.error("[User Action] Error updating theme preference:", error);
+        await createActivityLog({
+          userId: authUser ? authUser.id : undefined, // authUser might not be defined if getAuthenticatedUser() failed
+          userEmail: authUser ? authUser.email : undefined,
+          actionType: 'THEME_PREFERENCE_UPDATE',
+          targetEntityType: 'USER_SETTINGS',
+          status: 'FAILURE',
+          description: `Failed to update theme preference. Error: ${(error as Error).message}`,
+          details: { error: (error as Error).message, requestedTheme: theme }
+        });
         if (error instanceof z.ZodError) {
             return { success: false, message: `Invalid theme value: ${error.errors.map(e => e.message).join(', ')}` };
         }

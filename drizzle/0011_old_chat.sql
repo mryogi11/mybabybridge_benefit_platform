@@ -1,2 +1,0 @@
-ALTER TABLE "organization_approved_emails" DROP CONSTRAINT "organization_approved_emails_organization_id_email_pk";--> statement-breakpoint
-CREATE UNIQUE INDEX "organization_approved_emails_org_email_uq" ON "organization_approved_emails" USING btree ("organization_id","email");

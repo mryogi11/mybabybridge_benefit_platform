@@ -15,6 +15,7 @@ import type { Database } from '@/types/supabase';
 // Removed Database type import as it's not found in @/lib/types
 // We need to find the correct location or generate Supabase types
 // import type { Database } from '@/lib/types'; 
+import { createActivityLog } from '@/lib/actions/loggingActions';
 
 // Zod schema for validating the update payload
 const UpdateUserSchema = z.object({
@@ -99,11 +100,29 @@ export async function PUT(req: NextRequest, { params }: { params: { userId: stri
     }
 
     console.log(`User ${userIdToUpdate} updated successfully by admin ${adminUser.email}.`);
+    await createActivityLog({
+      userId: adminUser.id,
+      userEmail: adminUser.email,
+      actionType: 'USER_UPDATE',
+      targetEntityType: 'USER',
+      targetEntityId: userIdToUpdate,
+      status: 'SUCCESS',
+      description: `User ${userIdToUpdate} updated by admin.`
+    });
     return NextResponse.json(updatedUsers[0]);
 
   } catch (error: any) {
     console.error(`Error updating user ${userIdToUpdate}:`, error);
     // Check for specific database errors if needed
+    await createActivityLog({
+      userId: adminUser?.id,
+      userEmail: adminUser?.email,
+      actionType: 'USER_UPDATE',
+      targetEntityType: 'USER',
+      targetEntityId: userIdToUpdate,
+      status: 'FAILURE',
+      description: `Failed to update user ${userIdToUpdate}. Error: ${error}`
+    });
     return NextResponse.json({ error: 'Internal server error during user update.', details: error.message }, { status: 500 });
   }
 }
@@ -186,11 +205,29 @@ export async function DELETE(req: NextRequest, { params }: { params: { userId: s
     }
     // --- End Supabase Auth Deletion ---
 
+    await createActivityLog({
+      userId: adminUser.id,
+      userEmail: adminUser.email,
+      actionType: 'USER_DELETE',
+      targetEntityType: 'USER',
+      targetEntityId: userIdToDelete,
+      status: 'SUCCESS',
+      description: `User ${userIdToDelete} deleted by admin.`
+    });
     return NextResponse.json({ message: 'User deleted successfully' }, { status: 200 }); 
 
   } catch (error: any) {
     // Use the local variable
     console.error(`Error during user deletion process for ${userIdToDelete}:`, error);
+    await createActivityLog({
+      userId: adminUser?.id,
+      userEmail: adminUser?.email,
+      actionType: 'USER_DELETE',
+      targetEntityType: 'USER',
+      targetEntityId: userIdToDelete,
+      status: 'FAILURE',
+      description: `Failed to delete user ${userIdToDelete}. Error: ${error}`
+    });
     return NextResponse.json({ error: 'Internal server error during user deletion.', details: error.message }, { status: 500 });
   }
 } 

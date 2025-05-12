@@ -8,6 +8,7 @@ import {
   Grid,
   Paper,
   CircularProgress,
+  Alert,
 } from '@mui/material';
 import {
   LineChart,
@@ -23,6 +24,7 @@ import {
 } from 'recharts';
 import { createBrowserClient } from '@supabase/ssr';
 import type { Database } from '@/types/supabase';
+import ActivityLogs from './ActivityLogs';
 
 interface AnalyticsData {
   revenueByMonth: { month: string; revenue: number }[];
@@ -33,8 +35,19 @@ interface AnalyticsData {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
+const DEFAULT_DATA: AnalyticsData = {
+  revenueByMonth: [],
+  treatmentsByType: [],
+  userGrowth: [],
+  successRates: [
+    { name: 'Successful', value: 0 },
+    { name: 'In Progress', value: 0 },
+    { name: 'Discontinued', value: 0 },
+  ],
+};
+
 export default function AdminAnalyticsPage() {
-  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [data, setData] = useState<AnalyticsData>(DEFAULT_DATA);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [supabase] = useState(() => createBrowserClient<Database>(
@@ -45,48 +58,6 @@ export default function AdminAnalyticsPage() {
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
-        // Fetch revenue by month
-        // const { data: revenueData, error: revenueError } = await supabase
-        //   .from('payments')
-        //   .select('amount, created_at')
-        //   .order('created_at');
-
-        // if (revenueError) throw revenueError;
-
-        // const revenueByMonth = revenueData.reduce((acc: { month: string; revenue: number }[], payment) => {
-        //   const month = new Date(payment.created_at).toLocaleString('default', { month: 'short' });
-        //   const existingMonth = acc.find((item) => item.month === month);
-          
-        //   if (existingMonth) {
-        //     existingMonth.revenue += Number(payment.amount);
-        //   } else {
-        //     acc.push({ month, revenue: Number(payment.amount) });
-        //   }
-          
-        //   return acc;
-        // }, []);
-        const revenueByMonth: { month: string; revenue: number }[] = []; // Provide empty array as default
-
-        // Fetch treatments by type
-        const { data: treatmentsData, error: treatmentsError } = await supabase
-          .from('treatment_plans')
-          .select('title');
-
-        if (treatmentsError) throw treatmentsError;
-
-        const treatmentsByType = treatmentsData.reduce((acc: { name: string; value: number }[], treatment) => {
-          const typeName = treatment.title || 'Unknown Type';
-          const existingType = acc.find((item) => item.name === typeName);
-          
-          if (existingType) {
-            existingType.value += 1;
-          } else {
-            acc.push({ name: typeName, value: 1 });
-          }
-          
-      return acc;
-        }, []);
-
         // Fetch user growth
         const { data: usersData, error: usersError } = await supabase
           .from('users')
@@ -105,24 +76,17 @@ export default function AdminAnalyticsPage() {
             acc.push({ month, users: 1 });
           }
           
-        return acc;
+          return acc;
         }, []);
 
-        // Calculate success rates (mock data for now)
-        const successRates = [
-          { name: 'Successful', value: 75 },
-          { name: 'In Progress', value: 15 },
-          { name: 'Discontinued', value: 10 },
-        ];
-
+        // Set the data with only user growth for now
         setData({
-          revenueByMonth, // Use the empty array
-          treatmentsByType,
+          ...DEFAULT_DATA,
           userGrowth,
-          successRates,
         });
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
+        console.error('Error fetching analytics:', err);
+        setError('Failed to fetch analytics data. Some features might be unavailable.');
       } finally {
         setLoading(false);
       }
@@ -139,32 +103,23 @@ export default function AdminAnalyticsPage() {
     );
   }
 
-  if (error) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
-        <Typography color="error">{error}</Typography>
-      </Box>
-    );
-  }
-
-  if (!data) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
-        <Typography>No data available</Typography>
-      </Box>
-    );
-  }
-
   return (
     <Container maxWidth="lg">
       <Box sx={{ py: 4 }}>
         <Typography variant="h4" gutterBottom>
           Analytics Dashboard
         </Typography>
+
+        {error && (
+          <Alert severity="warning" sx={{ mb: 4 }}>
+            {error}
+          </Alert>
+        )}
+
         <Grid container spacing={4}>
           {/* Revenue Chart */}
           <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3, minHeight: 380 }}> {/* Adjust size if needed */}
+            <Paper sx={{ p: 3, minHeight: 380 }}>
               <Typography variant="h6" gutterBottom>Revenue by Month</Typography>
               <Box display="flex" justifyContent="center" alignItems="center" height="100%">
                 <Typography variant="body1" color="textSecondary">
@@ -174,46 +129,28 @@ export default function AdminAnalyticsPage() {
             </Paper>
           </Grid>
 
-          {/* Treatments by Type */}
-          <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Treatments by Type
-              </Typography>
-              <PieChart width={500} height={300}>
-                <Pie
-                  data={data.treatmentsByType}
-                  cx={250}
-                  cy={150}
-                  labelLine={false}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {data.treatmentsByType.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </Paper>
-          </Grid>
-
-          {/* User Growth */}
+          {/* User Growth Chart */}
           <Grid item xs={12} md={6}>
             <Paper sx={{ p: 3 }}>
               <Typography variant="h6" gutterBottom>
                 User Growth
               </Typography>
-              <LineChart width={500} height={300} data={data.userGrowth}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="users" stroke="#82ca9d" />
-              </LineChart>
+              {data.userGrowth.length > 0 ? (
+                <LineChart width={500} height={300} data={data.userGrowth}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="users" stroke="#8884d8" />
+                </LineChart>
+              ) : (
+                <Box display="flex" justifyContent="center" alignItems="center" height={300}>
+                  <Typography variant="body1" color="textSecondary">
+                    No user growth data available
+                  </Typography>
+                </Box>
+              )}
             </Paper>
           </Grid>
 
@@ -223,24 +160,33 @@ export default function AdminAnalyticsPage() {
               <Typography variant="h6" gutterBottom>
                 Treatment Success Rates
               </Typography>
-              <PieChart width={500} height={300}>
-                <Pie
-                  data={data.successRates}
-                  cx={250}
-                  cy={150}
-                  labelLine={false}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {data.successRates.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
+              <Box display="flex" justifyContent="center" alignItems="center" height={300}>
+                <Typography variant="body1" color="textSecondary">
+                  Treatment success data not available
+                </Typography>
+              </Box>
             </Paper>
+          </Grid>
+
+          {/* Future Chart Placeholder */}
+          <Grid item xs={12} md={6}>
+            <Paper sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Platform Usage
+              </Typography>
+              <Box display="flex" justifyContent="center" alignItems="center" height={300}>
+                <Typography variant="body1" color="textSecondary">
+                  Platform usage metrics coming soon
+                </Typography>
+              </Box>
+            </Paper>
+          </Grid>
+        </Grid>
+
+        {/* Activity Logs Section */}
+        <Grid container>
+          <Grid item xs={12}>
+            <ActivityLogs />
           </Grid>
         </Grid>
       </Box>

@@ -6,6 +6,7 @@ import { organizations, users, userRoleEnum } from '@/lib/db/schema';
 import { NextRequest, NextResponse } from 'next/server';
 import type { Database } from '@/types/supabase';
 import { authorizeAdmin } from '@/lib/auth/authorizeAdmin';
+import { createActivityLog } from '@/lib/actions/loggingActions';
 
 // Schema for POST request body (using Zod)
 const AddOrganizationSchema = z.object({
@@ -26,6 +27,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (!authorized) {
             console.warn(`[POST /api/admin/organizations] Authorization failed: ${authError}`);
             const status = authError === "User is not authenticated." ? 401 : 403;
+            await createActivityLog({
+                actionType: 'ORGANIZATION_CREATE_AUTH_FAILURE',
+                status: 'FAILURE',
+                description: `Unauthorized attempt to create organization. Error: ${authError}`,
+                details: { error: authError }
+            });
             return NextResponse.json({ success: false, message: authError || 'Unauthorized' }, { status });
         }
         console.log(`[POST /api/admin/organizations] authorizeAdmin succeeded for user ${user?.id}.`);
@@ -37,6 +44,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         if (!validation.success) {
             console.warn('[POST /api/admin/organizations] Schema validation failed:', validation.error.format());
+            await createActivityLog({
+                userId: user?.id,
+                userEmail: user?.email,
+                actionType: 'ORGANIZATION_CREATE_VALIDATION_FAILURE',
+                status: 'FAILURE',
+                description: 'Organization creation request validation failed.',
+                details: { errors: validation.error.flatten(), submittedData: reqBody }
+            });
             return NextResponse.json({ success: false, message: "Invalid request data", errors: validation.error.format() }, { status: 400 });
         }
         const { name, domain } = validation.data;
@@ -46,6 +61,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const existingOrg = await db.select({ id: organizations.id }).from(organizations).where(eq(organizations.name, name)).limit(1);
         if (existingOrg.length > 0) {
              console.warn(`[POST /api/admin/organizations] Conflict: Organization name '${name}' already exists.`);
+            await createActivityLog({
+                userId: user?.id,
+                userEmail: user?.email,
+                actionType: 'ORGANIZATION_CREATE_CONFLICT',
+                status: 'FAILURE',
+                description: `Conflict: Organization name '${name}' already exists.`,
+                details: { organizationName: name }
+            });
             return NextResponse.json({ success: false, message: `Organization name '${name}' already exists.` }, { status: 409 }); // 409 Conflict
         }
         console.log(`[POST /api/admin/organizations] No existing organization found. Proceeding with insert...`);
@@ -61,6 +84,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }
         console.log(`[POST /api/admin/organizations] SUCCESS: Organization created with ID: ${newOrg[0].id}`);
 
+        await createActivityLog({
+            userId: user?.id,
+            userEmail: user?.email,
+            actionType: 'ORGANIZATION_CREATE',
+            status: 'SUCCESS',
+            description: `Organization '${newOrg[0].name}' created by admin ${user?.email}.`,
+            details: { organizationData: newOrg[0] }
+        });
+
         return NextResponse.json({ success: true, data: newOrg[0], message: "Organization created successfully." }, { status: 201 });
 
     } catch (error) {
@@ -68,6 +100,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
         const status = message.includes('already exists') ? 409 : 500;
         console.log(`[POST /api/admin/organizations] Returning error response. Status: ${status}, Message: ${message}`);
+        await createActivityLog({
+            userId: user?.id,
+            userEmail: user?.email,
+            actionType: 'ORGANIZATION_CREATE_FAILURE',
+            status: 'FAILURE',
+            description: `Failed to create organization. Error: ${message}`,
+            details: { error: message }
+        });
         return NextResponse.json({ success: false, message: `Failed to create organization: ${message}` }, { status });
     }
 }
@@ -80,17 +120,39 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         if (!authorized) {
             console.warn(`[GET /api/admin/organizations] Authorization failed: ${authError}`);
             const status = authError === "User is not authenticated." ? 401 : 403;
+            await createActivityLog({
+                actionType: 'ORGANIZATION_FETCH_AUTH_FAILURE',
+                status: 'FAILURE',
+                description: `Unauthorized attempt to fetch organizations. Error: ${authError}`,
+                details: { error: authError }
+            });
             return NextResponse.json({ success: false, message: authError || 'Unauthorized' }, { status });
         }
         console.log(`[GET /api/admin/organizations] User ${user?.id} authorized. Fetching organizations...`);
 
         const orgs = await db.select().from(organizations).orderBy(organizations.name);
         console.log(`[GET /api/admin/organizations] Found ${orgs.length} organizations.`);
+        await createActivityLog({
+            userId: user?.id,
+            userEmail: user?.email,
+            actionType: 'ORGANIZATION_FETCH_ALL',
+            status: 'SUCCESS',
+            description: `Admin ${user?.email} fetched all organizations.`,
+            details: { organizationCount: orgs.length }
+        });
         return NextResponse.json({ success: true, data: orgs }, { status: 200 });
 
     } catch (error) {
         console.error(`[GET /api/admin/organizations] CRITICAL ERROR in handler:`, error);
         const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+        await createActivityLog({
+            userId: user?.id,
+            userEmail: user?.email,
+            actionType: 'ORGANIZATION_FETCH_ALL_FAILURE',
+            status: 'FAILURE',
+            description: `Failed to fetch organizations. Error: ${message}`,
+            details: { error: message }
+        });
         return NextResponse.json({ success: false, message: `Failed to fetch organizations: ${message}` }, { status: 500 });
     }
 }

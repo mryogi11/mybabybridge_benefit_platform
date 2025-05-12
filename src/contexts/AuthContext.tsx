@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
+import { createActivityLog } from '@/lib/actions/loggingActions';
 
 // Define a simple Profile type (adjust based on your actual profiles table)
 interface Profile {
@@ -118,12 +119,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
 
-        // If user signs out, explicitly clear profile
         if (event === 'SIGNED_OUT') {
             debugLog('SIGNED_OUT event detected, clearing profile.');
             setProfile(null);
+            // Add logout activity log
+            if (user) {
+              createActivityLog({
+                userId: user.id,
+                userEmail: user.email,
+                actionType: 'USER_LOGOUT',
+                status: 'SUCCESS',
+                description: 'User logged out.'
+              });
+            }
+        } else if (event === 'SIGNED_IN' && currentSession?.user) {
+          debugLog('SIGNED_IN event detected.');
+          
+          // Attempt to make logging idempotent for a single login flow
+          const loginEventKey = `loginLogged_${currentSession.user.id}_${currentSession.access_token.substring(0,10)}`;
+          
+          if (typeof window !== 'undefined' && !sessionStorage.getItem(loginEventKey)) {
+            debugLog('Logging USER_LOGIN_SUCCESS activity for key:', loginEventKey);
+            createActivityLog({
+              userId: currentSession.user.id,
+              userEmail: currentSession.user.email,
+              actionType: 'USER_LOGIN_SUCCESS',
+              status: 'SUCCESS',
+              description: 'User successfully logged in.',
+              details: { provider: currentSession.user.app_metadata.provider || 'email' }
+            }).then(() => {
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem(loginEventKey, 'true');
+                // Optional: Set a timeout to clear this flag after a short period,
+                // e.g., 5-10 seconds, to allow for legitimate quick re-logins
+                // if needed, but prevent rapid duplicate logs from the same event.
+                // setTimeout(() => sessionStorage.removeItem(loginEventKey), 10000);
+              }
+            });
+          } else if (typeof window !== 'undefined') {
+            debugLog('USER_LOGIN_SUCCESS already logged for this session event or sessionStorage not available.', loginEventKey);
+          }
         }
-        // Profile fetching for SIGNED_IN/USER_UPDATED is handled by the useEffect below
 
         debugLog(`<<< Auth state change event END: ${event} (Session/User state updated)`);
       }

@@ -19,8 +19,8 @@
     *   [VP] **Stripe Webhook Handler:** *(Same as critical item in Benefit Verification)*.
     *   [VP] Subscription management logic (if applicable beyond one-time payments).
     *   [VP] Review/Implement API routes for managing payment methods/subscriptions (currently placeholders/mock data in some docs).
-*   [🚧] **Analytics Module:**
-    *   [VP] **Admin Analytics (`/admin/analytics`):** Needs significant rework. Currently uses client-side Supabase calls, mock data (success rates), revenue data is commented out/non-functional. Full PRD features (logs, detailed metrics, server-side aggregation) are pending.
+*   [✅] **Analytics Module:**
+    *   [🚧] **Admin Analytics (`/admin/analytics`):** Needs significant rework. Currently uses client-side Supabase calls, mock data (success rates), revenue data is commented out/non-functional. Full PRD features (detailed metrics, server-side aggregation) are pending. *(Activity Log backend/DB/basic logging implemented)*
     *   [✅] **Provider Analytics (`/provider/analytics`):** Functional dashboard using RPCs.
     *   [✅] **Patient Analytics (`/dashboard/analytics`):** Functional dashboard using `analytics_metrics` table.
     *   [✅] **Provider Education Analytics (`/dashboard/provider/education/analytics`):** Functional dashboard.
@@ -40,9 +40,9 @@
 
 *   **Admin Module:**
     *   [🚧] **Provider Management (`/admin/providers`):** Basic CRUD for provider profiles (name, specialization, etc.) via client-side Supabase calls exists.
-        *   [VP] TODO: Link new provider creation to an actual `users` table entry / Supabase Auth user.
+        *   [✅] **DONE (Partially Addressed/Reframed):** The "Add Provider" form on the `/admin/providers` page (which used a placeholder `user_id` and didn't create auth users) has been removed. This page is now for listing/editing existing provider profiles. New provider creation (which correctly creates auth users and links them) is handled separately (e.g., via `/admin/users` which uses the `/api/admin/create-user` endpoint).
         *   [VP] Advanced features (credentials management, monitoring as per PRD) are pending.
-    *   [VP] **User Activity Logs / Platform Metrics Dashboard:** Implement mechanisms and UI as per PRD/Analytics section.
+    *   [✅] **User Activity Logs:** Implemented backend logging (`activity_logs` table, `createActivityLog` action). Basic UI for viewing/filtering logs at `/admin/analytics/logs`. *(Platform Metrics Dashboard part still pending)*
     *   [✅] **Settings (`/admin/admin/settings`):** Theme selection, profile information editing (first/last name), and password change are functional. Review for any other common admin-specific settings if needed.
 *   **Provider Module:**
     *   [✅] **Profile Management (`/provider/profile`):** View/edit core profile fields functional (client-side Supabase calls).

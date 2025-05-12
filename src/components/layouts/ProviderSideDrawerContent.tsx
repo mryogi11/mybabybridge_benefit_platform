@@ -35,6 +35,7 @@ import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
+import { createActivityLog } from '@/lib/actions/loggingActions';
 
 // Define the type for a provider menu item (can be simpler if no sub-menus planned)
 interface ProviderMenuItemType {
@@ -137,6 +138,17 @@ export default function ProviderSideDrawerContent({
     } else {
       // Redirect to login or home page after successful logout
       router.push('/login'); 
+      // Add activity log after successful logout
+      const user = await supabase.auth.getUser();
+      if (user && user.data && user.data.user) {
+        await createActivityLog({
+          userId: user.data.user.id,
+          userEmail: user.data.user.email,
+          actionType: 'USER_LOGOUT',
+          status: 'SUCCESS',
+          description: 'User logged out via ProviderSideDrawer.'
+        });
+      }
     }
   };
 

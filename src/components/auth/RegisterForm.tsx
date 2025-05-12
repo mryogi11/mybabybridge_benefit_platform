@@ -15,6 +15,7 @@ import {
   Link,
 } from '@mui/material';
 import { useAuth } from '@/contexts/AuthContext';
+import { createActivityLog } from '@/services/activityLogService';
 
 const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -51,6 +52,18 @@ export default function RegisterForm() {
 
       await signUp(email, password, firstName, lastName);
       router.push('/login?registered=true');
+
+      // Add activity log after successful registration
+      const user = await signUp(email, password, firstName, lastName);
+      if (user) {
+        await createActivityLog({
+          userId: user.id,
+          userEmail: user.email,
+          actionType: 'USER_REGISTER',
+          status: 'SUCCESS',
+          description: 'User registered successfully.'
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     }

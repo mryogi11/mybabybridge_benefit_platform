@@ -34,6 +34,8 @@ import {
   AccountCircle, // Used for profile icon in dropdown
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
+  Group as GroupIcon, // Added for Providers
+  BarChart as BarChartIcon,
 } from '@mui/icons-material';
 import { useAuth } from '@/contexts/AuthContext';
 // Link component is not directly used in the provided final version of dropdown, but kept for general use
@@ -41,6 +43,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import BusinessIcon from '@mui/icons-material/Business';
 import Logo from '@/components/Logo';
 import { usePageLoading } from '@/contexts/LoadingContext';
+import { createActivityLog } from '@/lib/actions/loggingActions';
 
 const drawerWidth = 240;
 const COLLAPSED_DRAWER_WIDTH = 88;
@@ -48,8 +51,10 @@ const COLLAPSED_DRAWER_WIDTH = 88;
 // adminNavItems still includes a "Settings" main navigation item
 const adminNavItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/admin' },
+  { text: 'Analytics', icon: <BarChartIcon />, path: '/admin/analytics' },
   { text: 'Users', icon: <PeopleIcon />, path: '/admin/users' },
   { text: 'Organizations', icon: <BusinessIcon />, path: '/admin/organizations' },
+  { text: 'Providers', icon: <GroupIcon />, path: '/admin/providers' }, // Added Providers link
   { text: 'Packages', icon: <ShoppingCartIcon />, path: '/admin/packages' },
   { text: 'Settings', icon: <SettingsIcon />, path: '/admin/settings' }, // Main page for settings
 ];
@@ -97,6 +102,16 @@ export default function AdminLayout({
     try {
       await signOut();
       router.push('/login');
+      // Add activity log after successful logout
+      if (user) {
+        await createActivityLog({
+          userId: user.id,
+          userEmail: user.email,
+          actionType: 'USER_LOGOUT',
+          status: 'SUCCESS',
+          description: 'User logged out via AdminLayout.'
+        });
+      }
     } catch (error) {
       console.error('Error logging out:', error);
       // setIsLoadingPage(false); // Reset if global loader was used

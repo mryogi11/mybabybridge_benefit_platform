@@ -7,6 +7,7 @@ import { eq, and } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { organization_approved_emails, users, userRoleEnum } from '@/lib/db/schema';
 import type { Database } from '@/types/supabase'; // Assuming you have this type
+import { createActivityLog } from '@/lib/actions/loggingActions';
 
 // Helper to authorize admin (using the corrected version)
 async function authorizeAdmin(request: NextRequest) {
@@ -39,28 +40,53 @@ const AddApprovedEmailSchema = z.object({
 
 // POST handler for /api/admin/organizations/emails
 export async function POST(request: NextRequest) {
-    let orgId = ''; // For error logging context
+    let orgId = '';
+    let email = '';
     try {
         await authorizeAdmin(request); 
         const reqBody = await request.json();
         const validation = AddApprovedEmailSchema.safeParse(reqBody);
         if (!validation.success) {
+            await createActivityLog({
+                actionType: 'ORG_APPROVED_EMAIL_ADD_VALIDATION_FAILURE',
+                status: 'FAILURE',
+                description: 'Validation failed for adding approved email.',
+                details: { errors: validation.error.format(), reqBody }
+            });
             return NextResponse.json({ success: false, message: "Invalid request data", errors: validation.error.format() }, { status: 400 });
         }
-        const { organizationId, email } = validation.data;
-        orgId = organizationId;
+        orgId = validation.data.organizationId;
+        email = validation.data.email;
         const newEmail = await db.insert(organization_approved_emails).values({
-            organization_id: organizationId,
+            organization_id: orgId,
             email: email.toLowerCase(), 
         }).returning();
+        await createActivityLog({
+            actionType: 'ORG_APPROVED_EMAIL_ADD',
+            status: 'SUCCESS',
+            description: `Approved email ${email} added to org ${orgId}.`,
+            details: { orgId, email, newEmail }
+        });
         return NextResponse.json({ success: true, data: newEmail[0], message: "Approved email added successfully." }, { status: 201 });
     } catch (error) {
         console.error(`[API /admin/orgs/emails POST] Error for org ${orgId}:`, error);
         const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
         const status = message === "User is not authenticated." ? 401 : message === "User is not authorized." ? 403 : 500;
         if (message.includes('duplicate key value violates unique constraint')) {
+            await createActivityLog({
+                actionType: 'ORG_APPROVED_EMAIL_ADD_DUPLICATE',
+                status: 'FAILURE',
+                description: `Attempted to add duplicate approved email for org ${orgId}.`,
+                details: { orgId, email }
+            });
             return NextResponse.json({ success: false, message: "This email address is already approved for this organization." }, { status: 409 });
         }
+        await createActivityLog({
+            actionType: 'ORG_APPROVED_EMAIL_ADD_FAILURE',
+            status: 'FAILURE',
+            description: `Failed to add approved email for org ${orgId}. Error: ${message}`,
+            details: { orgId, error: message }
+        });
         return NextResponse.json({ success: false, message: `Failed to add approved email: ${message}` }, { status });
     }
 }
@@ -85,6 +111,12 @@ export async function DELETE(request: NextRequest) {
         const validation = DeleteApprovedEmailSchema.safeParse(reqBody);
         
         if (!validation.success) {
+            await createActivityLog({
+                actionType: 'ORG_APPROVED_EMAIL_DELETE_VALIDATION_FAILURE',
+                status: 'FAILURE',
+                description: 'Validation failed for deleting approved email.',
+                details: { errors: validation.error.format(), reqBody }
+            });
             return NextResponse.json({ success: false, message: "Invalid request data for deletion", errors: validation.error.format() }, { status: 400 });
         }
         
@@ -99,16 +131,33 @@ export async function DELETE(request: NextRequest) {
             .returning({ id: organization_approved_emails.id });
             
         if (deletedEmail.length === 0) {
+            await createActivityLog({
+                actionType: 'ORG_APPROVED_EMAIL_DELETE_NOT_FOUND',
+                status: 'FAILURE',
+                description: `Approved email record ${emailId} not found for org ${orgId}.`,
+                details: { orgId, emailId }
+            });
             return NextResponse.json({ success: false, message: "Approved email record not found." }, { status: 404 });
         }
 
-        console.log(`[API /admin/orgs/emails DELETE] Successfully deleted email ${emailId} for org ${orgId}`);
+        await createActivityLog({
+            actionType: 'ORG_APPROVED_EMAIL_DELETE',
+            status: 'SUCCESS',
+            description: `Approved email ${emailId} deleted from org ${orgId}.`,
+            details: { orgId, emailId, deletedEmail }
+        });
         return NextResponse.json({ success: true, message: "Approved email deleted successfully." });
 
     } catch (error) {
         console.error(`[API /admin/orgs/emails DELETE] Error for org ${orgId}, email ${emailId}:`, error);
         const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
         const status = message === "User is not authenticated." ? 401 : message === "User is not authorized." ? 403 : 500;
+        await createActivityLog({
+            actionType: 'ORG_APPROVED_EMAIL_DELETE_FAILURE',
+            status: 'FAILURE',
+            description: `Failed to delete approved email ${emailId} for org ${orgId}. Error: ${message}`,
+            details: { orgId, emailId, error: message }
+        });
         return NextResponse.json({ success: false, message: `Failed to delete approved email: ${message}` }, { status });
     }
 }

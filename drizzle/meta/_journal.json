@@ -50,6 +50,27 @@
       "when": 1746683523112,
       "tag": "0006_foamy_puppet_master",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1747029798883,
+      "tag": "0007_bouncy_night_nurse",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1747030005137,
+      "tag": "0008_flippant_harry_osborn",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1747030696996,
+      "tag": "0009_workable_thunderbolts",
+      "breakpoints": true
     }
   ]
 }

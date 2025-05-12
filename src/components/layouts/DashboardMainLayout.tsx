@@ -27,6 +27,7 @@ import { AccountCircle, Logout, Settings } from '@mui/icons-material';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import SideDrawerContent from './SideDrawerContent'; // Import the drawer content
+import { createActivityLog } from '@/services/activityLogService';
 
 const DRAWER_WIDTH = 280;
 const COLLAPSED_DRAWER_WIDTH = 88; // Standard for icon-only navigation
@@ -72,6 +73,16 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
       try {
       await signOut();
       router.push('/login');
+      // Add activity log after successful logout
+      if (user) {
+        await createActivityLog({
+          userId: user.id,
+          userEmail: user.email,
+          actionType: 'USER_LOGOUT',
+          status: 'SUCCESS',
+          description: 'User logged out via DashboardMainLayout.'
+        });
+      }
       } catch (error) {
       console.error('Logout error:', error);
       }

@@ -41,7 +41,6 @@ export default function ProvidersPage() {
     experience_years: 0,
     education: [''],
     certifications: [''],
-    availability: {},
   });
 
   useEffect(() => {
@@ -58,14 +57,14 @@ export default function ProvidersPage() {
 
       const transformedData = (rawData || []).map(provider => ({
         ...provider,
-        specialization: provider.specialization ?? undefined,
-        bio: provider.bio ?? undefined,
-        experience_years: provider.experience_years ?? undefined,
-        education: provider.education ?? undefined,
-        certifications: provider.certifications ?? undefined,
+        specialization: provider.specialization === undefined ? null : provider.specialization,
+        bio: provider.bio === undefined ? null : provider.bio,
+        experience_years: provider.experience_years === undefined ? null : provider.experience_years,
+        education: provider.education === undefined ? null : provider.education,
+        certifications: provider.certifications === undefined ? null : provider.certifications,
       }));
 
-      setProviders(transformedData);
+      setProviders(transformedData as Provider[]);
     } catch (error) {
       console.error('Error fetching providers:', error);
       setError('Failed to load providers');
@@ -74,23 +73,9 @@ export default function ProvidersPage() {
     }
   };
 
-  const handleOpenDialog = (provider?: Provider) => {
-    if (provider) {
-      setEditingProvider(provider);
-      setFormData(provider);
-    } else {
-      setEditingProvider(null);
-      setFormData({
-        first_name: '',
-        last_name: '',
-        specialization: '',
-        bio: '',
-        experience_years: 0,
-        education: [''],
-        certifications: [''],
-        availability: {},
-      });
-    }
+  const handleOpenDialog = (provider: Provider) => {
+    setEditingProvider(provider);
+    setFormData(provider);
     setDialogOpen(true);
   };
 
@@ -105,7 +90,6 @@ export default function ProvidersPage() {
       experience_years: 0,
       education: [''],
       certifications: [''],
-      availability: {},
     });
   };
 
@@ -113,31 +97,20 @@ export default function ProvidersPage() {
     e.preventDefault();
     try {
       if (editingProvider) {
+        const updateData: Partial<Provider> = { ...formData };
+        if (updateData.specialization === '') updateData.specialization = null;
+        if (updateData.bio === '') updateData.bio = null;
+        if (updateData.education && updateData.education.length === 1 && updateData.education[0] === '') {
+            updateData.education = null;
+        }
+        if (updateData.certifications && updateData.certifications.length === 1 && updateData.certifications[0] === '') {
+            updateData.certifications = null;
+        }
+        
         const { error } = await supabase
           .from('providers')
-          .update(formData)
+          .update(updateData)
           .eq('id', editingProvider.id);
-
-        if (error) throw error;
-      } else {
-        // Construct the object for insertion, ensuring required fields are present
-        // TODO: Replace placeholder user_id with actual logic to get/create user ID
-        const providerDataToInsert = {
-          first_name: formData.first_name || '', // Ensure string type from Partial<T>
-          last_name: formData.last_name || '', // Ensure string type from Partial<T>
-          user_id: 'PLACEHOLDER_USER_ID', // Placeholder - Needs proper handling!
-          specialization: formData.specialization || null, // Handle potential undefined from Partial<T> -> null
-          bio: formData.bio || null, // Handle potential undefined from Partial<T> -> null
-          experience_years: formData.experience_years === undefined ? null : formData.experience_years, // Handle potential undefined number -> null
-          education: formData.education || null, // Handle potential undefined from Partial<T> -> null
-          certifications: formData.certifications || null, // Handle potential undefined from Partial<T> -> null
-          availability: formData.availability || {}, // Ensure object type
-          // created_at and updated_at are typically handled by the database
-        };
-
-        const { error } = await supabase
-          .from('providers')
-          .insert([providerDataToInsert]); // Use the explicitly constructed object
 
         if (error) throw error;
       }
@@ -198,14 +171,6 @@ export default function ProvidersPage() {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4">Providers</Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-        >
-          Add Provider
-        </Button>
       </Box>
 
       {error && (

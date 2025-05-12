@@ -16,6 +16,7 @@ import {
   pgPolicy,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
+export * from './schema/activityLog';
 // DO NOT import from './enums'
 
 // --- Enums (Defined in this file) ---
@@ -381,3 +382,7 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   }),
 }));
 // --- END: Added Notifications Relations ---
+
+// --- START: ADDED Activity Log Export ---
+export * from './schema/activityLog';
+// --- END: ADDED Activity Log Export ---

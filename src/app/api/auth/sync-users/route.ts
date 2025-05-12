@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createActivityLog } from '@/lib/actions/loggingActions';
 
 // Initialize Supabase client with service role key for admin operations
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -13,6 +14,12 @@ export async function GET() {
     const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
     
     if (authError) {
+      await createActivityLog({
+        actionType: 'USER_SYNC_AUTH_FETCH_FAILURE',
+        status: 'FAILURE',
+        description: 'Failed to fetch auth users during sync.',
+        details: { error: authError }
+      });
       return NextResponse.json({ error: 'Failed to fetch auth users', details: authError }, { status: 500 });
     }
 
@@ -22,6 +29,12 @@ export async function GET() {
       .select('id');
     
     if (existingError) {
+      await createActivityLog({
+        actionType: 'USER_SYNC_DB_FETCH_FAILURE',
+        status: 'FAILURE',
+        description: 'Failed to fetch existing users from DB during sync.',
+        details: { error: existingError }
+      });
       return NextResponse.json({ error: 'Failed to fetch existing users', details: existingError }, { status: 500 });
     }
 
@@ -48,9 +61,22 @@ export async function GET() {
         .insert(usersToInsert);
       
       if (insertError) {
+        await createActivityLog({
+          actionType: 'USER_SYNC_INSERT_FAILURE',
+          status: 'FAILURE',
+          description: 'Failed to insert new users during sync.',
+          details: { error: insertError, usersToInsert }
+        });
         return NextResponse.json({ error: 'Failed to insert new users', details: insertError }, { status: 500 });
       }
     }
+
+    // await createActivityLog({ // Commented out SUCCESS logging
+    //   actionType: 'USER_SYNC_SUCCESS',
+    //   status: 'SUCCESS',
+    //   description: 'User sync completed successfully.',
+    //   details: { total_auth_users: authUsers.users.length, new_users_added: newUsers.length }
+    // });
 
     return NextResponse.json({ 
       message: 'User sync completed successfully',
@@ -58,6 +84,12 @@ export async function GET() {
       new_users_added: newUsers.length
     });
   } catch (error) {
+    await createActivityLog({
+      actionType: 'USER_SYNC_FAILURE',
+      status: 'FAILURE',
+      description: `Failed to sync users. Error: ${error}`,
+      details: { error }
+    });
     return NextResponse.json({ error: 'Failed to sync users', details: error }, { status: 500 });
   }
 } 
