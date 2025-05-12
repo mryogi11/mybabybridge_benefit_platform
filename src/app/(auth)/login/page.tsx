@@ -170,6 +170,9 @@ export default function LoginPage() {
                   >
                     {(loading || isAuthLoading || isProfileLoading) ? <CircularProgress size={24} /> : "Sign In"}
                   </Button>
+                  <Typography variant="caption" display="block" align="center" sx={{ mt: 1, mb: 1, color: 'text.secondary' }}>
+                    By signing in, you agree to our data collection and analytics usage as outlined in our terms of service and privacy policy.
+                  </Typography>
                   <Box sx={{ mt: 1, textAlign: 'center' }}>
                     <Typography variant="body2">
                       Don't have an account?{' '}

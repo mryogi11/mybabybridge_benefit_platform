@@ -68,7 +68,7 @@
     - User Management:
       - View, edit, delete user accounts
       - Assign and manage user roles
-      - View user activity logs
+      - View user activity logs *(Implemented via custom `activity_logs` table and supplemented by Google Analytics for broader usage tracking)*
     - Package Management:
       - Create, edit, delete packages
       - Configure package tiers and pricing
@@ -80,7 +80,7 @@
       - Manage provider profiles and credentials
       - Monitor provider availability and appointments
       - Track provider performance metrics
-    - Dashboard for monitoring platform metrics
+    - Dashboard for monitoring platform metrics *(Partially implemented via custom logs; Google Analytics will provide additional user behavior and traffic metrics)*
     - **UI Guidelines:** Use Material UI's tabs and data tables for admin dashboard
 
 ### 5. **Provider Module**
@@ -142,6 +142,7 @@
 
 ### Overview
 The analytics module provides comprehensive insights into the platform's performance, user engagement, and business metrics. This module is accessible only to administrators and staff members with appropriate permissions.
+*(Note: This module is complemented by Google Analytics (GA4) integration for standard web traffic and user interaction analysis. See `docs/ANALYTICS_SETUP.md`.)*
 
 ### Key Features
 
@@ -159,11 +160,11 @@ The analytics module provides comprehensive insights into the platform's perform
 - Revenue forecasting
 
 #### 3. User Analytics
-- User growth trends
-- User demographics
-- User engagement metrics
-- User retention rates
-- User acquisition channels
+- User growth trends *(Tracked via GA)*
+- User demographics *(Available in GA)*
+- User engagement metrics *(Tracked via GA pageviews and custom events)*
+- User retention rates *(Analyzable in GA)*
+- User acquisition channels *(Available in GA)*
 
 #### 4. Treatment Analytics
 - Package type distribution
@@ -173,11 +174,11 @@ The analytics module provides comprehensive insights into the platform's perform
 - Package abandonment rates (?)
 
 #### 5. Performance Metrics
-- Platform usage statistics
-- Response time monitoring
-- Error rate tracking
-- System uptime
-- Resource utilization
+- Platform usage statistics *(Tracked via GA)*
+- Response time monitoring *(Potentially via GA or separate APM tools)*
+- Error rate tracking *(Partially via custom logs, potentially GA events, or separate APM tools)*
+- System uptime *(Monitored externally)*
+- Resource utilization *(Monitored externally)*
 
 ### Technical Requirements
 
@@ -195,7 +196,7 @@ The analytics module provides comprehensive insights into the platform's perform
 
 #### Security
 - Role-based access control
-- Audit logging
+- Audit logging *(Implemented via custom `activity_logs` table)*
 - Data encryption
 - Compliance with data protection regulations
 

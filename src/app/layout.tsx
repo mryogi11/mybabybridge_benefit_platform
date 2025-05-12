@@ -15,7 +15,12 @@ import './globals.css'
 import ThemeRegistry from '@/components/ThemeRegistry/ThemeRegistry';
 import { LoadingProvider } from '@/contexts/LoadingContext';
 import { PageChangeHandler } from '@/components/globals/PageChangeHandler';
-import React from 'react';
+import React, { useEffect } from 'react';
+import Script from 'next/script';
+import { usePathname, useSearchParams } from 'next/navigation';
+import * as gtag from '@/lib/gtag';
+import { useAuth } from '@/contexts/AuthContext';
+import { Suspense } from 'react';
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -50,6 +55,59 @@ const setInitialThemeScript = `
 })();
 `;
 
+// Component that includes the GA logic
+function GoogleAnalyticsInitializer() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (!gtag.GA_MEASUREMENT_ID) return; // Don't track if ID is missing
+    // Construct the full URL path including search parameters
+    const url = pathname + searchParams.toString();
+    gtag.pageview(url);
+  }, [pathname, searchParams]); // Re-run on route changes
+
+  // Set User ID when auth state changes
+  const { user } = useAuth(); // Assuming useAuth is available here or passed down
+
+  useEffect(() => {
+    if (user?.id) {
+      gtag.setUserId(user.id);
+    } else {
+      // Optional: Clear user_id if user logs out
+      gtag.setUserId(null);
+    }
+  }, [user]);
+
+  return (
+    <>
+      {/* Google Analytics Scripts - Render only if ID is present */}
+      {gtag.GA_MEASUREMENT_ID && (
+        <>
+          <Script
+            strategy="afterInteractive"
+            src={`https://www.googletagmanager.com/gtag/js?id=${gtag.GA_MEASUREMENT_ID}`}
+          />
+          <Script
+            id="gtag-init"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${gtag.GA_MEASUREMENT_ID}', {
+                  page_path: window.location.pathname,
+                });
+              `,
+            }}
+          />
+        </>
+      )}
+    </>
+  );
+}
+
 // Note: Removed Metadata export as it should be defined directly in Server Components
 // export const metadata = { ... }
 
@@ -71,7 +129,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <React.Suspense fallback={null}>
                 <PageChangeHandler />
               </React.Suspense>
-              {children} 
+              {children}
+              {/* Wrap GA Initializer in Suspense to prevent build errors */}
+              <Suspense fallback={null}> 
+                <GoogleAnalyticsInitializer />
+              </Suspense>
             </LoadingProvider>
           </ThemeRegistry>
         </AuthProvider>

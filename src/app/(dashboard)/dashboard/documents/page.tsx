@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import {
   Box,
   Card,
@@ -271,93 +271,86 @@ export default function DocumentsPage() {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Stack spacing={3}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <Typography variant="h4">My Documents</Typography>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setUploadDialog(true)}>
+          Upload Document
+        </Button>
+      </Stack>
 
+      {/* Wrap content in Suspense */}
+      <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}><CircularProgress /></Box>}>
         {error && (
-          <Alert severity="error" onClose={() => setError(null)}>
+          <Alert severity="error" sx={{ mb: 2 }}>
             {error}
           </Alert>
         )}
-
-        <Card>
-          <CardContent>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-              <Typography variant="h6">All Documents</Typography>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => setUploadDialog(true)}
-              >
-                Upload Document
-              </Button>
-            </Stack>
-
-            <Stack spacing={2}>
-              {documents.map((document) => (
-                <Box
-                  key={document.id}
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    p: 2,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                  }}
-                >
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle1">{document.title}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {document.description}
-                    </Typography>
-                    <Stack direction="row" spacing={1} mt={1}>
-                      <Chip
-                        label={document.category?.name || 'Uncategorized'}
-                        size="small"
-                        color="primary"
-                        variant="outlined"
-                      />
-                      {document.is_private && (
-                        <Chip
-                          label="Private"
-                          size="small"
-                          color="error"
-                          variant="outlined"
-                        />
-                      )}
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Stack spacing={2}>
+            {documents.length === 0 ? (
+              <Typography>No documents found.</Typography>
+            ) : (
+              documents.map((document) => (
+                <Card key={document.id} elevation={2}>
+                  <CardContent>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="subtitle1">{document.title}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {document.description}
+                        </Typography>
+                        <Stack direction="row" spacing={1} mt={1}>
+                          <Chip
+                            label={document.category?.name || 'Uncategorized'}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                          />
+                          {document.is_private && (
+                            <Chip
+                              label="Private"
+                              size="small"
+                              color="error"
+                              variant="outlined"
+                            />
+                          )}
+                        </Stack>
+                        <Typography variant="caption" color="text.secondary">
+                          Uploaded {document.created_at && typeof document.created_at === 'string' ? format(new Date(document.created_at), 'MMM d, yyyy') : 'date unknown'}
+                        </Typography>
+                      </Box>
+                      <Stack direction="row" spacing={1}>
+                        <IconButton
+                          onClick={() => handleDownloadDocument(document)}
+                          color="primary"
+                        >
+                          <DownloadIcon />
+                        </IconButton>
+                        <IconButton
+                          onClick={() => handleShareDocument(document)}
+                          color="primary"
+                        >
+                          <ShareIcon />
+                        </IconButton>
+                        <IconButton
+                          onClick={(e) => setAnchorEl(e.currentTarget)}
+                          color="primary"
+                        >
+                          <MoreVertIcon />
+                        </IconButton>
+                      </Stack>
                     </Stack>
-                    <Typography variant="caption" color="text.secondary">
-                      Uploaded {document.created_at && typeof document.created_at === 'string' ? format(new Date(document.created_at), 'MMM d, yyyy') : 'date unknown'}
-                    </Typography>
-                  </Box>
-                  <Stack direction="row" spacing={1}>
-                    <IconButton
-                      onClick={() => handleDownloadDocument(document)}
-                      color="primary"
-                    >
-                      <DownloadIcon />
-                    </IconButton>
-                    <IconButton
-                      onClick={() => handleShareDocument(document)}
-                      color="primary"
-                    >
-                      <ShareIcon />
-                    </IconButton>
-                    <IconButton
-                      onClick={(e) => setAnchorEl(e.currentTarget)}
-                      color="primary"
-                    >
-                      <MoreVertIcon />
-                    </IconButton>
-                  </Stack>
-                </Box>
-              ))}
-            </Stack>
-          </CardContent>
-        </Card>
-      </Stack>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </Stack>
+        )}
+      </Suspense> {/* End Suspense Wrap */}
 
       {/* Upload Dialog */}
       <Dialog open={uploadDialog} onClose={() => setUploadDialog(false)} maxWidth="sm" fullWidth>

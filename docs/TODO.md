@@ -19,8 +19,11 @@
     *   [VP] **Stripe Webhook Handler:** *(Same as critical item in Benefit Verification)*.
     *   [VP] Subscription management logic (if applicable beyond one-time payments).
     *   [VP] Review/Implement API routes for managing payment methods/subscriptions (currently placeholders/mock data in some docs).
-*   [✅] **Analytics Module:**
+*   [🚧] **Analytics Module:**
     *   [🚧] **Admin Analytics (`/admin/analytics`):** Needs significant rework. Currently uses client-side Supabase calls, mock data (success rates), revenue data is commented out/non-functional. Full PRD features (detailed metrics, server-side aggregation) are pending. *(Activity Log backend/DB/basic logging implemented)*
+    *   [✅] **Google Analytics (GA4) Basic Setup:** Pageview and User ID tracking implemented via `RootLayout`. *(Ref: `docs/ANALYTICS_SETUP.md`)*
+        *   [VP] Implement Custom Event Tracking for key actions (login, registration, form submission, etc.).
+        *   [VP] Implement robust Cookie Consent Management (Current implementation uses implicit consent on login).
     *   [✅] **Provider Analytics (`/provider/analytics`):** Functional dashboard using RPCs.
     *   [✅] **Patient Analytics (`/dashboard/analytics`):** Functional dashboard using `analytics_metrics` table.
     *   [✅] **Provider Education Analytics (`/dashboard/provider/education/analytics`):** Functional dashboard.

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link'; // Import Link
 import {
   Box,
@@ -369,28 +369,28 @@ export default function AdminOrganizationsPage() {
   }
 
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">
+    <Box sx={{ p: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
           Manage Organizations
         </Typography>
-        {/* Attach handler to open modal */}
-        <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAddModal}>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={handleOpenAddModal}
+        >
           Add Organization
         </Button>
       </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-      )}
-
-      {/* Display loading indicator during refetch */}
-      {loading && organizations.length > 0 && <CircularProgress sx={{ mb: 2 }} size={24} />}
-
-      <Paper>
-        <List disablePadding>
+      {/* Wrap potentially problematic client-side rendering in Suspense */}
+      <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}><CircularProgress /></Box>}>
+        <Paper elevation={3} sx={{ p: 2 }}>
+          {loading && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
+              <CircularProgress />
+            </Box>
+          )}
           {organizations.length === 0 && !error && !loading && (
              <ListItem>
                <ListItemText primary="No organizations found." />
@@ -440,8 +440,8 @@ export default function AdminOrganizationsPage() {
               {index < organizations.length - 1 && <Divider component="li" />}
             </React.Fragment>
           ))}
-        </List>
-      </Paper>
+        </Paper>
+      </Suspense> { /* End Suspense Wrap */ }
 
       {/* Add Organization Modal */}
       <Dialog open={isAddModalOpen} onClose={handleCloseAddModal} PaperProps={{ component: 'form', onSubmit: handleAddOrganization }}>
