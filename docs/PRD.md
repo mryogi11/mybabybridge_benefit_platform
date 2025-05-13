@@ -138,6 +138,19 @@
     - Secure handling of verification data.
   - **Details:** See `docs/BENEFIT_MODULE_GUIDE.md` for detailed implementation steps.
 
+### 10. **Educational Resources**
+  - **Description:** Patients can access a curated list of articles and news related to fertility, reproductive health, and wellness.
+  - **Requirements:**
+    - Articles are sourced from an external RSS feed.
+      - Current Feed URL: `https://www.sheknows.com/health-and-wellness/reproductive-health/feed/`
+    - Articles are displayed in a list format, showing title, publication date, a brief snippet, and a relevant image if available.
+    - Clicking an article leads to a detail page displaying the full content (or a significant portion) and the image.
+    - The feed is proxied through a backend API route (`/api/rss-proxy`) to manage CORS and potentially caching.
+    - Images from the feed are parsed and displayed on both the list and detail views.
+  - **UI Guidelines:**
+    - List page: Use Material UI Cards in a Grid layout.
+    - Detail page: Clean, readable layout for article content, with the image displayed prominently.
+
 ## Analytics Module
 
 ### Overview

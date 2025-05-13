@@ -91,6 +91,12 @@
 *   [✅] **Standardized Profile Dropdown Menus:** The user profile dropdown (avatar click) UI is now consistent across Patient, Provider, and Admin dashboards, including user info, profile link, and styled logout.
 *   [✅] **Global Page Loader Extended:** Ensured the main navigation page loader is functional and consistent across Patient, Provider, and Admin dashboards.
 
+## [VP] Educational Resources:
+*   [ ] **DONE - Implemented with RSS Feed:** Design and implement a module for patients to access educational materials (articles, videos, FAQs) - Now pulls from ScienceDaily fertility RSS feed.
+    *   [ ] ~~Categorization and tagging of resources.~~ (Handled by RSS feed structure if applicable, otherwise removed for simplicity with RSS)
+    *   [ ] ~~Tracking patient progress through materials.~~ (Removed as RSS feed is external and doesn't support this directly)
+    *   [ ] Potentially link to external reputable sources. (Achieved via "Original Source" link on each post)
+
 ---
 *Previous content below might be outdated.*
 <!-- (Previous content remains commented out) -->

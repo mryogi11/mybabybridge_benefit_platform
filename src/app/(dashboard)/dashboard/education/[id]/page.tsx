@@ -1,351 +1,226 @@
-'use client';
-
-import { useState, useEffect } from 'react';
-import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  Stack,
-  Grid,
-  CircularProgress,
-  Alert,
-  Chip,
-  Button,
-  LinearProgress,
-  useTheme,
-  useMediaQuery,
-  IconButton,
-  Paper,
-  Divider,
-} from '@mui/material';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import SchoolIcon from '@mui/icons-material/School';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import PlayCircleIcon from '@mui/icons-material/PlayCircle';
-import DescriptionIcon from '@mui/icons-material/Description';
-import ImageIcon from '@mui/icons-material/Image';
+import React from 'react';
+import { Box, Typography, Link as MuiLink, Container, Paper, Divider, CardMedia } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { supabase } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import NextLink from 'next/link';
 
-interface EducationResource {
-  id: string;
-  category_id?: string | null;
+// Must match API response structure and listing page definition
+interface FeedItem {
   title: string;
-  description?: string | null;
-  content: string;
-  media_url?: string | null;
-  media_type?: 'image' | 'video' | 'document' | null;
-  reading_time?: number | null;
-  difficulty_level?: 'beginner' | 'intermediate' | 'advanced' | null;
+  link: string;
+  pubDate: string;
+  content?: string;
+  contentSnippet?: string;
+  guid: string;
+  imageUrl?: string;
+  creator?: string;
 }
 
-interface PatientProgress {
-  status?: 'not_started' | 'in_progress' | 'completed' | null;
-  progress_percentage?: number | null;
-  last_accessed_at?: string | null;
-  completed_at?: string | null;
+// Define the structure of the API response item more comprehensively
+interface RssParserItem {
+    title: string;
+    link: string;
+    pubDate: string;
+    content?: string;
+    'content:encoded'?: string;
+    contentSnippet?: string;
+    guid: string;
+    enclosure?: { url: string; [key: string]: any };
+    'media:content'?: { $: { url: string; [key: string]: any }; [key: string]: any };
+    creator?: string;
+    'dc:creator'?: string;
+    [key: string]: any; // Allow other properties
 }
 
-export default function EducationResourcePage() {
-  const router = useRouter();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const params = useParams();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [resource, setResource] = useState<EducationResource | null>(null);
-  const [progress, setProgress] = useState<PatientProgress>({});
-  const [patientId, setPatientId] = useState<string | null>(null);
+// Matching API response structure
+interface ApiResponse {
+  items: RssParserItem[];
+  title?: string;
+  description?: string;
+  link?: string;
+}
 
-  useEffect(() => {
-    const resourceId = params.id;
-    if (typeof resourceId === 'string') {
-      fetchData(resourceId);
+// Helper function to extract the first image URL from an HTML string
+function extractFirstImageUrl(htmlContent?: string): string | undefined {
+  if (!htmlContent) return undefined;
+  const match = htmlContent.match(/<img[^>]+src\s*=\s*['\"]([^'\"]+)['\"]/i);
+  return match ? match[1] : undefined;
+}
+
+// Helper function to get the base URL (important for server-side fetch)
+function getBaseUrl() {
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+}
+
+// Helper function to strip HTML links, keeping their text content
+function stripHtmlLinks(htmlContent?: string): string {
+  if (!htmlContent) return '';
+  return htmlContent.replace(/<a\b[^>]*>(.*?)<\/a>/gi, '$1');
+}
+
+async function getFeedItemBySlugFromApi(slug: string, searchParams?: { [key: string]: string | string[] | undefined }): Promise<FeedItem | null> {
+  const baseUrl = getBaseUrl();
+  const apiUrl = `${baseUrl}/api/rss-proxy`;
+  console.log(`[EducationDetailPage] Fetching feed from API: ${apiUrl} to find slug: ${slug}`);
+
+  const passedImageUrl = searchParams?.imageUrl as string || undefined;
+
+  try {
+    const response = await fetch(apiUrl, {
+      next: { revalidate: 3600 }, // Cache for an hour
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(`[EducationDetailPage] API Error (${response.status}): ${errorBody}`);
+      throw new Error(`API request failed with status ${response.status}`);
     }
-  }, [params.id]);
 
-  const fetchData = async (resourceId: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    const data: ApiResponse = await response.json();
+    const decodedSlug = decodeURIComponent(slug);
 
-    setLoading(true);
-    setError(null);
+    const foundItem = data.items.find(item => {
+      if (!item.guid) return false;
+      const itemSlug = createSlug(item.guid); // createSlug needs to be available
+      return itemSlug === decodedSlug;
+    });
 
-    if (!resourceId || typeof resourceId !== 'string') {
-      setError('Invalid resource ID.');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const { data: patientData, error: patientError } = await supabase
-        .from('patient_profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (patientError) throw patientError;
-      setPatientId(patientData.id);
-
-      const { data: resourceData, error: resourceError } = await supabase
-        .from('education_resources')
-        .select('*')
-        .eq('id', resourceId)
-        .single();
-
-      if (resourceError) throw resourceError;
+    if (foundItem) {
+      console.log('[EducationDetailPage] Found item:', JSON.stringify(foundItem, null, 2)); // Log the found item
       
-      const typedResource: EducationResource = {
-        id: resourceData.id,
-        category_id: resourceData.category_id,
-        title: resourceData.title,
-        description: resourceData.description,
-        content: resourceData.content,
-        media_url: resourceData.media_url,
-        media_type: (
-          resourceData.media_type === 'image' ||
-          resourceData.media_type === 'video' ||
-          resourceData.media_type === 'document'
-        ) ? resourceData.media_type : null,
-        reading_time: resourceData.reading_time,
-        difficulty_level: (
-          resourceData.difficulty_level === 'beginner' ||
-          resourceData.difficulty_level === 'intermediate' ||
-          resourceData.difficulty_level === 'advanced'
-        ) ? resourceData.difficulty_level : null,
-      };
-      setResource(typedResource);
-
-      const { data: progressData, error: progressError } = await supabase
-        .from('patient_education_progress')
-        .select('*')
-        .eq('patient_id', patientData.id)
-        .eq('resource_id', resourceId)
-        .single();
-
-      if (progressError && progressError.code !== 'PGRST116') {
-        throw progressError;
+      let finalImageUrl = passedImageUrl;
+      if (!finalImageUrl) {
+        finalImageUrl = foundItem.enclosure?.url || 
+                        foundItem['media:content']?.$?.url || 
+                        extractFirstImageUrl(foundItem['content:encoded'] || foundItem.content) || 
+                        '/images/blog_placeholder.jpg'; // Fallback to placeholder
       }
 
-      if (progressData) {
-        const typedProgress: PatientProgress = {
-          status: progressData.status as PatientProgress['status'],
-          progress_percentage: progressData.progress_percentage,
-          last_accessed_at: progressData.last_accessed_at,
-          completed_at: progressData.completed_at,
-        };
-        setProgress(typedProgress);
-      }
-
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      setError('Failed to load education resource');
-      setLoading(false);
-    }
-  };
-
-  const handleUpdateProgress = async (newStatus: 'not_started' | 'in_progress' | 'completed') => {
-    if (!patientId || !resource) return;
-
-    try {
-      const now = new Date().toISOString();
-      const progressData = {
-        patient_id: patientId,
-        resource_id: resource.id,
-        status: newStatus,
-        progress_percentage: newStatus === 'completed' ? 100 : 50,
-        last_accessed_at: now,
-        completed_at: newStatus === 'completed' ? now : null,
+      return {
+        title: foundItem.title!,
+        link: foundItem.link!,
+        pubDate: foundItem.pubDate!,
+        content: foundItem['content:encoded'] || foundItem.content || foundItem.contentSnippet,
+        contentSnippet: foundItem.contentSnippet,
+        guid: foundItem.guid!,
+        imageUrl: finalImageUrl,
+        creator: foundItem.creator || foundItem['dc:creator'] || undefined,
       };
-
-      const { error } = await supabase
-        .from('patient_education_progress')
-        .upsert(progressData);
-
-      if (error) throw error;
-
-      setProgress(progressData);
-    } catch (error) {
-      console.error('Error updating progress:', error);
-      setError('Failed to update progress');
     }
-  };
+    return null;
 
-  const getDifficultyColor = (level: string | null | undefined) => {
-    switch (level) {
-      case 'beginner':
-        return 'success';
-      case 'intermediate':
-        return 'warning';
-      case 'advanced':
-        return 'error';
-      default:
-        return 'default';
-    }
-  };
-
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <CircularProgress />
-      </Box>
-    );
+  } catch (error) {
+    console.error("[EducationDetailPage] Failed to fetch or parse feed from API for slug:", error);
+    return null;
   }
+}
 
-  if (!resource) {
+// Duplicating slug creation logic. Refactor candidate.
+function createSlug(guid: string): string {
+    try {
+        const url = new URL(guid);
+        let path = url.pathname;
+        path = path.replace(/^\/+|\/+$/g, '');
+        const parts = path.split('/');
+        const slugPart = parts[parts.length - 1] || 'default-slug';
+        return slugPart.replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase();
+    } catch (e) {
+        return guid.replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase();
+    }
+}
+
+interface EducationDetailPageProps {
+  params: {
+    id: string; // This is the slug
+  };
+  searchParams?: { // Added searchParams for query parameters
+    imageUrl?: string;
+  };
+}
+
+export default async function EducationDetailPage({ params, searchParams }: EducationDetailPageProps) {
+  const item = await getFeedItemBySlugFromApi(params.id, searchParams); // Pass searchParams
+
+  if (!item) {
     return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error">Resource not found</Alert>
-      </Box>
+      <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
+        <Typography variant="h5" color="error">
+          Resource not found.
+        </Typography>
+        <MuiLink component={NextLink} href="/dashboard/education" sx={{ display: 'flex', alignItems: 'center', mt: 2, textDecoration: 'none', color: 'inherit' }}>
+            <ArrowBackIcon sx={{ mr: 1 }} />
+            Back to Resources
+        </MuiLink>
+      </Container>
     );
   }
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Stack spacing={3}>
-        <Stack direction="row" spacing={2} alignItems="center">
-          <IconButton onClick={() => router.back()}>
-            <ArrowBackIcon />
-          </IconButton>
-          <Typography variant="h4" sx={{ fontSize: { xs: '1.5rem', md: '2rem' } }}>
-            {resource?.title}
-          </Typography>
-        </Stack>
+    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
+      <Paper elevation={3} sx={{ p: { xs: 2, md: 4 } }}>
+        <MuiLink component={NextLink} href="/dashboard/education" sx={{ display: 'flex', alignItems: 'center', mb: 2, textDecoration: 'none', color: 'inherit' }}>
+            <ArrowBackIcon sx={{ mr: 1 }} />
+            Back to Resources
+        </MuiLink>
 
-        {error && (
-          <Alert severity="error" onClose={() => setError(null)}>
-            {error}
-          </Alert>
+        {/* Display Image if available */}
+        {item.imageUrl && (
+          <CardMedia
+            component="img"
+            height="300" // Consider a different height for detail page
+            image={item.imageUrl}
+            alt={item.title}
+            sx={{ width: '100%', objectFit: 'cover', mb: 3, borderRadius: 1 }}
+          />
         )}
 
-        {resource && (
-          <Grid container spacing={3}>
-            {/* Resource Content */}
-            <Grid sx={{ width: { xs: '100%', md: '70%' } }}>
-              <Card>
-                <CardContent>
-                  <Stack spacing={3}>
-                    <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-                      <Chip
-                        icon={<AccessTimeIcon />}
-                        label={`${resource.reading_time} min`}
-                        size="small"
-                        variant="outlined"
-                      />
-                      <Chip
-                        icon={<SchoolIcon />}
-                        label={resource.difficulty_level || 'N/A'}
-                        size="small"
-                        color={getDifficultyColor(resource.difficulty_level)}
-                      />
-                      <Chip
-                        icon={
-                          resource.media_type === 'video' ? (
-                            <PlayCircleIcon />
-                          ) : resource.media_type === 'image' ? (
-                            <ImageIcon />
-                          ) : (
-                            <DescriptionIcon />
-                          )
-                        }
-                        label={resource.media_type || 'Text'}
-                        size="small"
-                        variant="outlined"
-                      />
-                    </Stack>
+        <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 'bold', mb: 1 }}>
+          {item.title}
+        </Typography>
+        
+        <Box sx={{ display: 'flex', alignItems: 'center', color: 'text.secondary', mb: 2 }}>
+          {item.creator && (
+            <Typography variant="subtitle2" component="span" sx={{ mr: 1 }}>
+              By {item.creator}
+            </Typography>
+          )}
+          {item.creator && item.pubDate && (
+            <Typography variant="subtitle2" component="span" sx={{ mr: 1 }}>
+              •
+            </Typography>
+          )}
+          {item.pubDate && (
+            <Typography variant="subtitle2" component="span">
+              {new Date(item.pubDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </Typography>
+          )}
+        </Box>
 
-                    {resource.media_url && (
-                      <Box sx={{ width: '100%', aspectRatio: '16/9' }}>
-                        {resource.media_type === 'video' ? (
-                          <video
-                            controls
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            src={resource.media_url}
-                          />
-                        ) : resource.media_type === 'image' ? (
-                          <img
-                            src={resource.media_url}
-                            alt={resource.title}
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          />
-                        ) : (
-                          <iframe
-                            src={resource.media_url}
-                            style={{ width: '100%', height: '100%', border: 'none' }}
-                            title={resource.title}
-                          />
-                        )}
-                      </Box>
-                    )}
+        <Divider sx={{ my: 3 }} />
 
-                    <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                      {resource.content}
-                    </Typography>
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Progress Section */}
-            <Grid sx={{ width: { xs: '100%', md: '30%' } }}>
-              <Card>
-                <CardContent>
-                  <Stack spacing={3}>
-                    <Typography variant="h6">Your Progress</Typography>
-
-                    <Box>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                        <Typography variant="body2" color="text.secondary">
-                          Progress
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {progress.progress_percentage ?? 0}%
-                        </Typography>
-                      </Stack>
-                      <LinearProgress
-                        variant="determinate"
-                        value={progress.progress_percentage ?? 0}
-                        color={progress.status === 'completed' ? 'success' : 'primary'}
-                        sx={{ height: 8, borderRadius: 4 }}
-                      />
-                    </Box>
-
-                    <Stack spacing={2}>
-                      <Typography variant="body2" color="text.secondary">
-                        Status: {progress.status?.replace('_', ' ')}
-                      </Typography>
-                      {progress.last_accessed_at && (
-                        <Typography variant="body2" color="text.secondary">
-                          Last accessed: {new Date(progress.last_accessed_at).toLocaleDateString()}
-                        </Typography>
-                      )}
-                      {progress.completed_at && (
-                        <Typography variant="body2" color="success.main">
-                          Completed: {new Date(progress.completed_at).toLocaleDateString()}
-                        </Typography>
-                      )}
-                    </Stack>
-
-                    <Button
-                      variant="contained"
-                      fullWidth
-                      startIcon={progress.status === 'completed' ? <CheckCircleIcon /> : <PlayCircleIcon />}
-                      onClick={() => handleUpdateProgress(progress.status === 'completed' ? 'not_started' : 'completed')}
-                    >
-                      {progress.status === 'completed' ? 'Mark as Incomplete' : 'Mark as Complete'}
-                    </Button>
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
+        {/* Render HTML content if available, otherwise show snippet */}
+        {item.content ? (
+          <Box
+            dangerouslySetInnerHTML={{ __html: stripHtmlLinks(item.content) }}
+            sx={{
+              '& img': { maxWidth: '100%', height: 'auto', my: 2, borderRadius: '4px' },
+              '& p': { lineHeight: 1.7, mb: 2, fontSize: '1rem' },
+              '& h1, & h2, & h3, & h4, & h5, & h6': { my: 2.5, lineHeight: 1.3, fontWeight: 'bold' },
+              lineHeight: 1.7, // General line height for content not in P tags
+              fontSize: '1rem' // General font size
+            }}
+          />
+        ) : item.contentSnippet ? (
+          <Typography paragraph>{item.contentSnippet}</Typography>
+        ) : (
+          <Typography>No detailed content available for this item.</Typography>
         )}
-      </Stack>
-    </Box>
+      </Paper>
+    </Container>
   );
-} 
+}
+
+// generateStaticParams might also need to use the API route now, or be removed if content is too dynamic
+// export async function generateStaticParams() {
+//   // ... fetch from /api/rss-proxy ...
+// } 

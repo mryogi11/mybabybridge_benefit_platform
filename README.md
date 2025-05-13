@@ -27,4 +27,15 @@ To enable Google Analytics tracking:
 
 3.  Refer to `docs/ANALYTICS_SETUP.md` for detailed implementation steps.
 
+### Key Features
+
+*   **Patient Dashboard:** View benefits, package progress, appointments, and educational resources.
+*   **Benefit Verification:** Step-by-step flow to verify employer/plan benefits.
+*   **Educational Resources:** Access to articles and news on fertility and wellness. Sourced via RSS feed (`/api/rss-proxy`). Features include:
+    *   Listing page (`/dashboard/education`) with clickable cards displaying title, snippet, and image (or placeholder).
+    *   Detail page (`/dashboard/education/[slug]`) showing the full article content (hyperlinks removed) with a loading indicator during navigation.
+    *   Images extracted from feed metadata or content; uses `public/images/blog_placeholder.jpg` as a fallback.
+*   **Admin Module:** Manage users, organizations, packages, providers, and view basic analytics/logs.
+*   **Provider Module:** Manage profile, availability, appointments, and patient communication.
+
 ### Database Setup 
