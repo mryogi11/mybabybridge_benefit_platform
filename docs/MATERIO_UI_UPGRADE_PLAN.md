@@ -48,7 +48,9 @@ To incrementally upgrade the existing dashboard UI by adopting design elements, 
 
 ### Phase 2: Common UI Components (Global Styles)
 
-*   **New Functionality: Avatar Implementation**
+*   **STATUS: ON HOLD (Effective 2024-05-14)** - The team has decided to temporarily pause the direct implementation of Materio common UI component styles (Buttons, Cards, TextFields, etc.) due to complexities encountered with theme integration (`experimental_extendTheme` and CSS variable propagation for shadows). The focus will be on ensuring stability with the current theme system. The Avatar implementation part of this phase has been completed.
+
+*   **New Functionality: Avatar Implementation (Completed)**
     *   **Goal:** Introduce user profile avatars.
     *   **Assignment:** On login, if a user doesn't have an avatar, assign a random image from `public/images/avatar`.
     *   **User Control:** Allow users to select a new avatar from the available images in `public/images/avatar` within their profile editing section.
