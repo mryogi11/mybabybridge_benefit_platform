@@ -27,9 +27,9 @@ import { AccountCircle, Logout, Settings } from '@mui/icons-material';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import SideDrawerContent from './SideDrawerContent'; // Import the drawer content
-import { createActivityLog } from '@/services/activityLogService';
+import { createActivityLog } from '@/lib/actions/loggingActions'; // Corrected import path
 
-const DRAWER_WIDTH = 280;
+const DRAWER_WIDTH = 260;
 const COLLAPSED_DRAWER_WIDTH = 88; // Standard for icon-only navigation
 
 export default function DashboardMainLayout({ children }: { children: React.ReactNode }) {
@@ -101,14 +101,12 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
       <CssBaseline />
       <AppBar
         position="fixed"
-        elevation={0}
         sx={{
-          width: { md: `calc(100% - ${currentDrawerWidth}px)` }, // Use currentDrawerWidth
-          ml: { md: `${currentDrawerWidth}px` }, // Use currentDrawerWidth
-          backgroundColor: alpha(theme.palette.background.default, 0.8), // Adjusted for minimal feel
-          backdropFilter: 'blur(6px)',
-          borderBottom: `1px dashed ${theme.palette.divider}`,
-          color: theme.palette.text.primary, // Ensure icons/text are visible
+          width: { md: `calc(100% - ${currentDrawerWidth}px)` },
+          ml: { md: `${currentDrawerWidth}px` },
+          backgroundColor: theme.palette.background.default,
+          boxShadow: theme.shadows[2],
+          color: theme.palette.text.primary,
         }}
       >
         <Toolbar sx={{ justifyContent: 'space-between' }}>
@@ -210,9 +208,9 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
             display: { xs: 'block', md: 'none' },
             '& .MuiDrawer-paper': {
                 boxSizing: 'border-box',
-                width: DRAWER_WIDTH, // Mobile drawer is not collapsable, keeps original width
-                borderRight: `1px dashed ${theme.palette.divider}`,
-                transition: theme.transitions.create('width', { // Add transition
+                width: DRAWER_WIDTH,
+                boxShadow: theme.shadows[2],
+                transition: theme.transitions.create('width', {
                   easing: theme.transitions.easing.sharp,
                   duration: theme.transitions.duration.enteringScreen,
                 }),
@@ -232,10 +230,10 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
             display: { xs: 'none', md: 'block' },
             '& .MuiDrawer-paper': {
                 boxSizing: 'border-box',
-                width: currentDrawerWidth, // Use currentDrawerWidth
-                borderRight: `1px dashed ${theme.palette.divider}`,
-                overflowX: 'hidden', // Hide content when collapsing
-                transition: theme.transitions.create('width', { // Add transition
+                width: currentDrawerWidth,
+                boxShadow: theme.shadows[2],
+                overflowX: 'hidden',
+                transition: theme.transitions.create('width', {
                   easing: theme.transitions.easing.sharp,
                   duration: theme.transitions.duration.enteringScreen,
                 }),
@@ -256,10 +254,10 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
         sx={{
           flexGrow: 1,
           p: 3,
-          width: { md: `calc(100% - ${currentDrawerWidth}px)` }, // Use currentDrawerWidth
+          width: { md: `calc(100% - ${currentDrawerWidth}px)` }, 
           minHeight: '100vh',
-          backgroundColor: theme.palette.grey[100], // Or another light background
-          transition: theme.transitions.create(['margin', 'width'], { // Add transition
+          backgroundColor: theme.palette.background.default,
+          transition: theme.transitions.create(['margin', 'width'], { 
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.enteringScreen,
           }),

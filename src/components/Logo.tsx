@@ -39,6 +39,7 @@ const Logo = forwardRef<HTMLDivElement, LogoProps>(
         sx={{ 
           display: 'flex', 
           alignItems: 'center',
+          backgroundColor: 'transparent',
           ...sx 
         }}
       >

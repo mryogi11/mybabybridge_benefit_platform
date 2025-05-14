@@ -184,9 +184,9 @@ export default function AdminDashboardPage() {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom sx={{ mb: 3 }}>
+      {/* <Typography variant="h4" gutterBottom sx={{ mb: 3 }}>
         Dashboard Overview
-      </Typography>
+      </Typography> */}
       {/* Statistics Grid - Now uses DashboardWidget */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {statCardsData.map((item) => (

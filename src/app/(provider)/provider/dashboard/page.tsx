@@ -228,17 +228,17 @@ export default function ProviderDashboardPage() {
 
   if (pageLoading) {
     return (
-      <Container maxWidth="lg" sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 64px)' }}> 
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 64px)' }}> 
         <CircularProgress />
-      </Container>
+      </Box>
     );
   }
 
   return (
-    <Container maxWidth="lg">
-      <Typography variant="h4" sx={{ mb: 3 }}>
+    <Box>
+      {/* <Typography variant="h4" sx={{ mb: 3 }}>
         Welcome, {profile?.first_name || user?.email || 'Provider'}!
-      </Typography>
+      </Typography> */}
 
       <Grid container spacing={3}>
         {/* Placeholder Stat Cards */}
@@ -326,6 +326,6 @@ export default function ProviderDashboardPage() {
         </Grid>
 
       </Grid>
-    </Container>
+    </Box>
   );
 } 

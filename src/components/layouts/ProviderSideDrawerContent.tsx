@@ -71,19 +71,54 @@ function NavItem({ item, onNavigate, isNavigating, currentNavPath, isCollapsed }
     onNavigate(item.path);
   };
 
+  const theme = useTheme(); // ADD THIS LINE to access theme
+
   // Rely on theme override for styling
   return (
     <ListItemButton 
-      selected={isActive} // Let theme handle selected styles
+      selected={isActive} 
       onClick={handleClick} 
       disabled={isCurrentNavTarget}
       sx={{ 
-        pl: isCollapsed ? 1.5 : 2.5,
+        // From Admin/Patient layouts for Materio consistency
+        borderRadius: theme.shape.borderRadius,
+        py: 1,
+        px: isCollapsed ? 1.5 : 4.5, // INCREASED expanded padding from 3.5 to 4.5
+        mb: 0.5, // Added for consistency with item spacing
         justifyContent: isCollapsed ? 'center' : 'flex-start',
-        transition: 'padding 0.3s ease-in-out',
+        color: theme.palette.text.secondary, // Default text color
+        transition: theme.transitions.create(['padding', 'justify-content', 'background-color', 'color'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+        }),
+        '&:hover': {
+          backgroundColor: alpha(theme.palette.primary.main, 0.04),
+          color: theme.palette.primary.main, // Highlight icon on hover too
+          '& .MuiListItemIcon-root': {
+            color: theme.palette.primary.main,
+          },
+        },
+        '&.Mui-selected': {
+          backgroundColor: theme.palette.primary.main,
+          color: theme.palette.primary.contrastText,
+          fontWeight: 'fontWeightMedium', // Ensure font weight changes
+          borderRadius: '0 22px 22px 0', // MODIFIED for pill shape on right
+          '& .MuiListItemIcon-root': {
+            color: theme.palette.primary.contrastText, 
+          },
+          '&:hover': {
+            backgroundColor: theme.palette.primary.dark, // Keep hover on selected distinct
+          },
+        },
       }}
     >
-      <ListItemIcon sx={{ minWidth: isCollapsed? 'auto' : 40, justifyContent: 'center' }}> 
+      <ListItemIcon sx={{ 
+          minWidth: isCollapsed? 'auto' : 40, 
+          justifyContent: 'center',
+          // Icon color will be handled by ListItemButton's color prop and .Mui-selected override
+          // color: isActive ? theme.palette.primary.contrastText : theme.palette.text.secondary, // Simplified
+          mr: isCollapsed ? 0 : 1, // Keep existing icon margin logic for provider
+        }}>
         {isCurrentNavTarget ? (
           <CircularProgress size={20} color="inherit" />
         ) : item.badge ? (
@@ -197,29 +232,29 @@ export default function ProviderSideDrawerContent({
           justifyContent: isCollapsed ? 'center' : 'flex-start', 
           px: isCollapsed ? 0 : 2.5, 
           py: 0, 
-          backgroundColor: theme.palette.primary.main,
-          color: theme.palette.primary.contrastText, 
           boxSizing: 'border-box',
           overflow: 'hidden', // Add overflow:hidden to clip potential overflow
           transition: 'padding 0.3s ease-in-out, justify-content 0.3s ease-in-out',
         }}
       >
-        <Link href="/provider/dashboard" passHref>
-          {isCollapsed ? <Logo height={logoHeight} collapsed /> : <Logo height={logoHeight} />}
+        <Link 
+          href="/provider/dashboard" 
+          passHref 
+          style={{ textDecoration: 'none', display: 'flex', alignItems: 'center'}}
+        >
+          <Box sx={{ pl: !isCollapsed ? 2 : 0, display: 'flex', alignItems: 'center' }}>
+            {isCollapsed ? <Logo height={logoHeight} collapsed /> : <Logo height={logoHeight} />}
+          </Box>
         </Link>
       </Box>
 
       {/* Navigation List */}
       <List component="nav" sx={{ 
           flexGrow: 1, 
-          px: isCollapsed ? 0.5 : 2,
+          py: 1,
+          px: 0,
           overflowY: 'auto', 
           overflowX: 'hidden',
-          transition: 'padding 0.3s ease-in-out',
-          '& .MuiListItemIcon-root': {
-            minWidth: 'auto',
-            justifyContent: 'center',
-          },
         }}>
         {providerMenuItems.map((item) => (
           <NavItem
@@ -236,15 +271,15 @@ export default function ProviderSideDrawerContent({
       <Divider />
 
       <List component="nav" sx={{ 
-          px: isCollapsed ? 0.5 : 2,
-          transition: 'padding 0.3s ease-in-out',
+          py: 1,
+          px: 0,
           '& .MuiListItemIcon-root': {
             minWidth: 'auto',
             justifyContent: 'center',
           },
         }}>
         {/* Settings Link */}
-        <ListItemButton onClick={() => handleNavigation('/provider/settings')} sx={{ pl: isCollapsed ? 1.5 : 2.5, justifyContent: isCollapsed ? 'center' : 'flex-start' }}>
+        <ListItemButton onClick={() => handleNavigation('/provider/settings')} sx={{ pl: isCollapsed ? 1.5 : 4.5, pr: isCollapsed? 1.5 : 2.5, justifyContent: isCollapsed ? 'center' : 'flex-start' }}>
           <ListItemIcon sx={{ minWidth: isCollapsed? 'auto' : 40, justifyContent: 'center' }}>
             <SettingsIcon />
           </ListItemIcon>
@@ -252,7 +287,7 @@ export default function ProviderSideDrawerContent({
         </ListItemButton>
 
         {/* Availability Link */}
-        <ListItemButton onClick={() => handleNavigation('/provider/availability')} sx={{ pl: isCollapsed ? 1.5 : 2.5, justifyContent: isCollapsed ? 'center' : 'flex-start' }}>
+        <ListItemButton onClick={() => handleNavigation('/provider/availability')} sx={{ pl: isCollapsed ? 1.5 : 4.5, pr: isCollapsed? 1.5 : 2.5, justifyContent: isCollapsed ? 'center' : 'flex-start' }}>
           <ListItemIcon sx={{ minWidth: isCollapsed? 'auto' : 40, justifyContent: 'center' }}>
             <EventAvailableIcon />
           </ListItemIcon>

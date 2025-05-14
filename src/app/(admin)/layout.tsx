@@ -139,7 +139,6 @@ export default function AdminLayout({
       <Toolbar
         sx={{
           minHeight: { xs: 56, sm: 64 },
-          backgroundColor: theme.palette.primary.main, // Ensure primary is used
           color: theme.palette.primary.contrastText,
           display: 'flex',
           alignItems: 'center',
@@ -152,17 +151,26 @@ export default function AdminLayout({
         }}
       >
         {/* Use handleNavigation for logo click for consistency */}
-        <Box onClick={() => handleNavigation('/admin')} sx={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Box 
+          onClick={() => handleNavigation('/admin')} 
+          sx={{ 
+            cursor: 'pointer', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            pl: !(isCollapsedMode && isDesktop) ? 1.5 : 0 // ADJUSTED to 1.5 for expanded
+          }}
+        >
           <Logo height={logoHeight} collapsed={isCollapsedMode && isDesktop} />
         </Box>
       </Toolbar>
       <List sx={{
-        p: 1, // Match patient
+        py: 1,
+        px: 0,
         flexGrow: 1,
         overflowY: 'auto',
         overflowX: 'hidden',
-        // Removed transition for padding from List to match patient
-        '& .MuiListItemIcon-root': { // Copied from patient for consistency
+        '& .MuiListItemIcon-root': {
           color: theme.palette.text.secondary,
           minWidth: 'auto',
           marginRight: isCollapsedMode && isDesktop ? 0 : theme.spacing(1.5),
@@ -178,10 +186,10 @@ export default function AdminLayout({
             <ListItemButton
               selected={pathname === item.path}
               onClick={() => handleNavigation(item.path)}
-              sx={{ // Styles from patient dashboard for consistency
+              sx={{
                 borderRadius: theme.shape.borderRadius,
                 py: 1,
-                px: 1.5,
+                px: 3.5,
                 justifyContent: isCollapsedMode && isDesktop ? 'center' : 'flex-start',
                 color: theme.palette.text.secondary,
                 transition: theme.transitions.create(['padding', 'justify-content'], {
@@ -192,27 +200,24 @@ export default function AdminLayout({
                   backgroundColor: alpha(theme.palette.primary.main, 0.04),
                 },
                 '&.Mui-selected': {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.08),
-                  color: theme.palette.primary.main,
-                  fontWeight: 'fontWeightMedium',
+                  backgroundColor: theme.palette.primary.main, 
+                  color: theme.palette.primary.contrastText, 
+                  fontWeight: 'fontWeightMedium', 
+                  borderRadius: '0 22px 22px 0',
+                  '& .MuiListItemIcon-root': {
+                    color: theme.palette.primary.contrastText, 
+                  },
                   '&:hover': {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.12),
-                  },
-                  '& .MuiListItemIcon-root': { // Ensure selected icon color matches text
-                    color: theme.palette.primary.main,
-                  },
-                  '& .MuiListItemText-primary': {
-                    fontWeight: 'fontWeightMedium',
+                    backgroundColor: theme.palette.primary.dark,
                   },
                 },
-                // GeneralListItemIcon styles moved to parent List sx for non-selected items
                 '& .MuiListItemText-primary': {
                   fontSize: '0.875rem',
-                  whiteSpace: 'nowrap', // Keep text on one line
+                  whiteSpace: 'nowrap',
                 },
               }}
             >
-              <ListItemIcon> {/* Specific icon styling handled by parent List sx and .Mui-selected */}
+              <ListItemIcon>
                 {item.icon}
               </ListItemIcon>
               {!(isCollapsedMode && isDesktop) && <ListItemText primary={item.text} />}
@@ -220,14 +225,14 @@ export default function AdminLayout({
           </ListItem>
         ))}
       </List>
-      {isDesktop && ( // Collapse button for desktop
+      {isDesktop && (
         <Box
           sx={{
             p: isDrawerCollapsed ? 1 : 2,
             mt: 'auto',
             display: 'flex',
             justifyContent: isDrawerCollapsed ? 'center' : 'flex-end',
-            borderTop: `1px solid ${theme.palette.divider}`, // Match patient
+            borderTop: `1px solid ${theme.palette.divider}`,
             transition: theme.transitions.create(['padding', 'justify-content'], {
               easing: theme.transitions.easing.sharp,
               duration: theme.transitions.duration.enteringScreen,
@@ -243,7 +248,7 @@ export default function AdminLayout({
   );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}> {/* Added minHeight to match patient */}
+    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <CssBaseline />
       <AppBar
         position="fixed"
@@ -251,7 +256,10 @@ export default function AdminLayout({
         sx={{
           width: { sm: `calc(100% - ${currentEffectiveDrawerWidth}px)` },
           ml: { sm: `${currentEffectiveDrawerWidth}px` },
-          borderBottom: `1px solid ${alpha(theme.palette.primary.contrastText || '#fff', 0.12)}`,
+          backgroundColor: theme.palette.background.default,
+          color: theme.palette.text.primary, 
+          border: 'none',
+          boxShadow: 'none',
           transition: theme.transitions.create(['width', 'margin'], {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.enteringScreen,
@@ -268,32 +276,27 @@ export default function AdminLayout({
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            {adminNavItems.find(item => item.path === pathname)?.text || 'Admin Dashboard'}
-          </Typography>
+          <Box sx={{ flexGrow: 1 }} />
           <IconButton
             onClick={handleMenuOpen}
             sx={{ p: 0 }}
           >
-            <Avatar alt={user?.email || 'Admin'} sx={{ width: 32, height: 32 }}> {/* Use user email for alt */}
+            <Avatar alt={user?.email || 'Admin'} sx={{ width: 32, height: 32 }}>
               {user?.email ? user.email[0].toUpperCase() : <AccountCircle />}
             </Avatar>
           </IconButton>
           <Menu
-            sx={{ mt: '45px' }} // Match Provider/Patient positioning
-            id="menu-appbar-admin" // Consistent ID
+            sx={{ mt: '45px' }}
+            id="menu-appbar-admin"
             anchorEl={anchorEl}
             open={Boolean(anchorEl)}
             onClose={handleMenuClose}
-            MenuListProps={{ // Use MenuListProps like other layouts
+            MenuListProps={{
               'aria-labelledby': 'user-menu-button',
             }}
             transformOrigin={{ horizontal: 'right', vertical: 'top' }}
             anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-            // Optional: Add slotProps for paper if specific styling is needed, else rely on theme
-            // slotProps={{ paper: { sx: { mt: 1.5, borderRadius: '4px', boxShadow: theme.shadows[3], minWidth: 180 }}}}
           >
-            {/* User Info Box */}
             <Box sx={{ my: 1.5, px: 2.5 }}>
               <Typography variant="subtitle2" noWrap>
                 {user?.user_metadata?.first_name || user?.email?.split('@')[0]} {user?.user_metadata?.last_name || ''}
@@ -303,13 +306,12 @@ export default function AdminLayout({
               </Typography>
             </Box>
             <Divider sx={{ borderStyle: 'dashed' }} />
-            {/* Admin Profile link - pointing to /admin/settings */}
             <MenuItem onClick={() => handleNavigation('/admin/settings')}>
               <ListItemIcon sx={{ minWidth: 'auto', mr: 1.5 }}><AccountCircle fontSize="small" /></ListItemIcon>
               <Typography variant="body2">Profile Settings</Typography>
             </MenuItem>
             <Divider sx={{ borderStyle: 'dashed' }} />
-            <MenuItem onClick={handleLogout} sx={{ py: 1, px: 2, color: 'error.main' }}> {/* Matched patient/provider sx */}
+            <MenuItem onClick={handleLogout} sx={{ py: 1, px: 2, color: 'error.main' }}>
               <ListItemIcon sx={{ minWidth: 'auto', mr: 1.5, color: 'error.main' }}><LogoutIcon fontSize="small" /></ListItemIcon>
               <Typography variant="body2">Logout</Typography>
             </MenuItem>
@@ -328,7 +330,7 @@ export default function AdminLayout({
         }}
         aria-label="mailbox folders"
       >
-        <Drawer // Mobile Drawer
+        <Drawer
           variant="temporary"
           open={mobileOpen}
           onClose={handleDrawerToggle}
@@ -340,13 +342,12 @@ export default function AdminLayout({
             '& .MuiDrawer-paper': { 
                 boxSizing: 'border-box', 
                 width: drawerWidth, 
-                // borderRight: 'none' // Keep or remove based on desired theme
             },
           }}
         >
           {drawerContent(false)} 
         </Drawer>
-        <Drawer // Desktop Drawer
+        <Drawer
           variant="permanent"
           sx={{
             display: { xs: 'none', sm: 'block' },
@@ -354,7 +355,6 @@ export default function AdminLayout({
                 boxSizing: 'border-box', 
                 width: currentEffectiveDrawerWidth, 
                 overflowX: 'hidden', 
-                // borderRight: 'none', // Keep or remove based on desired theme
                 transition: theme.transitions.create('width', {
                     easing: theme.transitions.easing.sharp,
                     duration: theme.transitions.duration.enteringScreen,
@@ -370,21 +370,19 @@ export default function AdminLayout({
         component="main"
         sx={{ 
           flexGrow: 1, 
-          p: 3, 
+          p: 4.5,
           width: { sm: `calc(100% - ${currentEffectiveDrawerWidth}px)` },
-          mt: { xs: '56px', sm: '64px' }, // Match patient
-          position: 'relative', // Match patient
-          backgroundColor: theme.palette.background.default, // Match patient
-          overflowX: 'hidden', // Match patient
-          transition: theme.transitions.create(['width', 'padding'], { // Match patient (added padding)
+          mt: { xs: '56px', sm: '64px' },
+          position: 'relative',
+          backgroundColor: theme.palette.background.default,
+          overflowX: 'hidden',
+          transition: theme.transitions.create(['width', 'padding'], {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.enteringScreen,
           }),
         }}
       >
-        {/* <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }} /> Removed to match patient (mt handles spacing) */}
         {children}
-        {/* PAGE LOADER START */}
         <Backdrop
           sx={{
             position: 'absolute',
@@ -401,7 +399,6 @@ export default function AdminLayout({
         >
           <CircularProgress color="inherit" />
         </Backdrop>
-        {/* PAGE LOADER END */}
       </Box>
     </Box>
   );

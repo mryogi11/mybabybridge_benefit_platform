@@ -171,10 +171,10 @@ export default function PatientDashboardPage() {
     const allPackages = dashboardData?.allPackages || [];
 
   return (
-        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-            <Typography variant="h4" gutterBottom sx={{ mb: 3 }}>
+        <Container maxWidth="lg" disableGutters sx={{ mb: 4 }}>
+            {/* <Typography variant="h4" gutterBottom sx={{ mb: 3 }}>
                 Welcome Back!
-            </Typography>
+            </Typography> */}
             <Grid container spacing={3}>
                  {/* Current Benefit Package Display - Placeholder */}
                  <Grid item xs={12}>

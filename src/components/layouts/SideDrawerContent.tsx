@@ -73,6 +73,7 @@ interface NavItemProps {
 
 function NavItem({ item, depth = 0, onNavigate, isNavigating, currentNavPath, isCollapsed }: NavItemProps) {
   const pathname = usePathname();
+  const theme = useTheme(); // Get theme for colors
   const isActive = item.path && pathname === item.path;
   const isChildActive = item.children?.some((child: MenuItemType) => child.path && pathname === child.path);
   const isCurrentNavTarget = Boolean(item.path && isNavigating && currentNavPath === item.path);
@@ -92,20 +93,47 @@ function NavItem({ item, depth = 0, onNavigate, isNavigating, currentNavPath, is
     }
   };
 
-  // Use Mui-selected class for active state, rely on theme override
   return (
     <>
       <ListItemButton 
-        selected={isActive || isChildActive} // Let theme handle selected styles
+        selected={isActive || isChildActive} 
         onClick={handleClick} 
         disabled={isCurrentNavTarget}
         sx={{ 
-          pl: isCollapsed ? 1.5 : (2.5 + depth * 1.5), // Adjust padding when collapsed
-          justifyContent: isCollapsed ? 'center' : 'flex-start', // Center icon when collapsed
-          transition: 'padding 0.3s ease-in-out', // Smooth transition for padding
+          minHeight: '30px', // Materio nav item height
+          height: '30px',
+          py: theme.spacing(0.5), // Minimal vertical padding
+          px: isCollapsed ? 1.5 : theme.spacing(2.5), // Horizontal padding (20px equivalent)
+          mb: '4px', // Margin like Materio
+          justifyContent: isCollapsed ? 'center' : 'flex-start',
+          transition: 'padding 0.2s ease-in-out, background-color 0.1s ease-in-out', 
+          borderRadius: theme.shape.borderRadius / 2, // Slightly rounded like Materio menu items
+          '&:hover': {
+            backgroundColor: '#f3f3f3', // Materio hover
+          },
+          '&.Mui-selected': {
+            color: 'white',
+            backgroundColor: '#765feb', // Materio active bg
+            '&:hover': {
+              backgroundColor: '#765feb', // Maintain active bg on hover
+            },
+            '& .MuiListItemIcon-root': {
+              color: 'white', // Active icon color
+            },
+          },
+          // Adjust padding when collapsed specifically for ListItemButton
+          ...(isCollapsed && {
+            paddingLeft: theme.spacing(1.5),
+            paddingRight: theme.spacing(1.5),
+          })
         }}
       >
-        <ListItemIcon sx={{ minWidth: isCollapsed? 'auto' : 40, justifyContent: 'center' }}>  // Center icon
+        <ListItemIcon sx={{
+          minWidth: isCollapsed ? 'auto' : 36, // Adjusted minWidth
+          justifyContent: 'center',
+          color: (isActive || isChildActive) ? 'white' : 'inherit', // Icon color for active state
+          mr: isCollapsed ? 0 : 1, // Margin for icon when not collapsed
+        }}>
           {isCurrentNavTarget ? (
             <CircularProgress size={20} color="inherit" />
           ) : item.badge ? (
@@ -116,10 +144,14 @@ function NavItem({ item, depth = 0, onNavigate, isNavigating, currentNavPath, is
             item.icon
           )}
         </ListItemIcon>
-        {!isCollapsed && ( // Conditionally render ListItemText
+        {!isCollapsed && ( 
           <ListItemText
             primary={item.title}
-            primaryTypographyProps={{ variant: 'body2', fontWeight: 'inherit', whiteSpace: 'nowrap' }} 
+            primaryTypographyProps={{ 
+              variant: 'body2', // Materio menu item text size (0.8125rem)
+              fontWeight: isActive || isChildActive ? 500 : 400, 
+              whiteSpace: 'nowrap' 
+            }} 
           />
         )}
         {!isCollapsed && item.children && item.children.length > 0 && (open ? <ExpandLess /> : <ExpandMore />)}
@@ -186,27 +218,37 @@ export default function SideDrawerContent({ isCollapsed, onToggleCollapse }: Sid
   const theme = useTheme(); // Get theme for styling the toggle button
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' /* Prevent scrollbars during transition */ }}>
-      {/* Logo Section */}
-      <Box sx={{ 
-          px: isCollapsed ? 0 : 2.5, 
-          py: 3, 
-          display: 'flex', 
-          justifyContent: isCollapsed ? 'center' : 'flex-start',
-          alignItems: 'center', // Vertically center logo if needed
+    <Box sx={{ 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      overflow: 'hidden', /* Prevent scrollbars during transition */
+    }}>
+      {/* Logo Section - Styled like Materio NavHeader */}
+      <Box sx={{
+          padding: '15px',
+          pl: isCollapsed ? '15px' : '20px',
+          display: 'flex',
+          justifyContent: isCollapsed ? 'center' : 'space-between',
+          alignItems: 'center',
           transition: 'padding 0.3s ease-in-out, justify-content 0.3s ease-in-out',
-          height: 64, // Fixed height for logo area
+          height: 64,
           boxSizing: 'border-box',
         }}>
+        {/* <Typography variant="h3" color="error">FORCE CHECKPOINT ALPHA</Typography> */}
         <Link href="/dashboard" passHref>
-          {isCollapsed ? <Logo height={30} collapsed /> : <Logo />} 
+          {isCollapsed ? <Logo height={30} collapsed /> : <Logo />}
+          {/* <Typography sx={{ p: 1, border: '1px dashed red' }}>
+            {isCollapsed ? 'LOGO_C' : 'LOGO_FULL'}
+          </Typography> */}
         </Link>
       </Box>
 
       {/* Navigation List */}
       <List component="nav" sx={{ 
           flexGrow: 1, 
-          px: isCollapsed ? 0.5 : 2,  // Adjust padding when collapsed
+          px: isCollapsed ? 1 : 1.5,  // Materio seems to use around 12px (theme.spacing(1.5)) for nav list padding
+          pt: 1, // Add some top padding to the list
           overflowY: 'auto', 
           overflowX: 'hidden',
           transition: 'padding 0.3s ease-in-out',

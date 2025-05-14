@@ -32,16 +32,33 @@ const ThemeModeContext = createContext<ThemeModeContextType | undefined>(undefin
 // Define BASE theme options (without mode)
 const baseThemeOptions: Omit<ThemeOptions, 'palette'> = {
   typography: {
-    fontFamily: '"Public Sans", sans-serif',
-    fontWeightRegular: 400,
-    fontWeightMedium: 500,
-    fontWeightBold: 700,
-    h1: { fontWeight: 700 },
-    h2: { fontWeight: 700 },
-    h3: { fontWeight: 700 },
-    h4: { fontWeight: 700 },
-    h5: { fontWeight: 600 },
-    h6: { fontWeight: 600 },
+    fontFamily: [
+      'Inter',
+      'sans-serif',
+      '-apple-system',
+      'BlinkMacSystemFont',
+      '"Segoe UI"',
+      'Roboto',
+      '"Helvetica Neue"',
+      'Arial',
+      'sans-serif',
+      '"Apple Color Emoji"',
+      '"Segoe UI Emoji"',
+      '"Segoe UI Symbol"'
+    ].join(','),
+    h1: { fontSize: '2.875rem', fontWeight: 500, lineHeight: 1.478261 },
+    h2: { fontSize: '2.375rem', fontWeight: 500, lineHeight: 1.47368421 },
+    h3: { fontSize: '1.75rem', fontWeight: 500, lineHeight: 1.5 },
+    h4: { fontSize: '1.5rem', fontWeight: 500, lineHeight: 1.58334 },
+    h5: { fontSize: '1.125rem', fontWeight: 500, lineHeight: 1.5556 },
+    h6: { fontSize: '0.9375rem', fontWeight: 500, lineHeight: 1.46667 },
+    subtitle1: { fontSize: '0.9375rem', lineHeight: 1.46667 },
+    subtitle2: { fontSize: '0.8125rem', fontWeight: 400, lineHeight: 1.53846154 },
+    body1: { fontSize: '0.9375rem', lineHeight: 1.46667 },
+    body2: { fontSize: '0.8125rem', lineHeight: 1.53846154 },
+    button: { fontSize: '0.9375rem', lineHeight: 1.46667, textTransform: 'none' },
+    caption: { fontSize: '0.8125rem', lineHeight: 1.38462, letterSpacing: '0.4px' },
+    overline: { fontSize: '0.75rem', lineHeight: 1.16667, letterSpacing: '0.8px' }
   },
   shape: {
     borderRadius: 8,
@@ -95,28 +112,52 @@ const baseThemeOptions: Omit<ThemeOptions, 'palette'> = {
 // Define light and dark PALETTE BASE options (These contain the core structure)
 const lightPaletteBase: PaletteOptions = {
     mode: 'light',
-    primary: { main: '#3366FF', light: '#6690FF', dark: '#0040CC', contrastText: '#fff' },
-    secondary: { main: '#00A76F', light: '#33B88A', dark: '#00754D', contrastText: '#fff' },
-    error: { main: '#FF5630' },
-    warning: { main: '#FFAB00' },
-    info: { main: '#00B8D9' },
-    success: { main: '#22C55E' },
-    background: { default: '#F9FAFB', paper: '#FFFFFF' },
-    text: { primary: '#212B36', secondary: '#637381', disabled: '#919EAB' },
-    divider: 'rgba(145, 158, 171, 0.2)',
+    primary: { main: '#8C57FF', light: '#A379FF', dark: '#7E4EE6', contrastText: '#fff' },
+    secondary: { main: '#8A8D93', light: '#A1A4A9', dark: '#7C7F84', contrastText: '#fff' },
+    error: { main: '#FF4C51', light: '#FF7074', dark: '#E64449', contrastText: '#fff' },
+    warning: { main: '#FFB400', light: '#FFC333', dark: '#E6A200', contrastText: '#fff' },
+    info: { main: '#16B1FF', light: '#45C1FF', dark: '#149FE6', contrastText: '#fff' },
+    success: { main: '#56CA00', light: '#78D533', dark: '#4DB600', contrastText: '#fff' },
+    background: { default: '#F4F5FA', paper: '#FFFFFF' },
+    text: { 
+        primary: 'rgba(47, 43, 61, 0.9)', 
+        secondary: 'rgba(47, 43, 61, 0.7)', 
+        disabled: 'rgba(47, 43, 61, 0.4)' 
+    },
+    divider: 'rgba(47, 43, 61, 0.12)',
+    action: {
+        active: 'rgba(47, 43, 61, 0.6)',
+        hover: 'rgba(47, 43, 61, 0.04)',
+        selected: 'rgba(47, 43, 61, 0.08)',
+        disabled: 'rgba(47, 43, 61, 0.3)',
+        disabledBackground: 'rgba(47, 43, 61, 0.12)',
+        focus: 'rgba(47, 43, 61, 0.1)',
+    },
 };
 
 const darkPaletteBase: PaletteOptions = {
     mode: 'dark',
-    primary: { main: '#6690FF', light: '#84a9ff', dark: '#3366ff', contrastText: '#fff' }, // Adjust dark primary
-    secondary: { main: '#33B88A', light: '#5eccaa', dark: '#00a76f', contrastText: '#fff' }, // Adjust dark secondary
-    error: { main: '#FF8A65' }, // Lighter error for dark mode
-    warning: { main: '#FFC107' }, // Standard warning yellow
-    info: { main: '#29B6F6' }, // Lighter info blue
-    success: { main: '#66BB6A' }, // Lighter success green
-    background: { default: '#161C24', paper: '#212B36' }, // Dark background
-    text: { primary: '#FFFFFF', secondary: '#919EAB', disabled: '#637381' }, // Light text
-    divider: 'rgba(145, 158, 171, 0.2)', // Divider can often stay similar
+    primary: { main: '#8C57FF', light: '#A379FF', dark: '#7E4EE6', contrastText: '#fff' },
+    secondary: { main: '#8A8D93', light: '#A1A4A9', dark: '#7C7F84', contrastText: '#fff' },
+    error: { main: '#FF4C51', light: '#FF7074', dark: '#E64449', contrastText: '#fff' },
+    warning: { main: '#FFB400', light: '#FFC333', dark: '#E6A200', contrastText: '#fff' },
+    info: { main: '#16B1FF', light: '#45C1FF', dark: '#149FE6', contrastText: '#fff' },
+    success: { main: '#56CA00', light: '#78D533', dark: '#4DB600', contrastText: '#fff' },
+    background: { default: '#28243D', paper: '#312D4B' },
+    text: { 
+        primary: 'rgba(231, 227, 252, 0.9)', 
+        secondary: 'rgba(231, 227, 252, 0.7)', 
+        disabled: 'rgba(231, 227, 252, 0.4)' 
+    },
+    divider: 'rgba(231, 227, 252, 0.12)',
+    action: {
+        active: 'rgba(231, 227, 252, 0.6)',
+        hover: 'rgba(231, 227, 252, 0.04)',
+        selected: 'rgba(231, 227, 252, 0.08)',
+        disabled: 'rgba(231, 227, 252, 0.3)',
+        disabledBackground: 'rgba(231, 227, 252, 0.12)',
+        focus: 'rgba(231, 227, 252, 0.1)',
+    },
 };
 
 // --- Define New Theme Palettes ---
@@ -318,24 +359,25 @@ export default function ClientThemeProviders({ children }: { children: React.Rea
     }
 
     const getAppBarStylesInternal = (palette: PaletteOptions) => {
-        const defaultPrimaryLight = { main: '#3366FF', contrastText: '#fff' };
-        const defaultPrimaryDark = { main: '#6690FF', contrastText: '#fff' };
-        const basePrimaryColors = palette.mode === 'dark' ? defaultPrimaryDark : defaultPrimaryLight;
+        // const defaultPrimaryLight = { main: '#3366FF', contrastText: '#fff' }; // No longer needed for bg
+        // const defaultPrimaryDark = { main: '#6690FF', contrastText: '#fff' }; // No longer needed for bg
+        // const basePrimaryColors = palette.mode === 'dark' ? defaultPrimaryDark : defaultPrimaryLight;
 
-        let mainColor = basePrimaryColors.main;
-        let contrastTextColor = basePrimaryColors.contrastText;
+        // let mainColor = basePrimaryColors.main;
+        let contrastTextColor = palette.mode === 'dark' ? palette.text?.primary : palette.text?.primary; // Default to text.primary
 
         if (palette.primary && typeof palette.primary === 'object') {
             const primarySimple = palette.primary as import('@mui/material/styles').SimplePaletteColorOptions;
-            if (primarySimple) { 
-                mainColor = primarySimple.main || mainColor;
-                contrastTextColor = primarySimple.contrastText || contrastTextColor;
+            if (primarySimple && primarySimple.contrastText) { 
+                // mainColor = primarySimple.main || mainColor; // We want background.default for AppBar bg
+                contrastTextColor = primarySimple.contrastText; // Keep this for text on primary colored elements if ever needed
             }
         }
         return {
-            backgroundColor: mainColor,
-            color: contrastTextColor,
-            borderBottom: `1px solid ${alpha(contrastTextColor, 0.12)}`,
+            // backgroundColor: mainColor, // Changed to palette.background.default
+            backgroundColor: palette.background?.default,
+            color: palette.text?.primary, // Ensure AppBar text uses standard text color
+            // borderBottom: `1px solid ${alpha(contrastTextColor, 0.12)}`, // Remove border, handle shadow in layout
         };
     };
 
@@ -355,7 +397,7 @@ export default function ClientThemeProviders({ children }: { children: React.Rea
       MuiDrawer: {
           styleOverrides: {
               paper: {
-                  backgroundColor: activePaletteOptions.background?.paper,
+                  backgroundColor: activePaletteOptions.background?.default,
                   border: 'none',
               }
           }

@@ -120,9 +120,10 @@ export default function ProviderMainLayout({ children }: { children: React.React
         sx={{
           width: { md: `calc(100% - ${currentDrawerWidth}px)` },
           ml: { md: `${currentDrawerWidth}px` },
-          backgroundColor: theme.palette.primary.main,
-          color: theme.palette.primary.contrastText,
-          borderBottom: `1px solid ${alpha(theme.palette.primary.contrastText || '#fff', 0.12)}`,
+          backgroundColor: theme.palette.background.default,
+          color: theme.palette.text.primary,
+          border: 'none',
+          boxShadow: 'none',
         }}
       >
         <Toolbar sx={{ justifyContent: 'space-between' }} ref={appBarToolbarRef}>
@@ -264,15 +265,16 @@ export default function ProviderMainLayout({ children }: { children: React.React
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
+          p: 4.5,
           width: { md: `calc(100% - ${currentDrawerWidth}px)` },
-          mt: { // Dynamically calculate based on AppBar Toolbar height
-            // This might need adjustment if toolbar height is variable across screen sizes
-            xs: '56px', // Standard mobile toolbar height
-            sm: '64px', // Standard desktop toolbar height
-          },
-          position: 'relative', // Important for Backdrop positioning
-          transition: 'padding-left 0.3s ease-in-out', // Smooth transition for content area
+          marginLeft: { md: `${currentDrawerWidth}px` },
+          marginTop: { xs: '56px', sm: '64px' },
+          backgroundColor: theme.palette.background.default,
+          overflow: 'auto',
+          transition: theme.transitions.create(['margin', 'width', 'padding'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
         }}
       >
         {/* Removed Toolbar spacer */}

@@ -263,18 +263,22 @@ export default function DashboardLayout({
          // Adjust justifyContent and padding for collapsed state on desktop
          justifyContent: isDesktop && isDrawerCollapsed ? 'center' : 'flex-start',
          px: isDesktop && isDrawerCollapsed ? 0 : 2, 
-         backgroundColor: theme.palette.primary.main, 
-         color: theme.palette.primary.contrastText,
          transition: theme.transitions.create(['justify-content', 'padding'], {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.enteringScreen,
          }),
         }}>
-         <Link href="/dashboard" passHref>
-            <Logo height={logoHeight} collapsed={isDesktop && isDrawerCollapsed} />
+         <Link 
+          href="/dashboard" 
+          passHref 
+          style={{ textDecoration: 'none', display: 'flex', alignItems: 'center'}}
+         >
+            <Box sx={{ pl: !(isDesktop && isDrawerCollapsed) ? 1.5 : 0, display: 'flex', alignItems: 'center' }}>
+              <Logo height={logoHeight} collapsed={isDesktop && isDrawerCollapsed} />
+            </Box>
          </Link>
        </Toolbar>
-      <List sx={{ p: 1, flexGrow: 1, overflowY: 'auto' }}>
+      <List sx={{ py: 1, px: 0, flexGrow: 1, overflowY: 'auto' }}>
         {patientNavItems.map((item) => (
           <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
             <ListItemButton
@@ -284,7 +288,7 @@ export default function DashboardLayout({
               sx={{
                 borderRadius: theme.shape.borderRadius,
                 py: 1,
-                px: isDesktop && isDrawerCollapsed ? 1.5 : 1.5, // Adjust padding if needed for collapsed
+                px: isDesktop && isDrawerCollapsed ? 1.5 : 3.5, // INCREASED expanded padding to 3.5
                 justifyContent: isDesktop && isDrawerCollapsed ? 'center' : 'flex-start',
                 color: theme.palette.text.secondary,
                 transition: theme.transitions.create(['padding', 'justify-content'], {
@@ -295,17 +299,15 @@ export default function DashboardLayout({
                   backgroundColor: alpha(theme.palette.primary.main, 0.04), 
                 },
                 '&.Mui-selected': {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.08), 
-                  color: theme.palette.primary.main,
+                  backgroundColor: theme.palette.primary.main, 
+                  color: theme.palette.primary.contrastText, 
                   fontWeight: 'fontWeightMedium', 
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.12), 
-                  },
+                  borderRadius: '0 22px 22px 0',
                   '& .MuiListItemIcon-root': {
-                    color: theme.palette.primary.main,
+                    color: theme.palette.primary.contrastText, 
                   },
-                  '& .MuiListItemText-primary': {
-                    fontWeight: 'fontWeightMedium', 
+                  '&:hover': {
+                    backgroundColor: theme.palette.primary.dark,
                   },
                 },
                 '& .MuiListItemIcon-root': {
@@ -367,7 +369,10 @@ export default function DashboardLayout({
           // Adjust width and ml for collapsed state on desktop
           width: { sm: `calc(100% - ${effectiveDrawerWidth}px)` },
           ml: { sm: `${effectiveDrawerWidth}px` },
-           borderBottom: `1px solid ${alpha(theme.palette.primary.contrastText || '#fff', 0.12)}`,
+          backgroundColor: theme.palette.background.default,
+          color: theme.palette.text.primary,
+          border: 'none',
+          boxShadow: 'none',
            transition: theme.transitions.create(['width', 'margin'], {
               easing: theme.transitions.easing.sharp,
               duration: theme.transitions.duration.enteringScreen,
@@ -384,10 +389,7 @@ export default function DashboardLayout({
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            {/* Dynamically set title based on route? */}
-             {patientNavItems.find(item => item.path === pathname)?.text || 'Dashboard'}
-          </Typography>
+          <Box sx={{ flexGrow: 1 }} />
           {/* Notifications Icon Button - Added */}
           <Tooltip title="Notifications">
             <IconButton
@@ -506,14 +508,12 @@ export default function DashboardLayout({
         component="main"
         sx={{
           flexGrow: 1,
-          p: { xs: 2, sm: 3 }, 
-          // Adjust width for collapsed state on desktop
+          p: 4.5,
           width: { sm: `calc(100% - ${effectiveDrawerWidth}px)` },
-          mt: { xs: '56px', sm: '64px' }, 
-          position: 'relative', 
-          backgroundColor: theme.palette.background.default, 
-          overflowX: 'hidden', 
-          transition: theme.transitions.create('width', {
+          mt: { xs: '56px', sm: '64px' },
+          backgroundColor: theme.palette.background.default,
+          overflowX: 'hidden',
+          transition: theme.transitions.create(['margin', 'width', 'padding'], {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.enteringScreen,
           }),
