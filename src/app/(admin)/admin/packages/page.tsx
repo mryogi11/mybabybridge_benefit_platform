@@ -244,7 +244,12 @@ export default function AdminPackagesPage() {
             headerName: 'Cost ($/mo)',
             type: 'number',
             width: 120,
-            valueFormatter: (value: number) => value.toFixed(2),
+            valueFormatter: (value: number | null | undefined) => {
+                if (typeof value === 'number') {
+                    return value.toFixed(2);
+                }
+                return ''; // Or return '-', 'N/A', or handle as appropriate
+            },
         },
         { 
             field: 'is_base_employer_package', 
