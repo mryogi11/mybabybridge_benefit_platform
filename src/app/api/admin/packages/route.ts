@@ -48,15 +48,43 @@ export async function GET(req: NextRequest) {
       }
     });
     
+    // Transform packages to include organization_name directly
+    const transformedPackages = allPackages.map(pkg => {
+      // Assuming a package is primarily associated with one organization
+      // for the purpose of this list display.
+      // If a package could be linked to multiple orgs and you need to display
+      // all, the frontend DataGrid structure might need to change.
+      const orgPackage = pkg.organizationPackages && pkg.organizationPackages.length > 0 
+        ? pkg.organizationPackages[0] 
+        : null;
+      
+      const organizationName = orgPackage && orgPackage.organization 
+        ? orgPackage.organization.name 
+        : null;
+
+      const organizationId = orgPackage && orgPackage.organization
+        ? orgPackage.organization.id
+        : null;
+
+      // Create a new object to avoid mutating the original pkg object from the DB query result
+      // and to explicitly define the shape sent to the client.
+      // Also, ensure all fields expected by the frontend's Package interface are present.
+      return {
+        ...pkg,
+        organization_name: organizationName,
+        organization_id: organizationId,
+      };
+    });
+    
     await createActivityLog({
         userId: adminUser.id,
         userEmail: adminUser.email,
         actionType: 'PACKAGE_FETCH_ALL',
         status: 'SUCCESS',
         description: `Admin ${adminUser.email} fetched all packages.`,
-        details: { packageCount: allPackages.length }
+        details: { packageCount: transformedPackages.length }
     });
-    return NextResponse.json(allPackages);
+    return NextResponse.json(transformedPackages);
 
   } catch (error: any) {
     console.error('[API GET /admin/packages] Error fetching packages:', error);
