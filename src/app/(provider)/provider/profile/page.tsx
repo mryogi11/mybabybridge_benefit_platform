@@ -13,16 +13,23 @@ import {
   Snackbar,
   Alert,
   Container,
+  Avatar as MuiAvatar,
+  Card,
+  CardContent,
+  CircularProgress,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { getAvatarList, updateUserAvatar } from '@/actions/userActions';
+import Image from 'next/image';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PersonIcon from '@mui/icons-material/Person';
 import { Provider } from '@/types';
 
 export default function ProviderProfilePage() {
   const [profile, setProfile] = useState<Provider | null>(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -33,35 +40,71 @@ export default function ProviderProfilePage() {
     message: '',
     severity: 'success',
   });
-  const { user } = useAuth();
+  const { user: authUser, profile: authProfile, fetchAndSetProfile } = useAuth();
   const [newEducation, setNewEducation] = useState('');
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
+  const [pageLoadingStates, setPageLoadingStates] = useState({
+    initialProfile: true,
+    savingProfile: false,
+    savingAvatar: false,
+  });
 
-  const fetchProfile = async () => {
+  const [availableAvatars, setAvailableAvatars] = useState<string[]>([]);
+  const [selectedAvatarForUpdate, setSelectedAvatarForUpdate] = useState<string | null>(null);
+  const [avatarSnackbar, setAvatarSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadProviderData = async () => {
+      if (isMounted) {
+        setPageLoadingStates(prev => ({ ...prev, initialProfile: true }));
+      }
+      await fetchProviderSpecificProfile();
+      if (isMounted) {
+        setPageLoadingStates(prev => ({ ...prev, initialProfile: false }));
+      }
+    };
+
+    const fetchAvatars = async () => {
+      try {
+        const avatars = await getAvatarList();
+        if (isMounted) {
+          setAvailableAvatars(avatars);
+        }
+      } catch (err) {
+        console.error("Error fetching avatar list for provider:", err);
+        if (isMounted) {
+          setAvatarSnackbar({ open: true, message: 'Could not load avatar choices.', severity: 'error' });
+        }
+      }
+    };
+    
+    loadProviderData();
+    fetchAvatars();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [authUser]);
+
+  const fetchProviderSpecificProfile = async () => {
     try {
-      setLoading(true);
-      if (!user) {
-        throw new Error("User not authenticated");
+      if (!authUser) {
+        return;
       }
 
       const { data, error } = await supabase
         .from('providers')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', authUser.id)
         .single();
 
       if (error) throw error;
 
       setProfile(data as any);
-      setNewEducation(data.education?.join(', ') || '');
     } catch (error) {
-      console.error('Error fetching profile:', error);
-      showSnackbar('Failed to load profile', 'error');
-    } finally {
-      setLoading(false);
+      console.error('Error fetching provider-specific profile:', error);
+      showSnackbar('Failed to load provider details', 'error');
     }
   };
 
@@ -108,7 +151,7 @@ export default function ProviderProfilePage() {
         .from('providers')
         .upsert({
           ...profile,
-          user_id: user?.id,
+          user_id: authUser?.id,
           updated_at: new Date().toISOString(),
         } as any);
 
@@ -135,7 +178,39 @@ export default function ProviderProfilePage() {
     setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
-  if (loading) {
+  const handleSaveAvatar = async () => {
+    if (!authUser?.id || !selectedAvatarForUpdate) {
+      setAvatarSnackbar({ open: true, message: 'Please select an avatar first.', severity: 'error' });
+      return;
+    }
+    setPageLoadingStates(prev => ({ ...prev, savingAvatar: true }));
+    setAvatarSnackbar(null);
+
+    try {
+      const result = await updateUserAvatar(authUser.id, selectedAvatarForUpdate);
+      if (result.success) {
+        setAvatarSnackbar({ open: true, message: 'Avatar updated successfully!', severity: 'success' });
+        await fetchAndSetProfile(authUser.id);
+      } else {
+        setAvatarSnackbar({ open: true, message: result.error || 'Failed to update avatar.', severity: 'error' });
+      }
+    } catch (err: any) {
+      console.error("Error saving avatar for provider:", err);
+      setAvatarSnackbar({ open: true, message: err.message || 'An unexpected error occurred.', severity: 'error' });
+    } finally {
+      setPageLoadingStates(prev => ({ ...prev, savingAvatar: false }));
+    }
+  };
+
+  const handleCloseAvatarSnackbar = () => {
+    setAvatarSnackbar(null);
+  };
+
+  const currentAvatarDisplayUrl = authProfile?.avatar_filename 
+    ? `/images/avatar/${authProfile.avatar_filename}` 
+    : (authProfile?.first_name ? '' : '/images/avatar/default.png');
+
+  if (pageLoadingStates.initialProfile) {
     return <LinearProgress />;
   }
 
@@ -153,10 +228,85 @@ export default function ProviderProfilePage() {
   }
 
   return (
-    <Container maxWidth="lg">
+    <Container maxWidth="lg" sx={{py:3}}>
       <Typography variant="h4" sx={{ mb: 3 }}>
-        My Profile
+        My Provider Profile
       </Typography>
+
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom sx={{display: 'flex', alignItems: 'center'}}>
+            <PersonIcon sx={{ mr: 1, color: 'primary.main' }} />
+            Profile Picture
+          </Typography>
+          <Grid container spacing={3} alignItems="center">
+            <Grid item xs={12} md={3} sx={{ textAlign: 'center' }}>
+              <Typography variant="subtitle1" gutterBottom>Current Avatar</Typography>
+              <MuiAvatar
+                src={currentAvatarDisplayUrl}
+                alt={authProfile?.first_name || authUser?.email || 'Provider Avatar'}
+                sx={{ width: 120, height: 120, margin: '0 auto', mb: 2, fontSize: '3rem' }}
+              >
+                {(!currentAvatarDisplayUrl && (authProfile?.first_name || authUser?.email)) 
+                  ? (authProfile.first_name || authUser.email)?.[0].toUpperCase() 
+                  : null}
+              </MuiAvatar>
+            </Grid>
+            <Grid item xs={12} md={9}>
+              <Typography variant="subtitle1" gutterBottom>Choose a new Avatar</Typography>
+              {availableAvatars.length > 0 ? (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                  {availableAvatars.map((avatarFile) => (
+                    <Box 
+                      key={avatarFile} 
+                      onClick={() => setSelectedAvatarForUpdate(avatarFile)}
+                      sx={{ 
+                        cursor: 'pointer', 
+                        position: 'relative',
+                        border: selectedAvatarForUpdate === avatarFile ? (theme) => `3px solid ${theme.palette.primary.main}` : `3px solid transparent`,
+                        borderRadius: '50%',
+                        padding: '2px',
+                        transition: 'border-color 0.2s ease-in-out'
+                      }}
+                    >
+                      <Image 
+                        src={`/images/avatar/${avatarFile}`} 
+                        alt={`Avatar ${avatarFile}`} 
+                        width={80} 
+                        height={80} 
+                        style={{ borderRadius: '50%', display: 'block' }}
+                      />
+                      {selectedAvatarForUpdate === avatarFile && (
+                        <CheckCircleIcon 
+                          sx={{ 
+                            position: 'absolute', 
+                            bottom: 0, 
+                            right: 0, 
+                            color: (theme) => theme.palette.success.main,
+                            backgroundColor: 'white',
+                            borderRadius: '50%',
+                            fontSize: '1.5rem'
+                          }} 
+                        />
+                      )}
+                    </Box>
+                  ))}
+                </Box>
+              ) : (
+                 pageLoadingStates.initialProfile ? <CircularProgress size={24} /> : <Typography>No other avatars available.</Typography>
+              )}
+              <Button
+                variant="contained"
+                onClick={handleSaveAvatar}
+                disabled={pageLoadingStates.savingAvatar || !selectedAvatarForUpdate}
+                sx={{ mt: 3 }}
+              >
+                {pageLoadingStates.savingAvatar ? <CircularProgress size={24} color="inherit" /> : 'Save Avatar'}
+              </Button>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
 
       <Paper sx={{ p: 3 }}>
         <Typography variant="h6" gutterBottom>
@@ -306,9 +456,9 @@ export default function ProviderProfilePage() {
                 type="submit"
                 variant="contained"
                 color="primary"
-                disabled={saving}
+                disabled={saving || pageLoadingStates.savingProfile}
               >
-                {saving ? 'Saving...' : 'Save Changes'}
+                {saving || pageLoadingStates.savingProfile ? <CircularProgress size={24} color="inherit"/> : 'Save Profile Changes'}
               </Button>
             </Grid>
           </Grid>
@@ -319,6 +469,7 @@ export default function ProviderProfilePage() {
         open={snackbar.open}
         autoHideDuration={6000}
         onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <Alert
           onClose={handleCloseSnackbar}
@@ -328,6 +479,19 @@ export default function ProviderProfilePage() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {avatarSnackbar && (
+        <Snackbar
+          open={avatarSnackbar.open}
+          autoHideDuration={6000}
+          onClose={handleCloseAvatarSnackbar}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert onClose={handleCloseAvatarSnackbar} severity={avatarSnackbar.severity} sx={{ width: '100%' }}>
+            {avatarSnackbar.message}
+          </Alert>
+        </Snackbar>
+      )}
     </Container>
   );
 } 

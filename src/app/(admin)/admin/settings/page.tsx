@@ -19,12 +19,16 @@ import {
   Divider,
   InputAdornment,
   IconButton,
+  Avatar,
 } from '@mui/material';
 import { useAuth } from '@/contexts/AuthContext';
 // Assuming updateAdminProfile will be created or exists in userActions
-import { updateUserThemePreference, updateAdminProfile, updateUserPassword } from '@/actions/userActions'; 
+import { updateUserThemePreference, updateAdminProfile, updateUserPassword, getAvatarList, updateUserAvatar } from '@/actions/userActions'; 
 import type { ThemeModeSetting } from '@/components/ThemeRegistry/ClientThemeProviders';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
+import Image from 'next/image';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PersonIcon from '@mui/icons-material/Person';
 
 // Original component content starts here
 function AdminSettingsPageComponent() {
@@ -38,6 +42,7 @@ function AdminSettingsPageComponent() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isSavingAvatar, setIsSavingAvatar] = useState(false);
 
   // Snackbar state
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' } | null>(null);
@@ -49,11 +54,36 @@ function AdminSettingsPageComponent() {
   const [showPassword, setShowPassword] = useState(false);
   const [isPasswordChanging, setIsPasswordChanging] = useState(false);
 
+  // State for avatar selection
+  const [availableAvatars, setAvailableAvatars] = useState<string[]>([]);
+  const [selectedAvatarForUpdate, setSelectedAvatarForUpdate] = useState<string | null>(null);
+
   useEffect(() => {
     if (profile) {
       setThemeMode(profile.theme_preference || 'system');
       setFirstName(profile.first_name || '');
       setLastName(profile.last_name || '');
+    }
+
+    // Fetch available avatars
+    let isMounted = true;
+    const fetchAvatars = async () => {
+      try {
+        const avatars = await getAvatarList();
+        if (isMounted) {
+          setAvailableAvatars(avatars);
+        }
+      } catch (err) {
+        console.error("Error fetching avatar list for admin:", err);
+        if (isMounted) {
+          setSnackbar({ open: true, message: 'Could not load avatar choices.', severity: 'error' });
+        }
+      }
+    };
+    fetchAvatars();
+
+    return () => {
+      isMounted = false;
     }
   }, [profile]);
 
@@ -169,6 +199,30 @@ function AdminSettingsPageComponent() {
     setSnackbar(null);
   };
 
+  const handleSaveAvatar = async () => {
+    if (!user?.id || !selectedAvatarForUpdate) {
+      setSnackbar({ open: true, message: 'Please select an avatar first.', severity: 'error' });
+      return;
+    }
+    setIsSavingAvatar(true);
+    try {
+      const result = await updateUserAvatar(user.id, selectedAvatarForUpdate);
+      if (result.success) {
+        setSnackbar({ open: true, message: 'Avatar updated successfully!', severity: 'success' });
+        if (fetchAndSetProfile) {
+            await fetchAndSetProfile(user.id); // Refresh global auth profile
+        }
+      } else {
+        setSnackbar({ open: true, message: result.error || 'Failed to update avatar.', severity: 'error' });
+      }
+    } catch (err: any) {
+      console.error("Error saving avatar for admin:", err);
+      setSnackbar({ open: true, message: err.message || 'An unexpected error occurred.', severity: 'error' });
+    } finally {
+      setIsSavingAvatar(false);
+    }
+  };
+
   if (!profile && !user) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
@@ -266,6 +320,81 @@ function AdminSettingsPageComponent() {
             {isSavingProfile ? <CircularProgress size={24} /> : 'Save Profile'}
           </Button>
         </Box>
+      </Paper>
+
+      {/* Profile Picture Section - NEW */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" gutterBottom sx={{display: 'flex', alignItems: 'center'}}>
+          <PersonIcon sx={{ mr: 1, color: 'primary.main' }} /> Profile Picture
+        </Typography>
+        <Divider sx={{mb: 2}} />
+        <Grid container spacing={3} alignItems="center">
+          <Grid item xs={12} md={3} sx={{ textAlign: 'center' }}>
+            <Typography variant="subtitle2" gutterBottom>Current Avatar</Typography>
+            <Avatar
+              src={profile?.avatar_filename ? `/images/avatar/${profile.avatar_filename}` : undefined}
+              alt={profile?.first_name || user?.email || 'Admin Avatar'}
+              sx={{ width: 100, height: 100, margin: '0 auto', mb: 2, fontSize: '2.5rem' }}
+            >
+              {(!profile?.avatar_filename && (profile?.first_name || user?.email)) 
+                ? (profile?.first_name || user?.email)?.[0].toUpperCase() 
+                : null}
+            </Avatar>
+          </Grid>
+          <Grid item xs={12} md={9}>
+            <Typography variant="subtitle2" gutterBottom>Choose a new Avatar</Typography>
+            {availableAvatars.length > 0 ? (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb:2 }}>
+                {availableAvatars.map((avatarFile) => (
+                  <Box 
+                    key={avatarFile} 
+                    onClick={() => setSelectedAvatarForUpdate(avatarFile)}
+                    sx={theme => ({
+                      cursor: 'pointer', 
+                      position: 'relative',
+                      border: selectedAvatarForUpdate === avatarFile ? `3px solid ${theme.palette.primary.main}` : `3px solid transparent`,
+                      borderRadius: '50%',
+                      padding: '2px',
+                      transition: 'border-color 0.2s ease-in-out',
+                      'img': {
+                        borderRadius: '50%', display: 'block'
+                      }
+                    })}
+                  >
+                    <Image 
+                      src={`/images/avatar/${avatarFile}`} 
+                      alt={`Avatar ${avatarFile}`} 
+                      width={70} 
+                      height={70} 
+                    />
+                    {selectedAvatarForUpdate === avatarFile && (
+                      <CheckCircleIcon 
+                        sx={theme =>({
+                          position: 'absolute', 
+                          bottom: 0, 
+                          right: 0, 
+                          color: theme.palette.success.main,
+                          backgroundColor: 'white',
+                          borderRadius: '50%',
+                          fontSize: '1.25rem' // Slightly smaller for smaller avatars
+                        })} 
+                      />
+                    )}
+                  </Box>
+                ))}
+              </Box>
+            ) : (
+               <Typography color="textSecondary" sx={{mb:2}}>No other avatars available.</Typography>
+            )}
+            <Button
+              variant="contained"
+              onClick={handleSaveAvatar}
+              disabled={isSavingAvatar || !selectedAvatarForUpdate || selectedAvatarForUpdate === profile?.avatar_filename}
+            >
+              {isSavingAvatar ? <CircularProgress size={24} /> : 'Save Avatar'}
+            </Button>
+          </Grid>
+        </Grid>
       </Paper>
 
       {/* Change Password Section */}

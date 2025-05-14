@@ -24,12 +24,13 @@ import {
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import NotificationsIcon from '@mui/icons-material/Notifications';
-import { AccountCircle, Logout, Settings } from '@mui/icons-material';
+import { AccountCircle, Logout, Settings, Brightness4 as Brightness4Icon, Brightness7 as Brightness7Icon } from '@mui/icons-material';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import ProviderSideDrawerContent from './ProviderSideDrawerContent'; // Import the PROVIDER drawer content
 import { usePageLoading } from '@/contexts/LoadingContext'; // Added import
 import { createActivityLog } from '@/lib/actions/loggingActions'; // Corrected import path
+import { updateUserThemePreference } from '@/actions/userActions'; // Import action to update theme
 
 const DRAWER_WIDTH = 280;
 const COLLAPSED_DRAWER_WIDTH = 88; // Standard for icon-only navigation
@@ -45,10 +46,11 @@ export default function ProviderMainLayout({ children }: { children: React.React
   // User Menu State & Handlers
   const [anchorElUser, setAnchorElUser] = useState<null | HTMLElement>(null);
   const [anchorElNotifications, setAnchorElNotifications] = useState<null | HTMLElement>(null);
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, fetchAndSetProfile } = useAuth();
   const router = useRouter();
   const pathname = usePathname(); // Added usePathname hook
   const { isLoadingPage, setIsLoadingPage } = usePageLoading(); // Added page loading context
+  const [isThemeToggling, setIsThemeToggling] = useState(false); // New state
 
   const handleOpenUserMenu = (event: React.MouseEvent<HTMLElement>) => setAnchorElUser(event.currentTarget);
   const handleCloseUserMenu = () => setAnchorElUser(null);
@@ -102,6 +104,58 @@ export default function ProviderMainLayout({ children }: { children: React.React
     handleCloseUserMenu();
   };
 
+  const handleThemeToggle = async () => {
+    if (!user?.id || !profile || isThemeToggling) { // Added isThemeToggling check
+      console.warn("Theme toggle skipped in Provider layout: User/profile not available or toggle in progress.");
+      return;
+    }
+    setIsThemeToggling(true);
+    const currentMode = theme.palette.mode;
+    const newThemeMode = currentMode === 'dark' ? 'light' : 'dark';
+
+    try {
+      const result = await updateUserThemePreference(newThemeMode as 'light' | 'dark' | 'system');
+      if (result.success) {
+        if (fetchAndSetProfile && user.id) {
+          await fetchAndSetProfile(user.id);
+           if (user.email) { // user.email from refreshed profile
+             await createActivityLog({
+              userId: user.id,
+              userEmail: user.email,
+              actionType: 'THEME_CHANGE',
+              status: 'SUCCESS',
+              description: `User changed theme to ${newThemeMode} (Provider).`
+            });
+           }
+        }
+      } else {
+        console.error("Failed to update theme preference (Provider):", result.message);
+        if (user.id && user.email) { // user.id and user.email from initial state
+          await createActivityLog({
+            userId: user.id,
+            userEmail: user.email,
+            actionType: 'THEME_CHANGE_FAILED',
+            status: 'FAILURE', // Already corrected
+            description: `Failed to change theme to ${newThemeMode} (Provider). Error: ${result.message}`
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error toggling theme (Provider):", error);
+      if (user.id && user.email) { // user.id and user.email from initial state
+        await createActivityLog({
+          userId: user.id,
+          userEmail: user.email,
+          actionType: 'THEME_CHANGE_ERROR',
+          status: 'FAILURE', // Already corrected
+          description: `Error toggling theme to ${newThemeMode} (Provider). Details: ${(error as Error).message}`
+        });
+      }
+    } finally {
+      setIsThemeToggling(false);
+    }
+  };
+
   useEffect(() => {
     if (appBarToolbarRef.current) {
       console.log('[ProviderMainLayout] AppBar Toolbar ClientHeight:', appBarToolbarRef.current.clientHeight);
@@ -112,7 +166,7 @@ export default function ProviderMainLayout({ children }: { children: React.React
   const currentDrawerWidth = isMdUp && isDrawerCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH;
 
   return (
-    <Box sx={{ display: 'flex', transition: 'all 0.3s ease-in-out' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <CssBaseline />
       <AppBar
         position="fixed"
@@ -140,7 +194,7 @@ export default function ProviderMainLayout({ children }: { children: React.React
           <Box sx={{ flexGrow: 1 }} /> {/* Spacer */}
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            {/* Notifications */}
+            {/* Notifications - MOVED BEFORE THEME TOGGLE */}
             <Tooltip title="Notifications">
                <IconButton color="inherit" onClick={handleOpenNotificationsMenu}>
                    <Badge badgeContent={1} color="error"> {/* Example */}
@@ -156,12 +210,39 @@ export default function ProviderMainLayout({ children }: { children: React.React
             >
                 <MenuItem onClick={handleCloseNotificationsMenu}>Provider Notification 1</MenuItem>
             </Menu>
+            
+            {/* Theme Toggle Button - NOW AFTER NOTIFICATIONS */}
+            <Tooltip title={`Switch to ${theme.palette.mode === 'dark' ? 'light' : 'dark'} mode`}>
+              <span>
+                <IconButton
+                  onClick={handleThemeToggle}
+                  color="inherit"
+                  aria-label="toggle theme"
+                  disabled={isThemeToggling} // Disable button
+                >
+                  {isThemeToggling ? <CircularProgress size={24} color="inherit" /> : (theme.palette.mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />)}
+                </IconButton>
+              </span>
+            </Tooltip>
 
             {/* User Avatar & Menu */}
             <Tooltip title="Open settings">
               <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-                 {/* TODO: Replace with dynamic avatar source if available */}
-                <Avatar alt={profile?.first_name || user?.email} src="/static/images/avatar/provider.jpg" />
+                {profile?.avatar_filename ? (
+                  <Avatar 
+                    alt={profile.first_name || user?.email || 'User'}
+                    src={`/images/avatar/${profile.avatar_filename}`}
+                  />
+                ) : (
+                  <Avatar 
+                    alt={profile?.first_name || user?.email || 'User'}
+                    // Fallback to initials or a default icon if no avatar_filename
+                  >
+                    {(profile?.first_name || user?.email) 
+                      ? ( (profile?.first_name || user?.email || '')?.[0] || '' ).toUpperCase() 
+                      : <AccountCircle />}
+                  </Avatar>
+                )}
               </IconButton>
             </Tooltip>
             {/* Use theme override for Menu styling, remove local PaperProps */}
@@ -205,7 +286,11 @@ export default function ProviderMainLayout({ children }: { children: React.React
       {/* Drawer */}
       <Box
         component="nav"
-        sx={{ width: { md: currentDrawerWidth }, flexShrink: { md: 0 }, transition: 'width 0.3s ease-in-out' }}
+        sx={{ 
+          // width: { md: currentDrawerWidth }, // Intentionally removed/commented out
+          flexShrink: { md: 0 }, 
+          // transition: 'width 0.3s ease-in-out', // Optional: Consider removing if Drawer's own transition is enough
+        }}
       >
         {/* Mobile Drawer */}
         <Drawer
@@ -243,7 +328,6 @@ export default function ProviderMainLayout({ children }: { children: React.React
                 boxSizing: 'border-box',
                 width: currentDrawerWidth,
                 overflowX: 'hidden',
-                borderRight: `1px dashed ${theme.palette.divider}`,
                 transition: theme.transitions.create('width', {
                   easing: theme.transitions.easing.sharp,
                   duration: theme.transitions.duration.enteringScreen,
@@ -265,7 +349,7 @@ export default function ProviderMainLayout({ children }: { children: React.React
         component="main"
         sx={{
           flexGrow: 1,
-          p: 4.5,
+          p: 3,
           width: { md: `calc(100% - ${currentDrawerWidth}px)` },
           marginLeft: { md: `${currentDrawerWidth}px` },
           marginTop: { xs: '56px', sm: '64px' },

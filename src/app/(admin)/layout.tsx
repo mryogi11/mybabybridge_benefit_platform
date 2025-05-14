@@ -36,6 +36,8 @@ import {
   ChevronRight as ChevronRightIcon,
   Group as GroupIcon, // Added for Providers
   BarChart as BarChartIcon,
+  Brightness4 as Brightness4Icon, // Moon icon for dark mode
+  Brightness7 as Brightness7Icon, // Sun icon for light mode
 } from '@mui/icons-material';
 import { useAuth } from '@/contexts/AuthContext';
 // Link component is not directly used in the provided final version of dropdown, but kept for general use
@@ -44,6 +46,7 @@ import BusinessIcon from '@mui/icons-material/Business';
 import Logo from '@/components/Logo';
 import { usePageLoading } from '@/contexts/LoadingContext';
 import { createActivityLog } from '@/lib/actions/loggingActions';
+import { updateUserThemePreference } from '@/actions/userActions'; // Import action to update theme
 
 const drawerWidth = 240;
 const COLLAPSED_DRAWER_WIDTH = 88;
@@ -69,11 +72,12 @@ export default function AdminLayout({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isDesktop = useMediaQuery(theme.breakpoints.up('sm'));
-  const { user, signOut } = useAuth(); // 'profile' is not directly from useAuth here
+  const { user, profile, signOut, fetchAndSetProfile } = useAuth(); // Added 'fetchAndSetProfile'
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [isDrawerCollapsed, setIsDrawerCollapsed] = useState(false);
   const { isLoadingPage, setIsLoadingPage } = usePageLoading();
+  const [isThemeToggling, setIsThemeToggling] = useState(false); // New state for theme toggle loading
 
   const logoHeight = isMobile ? 46 : 48;
 
@@ -129,6 +133,63 @@ export default function AdminLayout({
      // Close user menu if navigation is triggered from there
     if (anchorEl) {
         handleMenuClose();
+    }
+  };
+
+  const handleThemeToggle = async () => {
+    if (!user?.id || !profile || isThemeToggling) { // Added isThemeToggling check
+      console.warn("Theme toggle skipped: User/profile not available or toggle already in progress.");
+      return;
+    }
+    setIsThemeToggling(true);
+    const currentMode = theme.palette.mode; // Get current mode from MUI theme
+    const newThemeMode = currentMode === 'dark' ? 'light' : 'dark';
+
+    try {
+      // First, update the theme preference in the backend
+      const result = await updateUserThemePreference(newThemeMode as 'light' | 'dark' | 'system');
+
+      if (result.success) {
+        // If backend update is successful, then refresh the profile in AuthContext
+        if (fetchAndSetProfile && user.id) { // user.id is confirmed by initial check
+          await fetchAndSetProfile(user.id);
+          // Activity log after profile is updated and new theme should be active
+          if (user.email) { // user.email is also from profile, which is now fresh
+            await createActivityLog({
+              userId: user.id,
+              userEmail: user.email, // This email should be from the refreshed profile
+              actionType: 'THEME_CHANGE',
+              status: 'SUCCESS',
+              description: `User changed theme to ${newThemeMode}.` // newThemeMode is what we attempted
+            });
+          }
+        }
+      } else {
+        // Backend update failed
+        console.error("Failed to update theme preference in backend:", result.message);
+        if (user.id && user.email) { // user.id and user.email should still be available from initial profile state
+          await createActivityLog({
+            userId: user.id,
+            userEmail: user.email,
+            actionType: 'THEME_CHANGE_FAILED',
+            status: 'FAILURE', // Corrected status
+            description: `Failed to change theme to ${newThemeMode}. Error: ${result.message}`
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error during theme toggle process:", error);
+      if (user.id && user.email) { // user.id and user.email from initial profile state
+        await createActivityLog({
+          userId: user.id,
+          userEmail: user.email,
+          actionType: 'THEME_CHANGE_ERROR',
+          status: 'FAILURE', // Corrected status
+          description: `Error changing theme to ${newThemeMode}. Details: ${(error as Error).message}`
+        });
+      }
+    } finally {
+      setIsThemeToggling(false); // Reset loading state
     }
   };
 
@@ -278,39 +339,60 @@ export default function AdminLayout({
           </IconButton>
           <Box sx={{ flexGrow: 1 }} />
           <IconButton
+            sx={{ mr: 1, color: 'inherit' }}
+            onClick={handleThemeToggle}
+            aria-label="toggle theme"
+            disabled={isThemeToggling} // Disable button while toggling
+          >
+            {isThemeToggling ? <CircularProgress size={24} color="inherit" /> : (theme.palette.mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />)}
+          </IconButton>
+          <IconButton
             onClick={handleMenuOpen}
             sx={{ p: 0 }}
           >
-            <Avatar alt={user?.email || 'Admin'} sx={{ width: 32, height: 32 }}>
-              {user?.email ? user.email[0].toUpperCase() : <AccountCircle />}
-            </Avatar>
+            {profile?.avatar_filename ? (
+              <Avatar 
+                alt={profile.first_name || user?.email || 'Admin'}
+                src={`/images/avatar/${profile.avatar_filename}`}
+                sx={{ width: 32, height: 32 }}
+              />
+            ) : (
+              <Avatar 
+                alt={profile?.first_name || user?.email || 'Admin'}
+                sx={{ width: 32, height: 32 }}
+              >
+                {(() => {
+                  const nameSource = profile?.first_name || user?.email;
+                  if (nameSource && nameSource.length > 0) {
+                    return nameSource[0].toUpperCase();
+                  }
+                  return <AccountCircle />;
+                })()}
+              </Avatar>
+            )}
           </IconButton>
           <Menu
-            sx={{ mt: '45px' }}
-            id="menu-appbar-admin"
+            sx={{ '& .MuiPaper-root': { width: 230, mt: 1 } }}
             anchorEl={anchorEl}
             open={Boolean(anchorEl)}
             onClose={handleMenuClose}
-            MenuListProps={{
-              'aria-labelledby': 'user-menu-button',
-            }}
-            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
           >
-            <Box sx={{ my: 1.5, px: 2.5 }}>
+            <Box sx={{ p: 2 }}>
               <Typography variant="subtitle2" noWrap>
-                {user?.user_metadata?.first_name || user?.email?.split('@')[0]} {user?.user_metadata?.last_name || ''}
+                {`${profile?.first_name || user?.user_metadata?.first_name || user?.email?.split('@')[0] || 'User'} ${profile?.last_name || user?.user_metadata?.last_name || ''}`.trim()}
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary' }} noWrap>
-                {user?.email}
+                {user?.email || 'No email'}
               </Typography>
             </Box>
-            <Divider sx={{ borderStyle: 'dashed' }} />
+            <Divider />
             <MenuItem onClick={() => handleNavigation('/admin/settings')}>
               <ListItemIcon sx={{ minWidth: 'auto', mr: 1.5 }}><AccountCircle fontSize="small" /></ListItemIcon>
               <Typography variant="body2">Profile Settings</Typography>
             </MenuItem>
-            <Divider sx={{ borderStyle: 'dashed' }} />
+            <Divider />
             <MenuItem onClick={handleLogout} sx={{ py: 1, px: 2, color: 'error.main' }}>
               <ListItemIcon sx={{ minWidth: 'auto', mr: 1.5, color: 'error.main' }}><LogoutIcon fontSize="small" /></ListItemIcon>
               <Typography variant="body2">Logout</Typography>

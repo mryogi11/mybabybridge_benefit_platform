@@ -23,11 +23,12 @@ import {
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import NotificationsIcon from '@mui/icons-material/Notifications';
-import { AccountCircle, Logout, Settings } from '@mui/icons-material';
+import { AccountCircle, Logout, Settings, Brightness4 as Brightness4Icon, Brightness7 as Brightness7Icon } from '@mui/icons-material';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import SideDrawerContent from './SideDrawerContent'; // Import the drawer content
 import { createActivityLog } from '@/lib/actions/loggingActions'; // Corrected import path
+import { updateUserThemePreference } from '@/actions/userActions'; // Import action to update theme
 
 const DRAWER_WIDTH = 260;
 const COLLAPSED_DRAWER_WIDTH = 88; // Standard for icon-only navigation
@@ -42,8 +43,9 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
   // User Menu State & Handlers (Moved from Navigation.tsx)
   const [anchorElUser, setAnchorElUser] = useState<null | HTMLElement>(null);
   const [anchorElNotifications, setAnchorElNotifications] = useState<null | HTMLElement>(null);
-  const { user, profile, signOut } = useAuth(); // Added profile
+  const { user, profile, signOut, fetchAndSetProfile } = useAuth(); // Added profile and fetchAndSetProfile
   const router = useRouter();
+  const [isThemeToggling, setIsThemeToggling] = useState(false); // New state
 
   const handleOpenUserMenu = (event: React.MouseEvent<HTMLElement>) => setAnchorElUser(event.currentTarget);
   const handleCloseUserMenu = () => setAnchorElUser(null);
@@ -94,6 +96,58 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
       handleCloseUserMenu(); // Close menu after navigation
   }
 
+  const handleThemeToggle = async () => {
+    if (!user?.id || !profile || isThemeToggling) { // Added isThemeToggling check
+      console.warn("Theme toggle skipped in DashboardMainLayout: User/profile not available or toggle in progress.");
+      return;
+    }
+    setIsThemeToggling(true);
+    const currentMode = theme.palette.mode;
+    const newThemeMode = currentMode === 'dark' ? 'light' : 'dark';
+
+    try {
+      const result = await updateUserThemePreference(newThemeMode as 'light' | 'dark' | 'system');
+      if (result.success) {
+        if (fetchAndSetProfile && user.id) {
+          await fetchAndSetProfile(user.id);
+          if (user.email) { // user.email from refreshed profile
+            await createActivityLog({
+              userId: user.id,
+              userEmail: user.email,
+              actionType: 'THEME_CHANGE',
+              status: 'SUCCESS',
+              description: `User changed theme to ${newThemeMode} (DashboardMainLayout).`
+            });
+          }
+        }
+      } else {
+        console.error("Failed to update theme preference (DashboardMainLayout):", result.message);
+        if (user.id && user.email) { // user.id and user.email from initial state
+            await createActivityLog({
+                userId: user.id,
+                userEmail: user.email,
+                actionType: 'THEME_CHANGE_FAILED',
+                status: 'FAILURE', // Already corrected
+                description: `Failed to change theme to ${newThemeMode} (DashboardMainLayout). Error: ${result.message}`
+            });
+        }
+      }
+    } catch (error) {
+      console.error("Error toggling theme (DashboardMainLayout):", error);
+      if (user.id && user.email) { // user.id and user.email from initial state
+        await createActivityLog({
+            userId: user.id,
+            userEmail: user.email,
+            actionType: 'THEME_CHANGE_ERROR',
+            status: 'FAILURE', // Already corrected
+            description: `Error toggling theme to ${newThemeMode} (DashboardMainLayout). Details: ${(error as Error).message}`
+          });
+      }
+    } finally {
+        setIsThemeToggling(false);
+    }
+  };
+
   const currentDrawerWidth = isMdUp && isDrawerCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH;
 
   return (
@@ -125,6 +179,20 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
 
           {/* Right-side Icons (Notifications, User) */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            {/* Theme Toggle Button - NEW */}
+            <Tooltip title={`Switch to ${theme.palette.mode === 'dark' ? 'light' : 'dark'} mode`}>
+              <span>
+                <IconButton
+                  onClick={handleThemeToggle}
+                  color="inherit"
+                  aria-label="toggle theme"
+                  disabled={isThemeToggling} // Disable button
+                >
+                  {isThemeToggling ? <CircularProgress size={24} color="inherit" /> : (theme.palette.mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />)}
+                </IconButton>
+              </span>
+            </Tooltip>
+
             {/* Notifications */}
             <Tooltip title="Notifications">
                <IconButton color="inherit" onClick={handleOpenNotificationsMenu}>
@@ -149,7 +217,21 @@ export default function DashboardMainLayout({ children }: { children: React.Reac
             {/* User Avatar & Menu */}
             <Tooltip title="Open settings">
               <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-                <Avatar alt={profile?.first_name || user?.email} src="/static/images/avatar/2.jpg" />
+                {profile?.avatar_filename ? (
+                  <Avatar 
+                    alt={profile.first_name || user?.email || 'User'}
+                    src={`/images/avatar/${profile.avatar_filename}`}
+                  />
+                ) : (
+                  <Avatar 
+                    alt={profile?.first_name || user?.email || 'User'}
+                    // Fallback to initials or a default icon if no avatar_filename
+                  >
+                    {(profile?.first_name || user?.email) 
+                      ? ( (profile?.first_name || user?.email || '')?.[0] || '' ).toUpperCase() 
+                      : <AccountCircle />}
+                  </Avatar>
+                )}
               </IconButton>
             </Tooltip>
             <Menu

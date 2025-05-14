@@ -23,6 +23,8 @@ import {
   CircularProgress,
   Avatar,
   useTheme,
+  Alert,
+  Snackbar,
 } from '@mui/material';
 import { supabase } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -35,6 +37,10 @@ import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import ContactsIcon from '@mui/icons-material/Contacts';
 import HistoryIcon from '@mui/icons-material/History';
 import md5 from 'crypto-js/md5';
+import { useAuth } from '@/contexts/AuthContext';
+import { getAvatarList, updateUserAvatar } from '@/actions/userActions';
+import Image from 'next/image';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 interface EmergencyContact {
   id: string;
@@ -55,11 +61,13 @@ interface MedicalHistory {
 export default function PatientProfilePage() {
   const router = useRouter();
   const theme = useTheme();
+  const { user: authUser, profile: authProfile, fetchAndSetProfile } = useAuth();
   const [loading, setLoading] = useState({
     initial: true,
     savingProfile: false,
     emergencyContacts: false,
     medicalHistory: false,
+    savingAvatar: false,
   });
   const [saving, setSaving] = useState(false);
   const [gravatarUrl, setGravatarUrl] = useState('');
@@ -88,6 +96,12 @@ export default function PatientProfilePage() {
   const [newContact, setNewContact] = useState<Partial<EmergencyContact>>({});
   const [newHistory, setNewHistory] = useState<Partial<MedicalHistory>>({});
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // State for avatar selection
+  const [availableAvatars, setAvailableAvatars] = useState<string[]>([]);
+  const [selectedAvatarForUpdate, setSelectedAvatarForUpdate] = useState<string | null>(null);
+  const [avatarSnackbar, setAvatarSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -111,7 +125,23 @@ export default function PatientProfilePage() {
       }
     };
 
+    // Fetch available avatars
+    const fetchAvatars = async () => {
+      try {
+        const avatars = await getAvatarList();
+        if (isMounted) {
+          setAvailableAvatars(avatars);
+        }
+      } catch (err) {
+        console.error("Error fetching avatar list:", err);
+        if (isMounted) {
+          setAvatarSnackbar({ open: true, message: 'Could not load avatar choices.', severity: 'error' });
+        }
+      }
+    };
+
     loadData();
+    fetchAvatars();
     
     return () => {
       isMounted = false;
@@ -120,11 +150,13 @@ export default function PatientProfilePage() {
 
   // Generate Gravatar URL when email changes
   useEffect(() => {
-    if (profile.email) {
+    if (profile.email && !authProfile?.avatar_filename) {
       const hash = md5(profile.email.trim().toLowerCase()).toString();
       setGravatarUrl(`https://www.gravatar.com/avatar/${hash}?d=mp&s=200`);
+    } else if (authProfile?.avatar_filename) {
+      setGravatarUrl('');
     }
-  }, [profile.email]);
+  }, [profile.email, authProfile?.avatar_filename]);
 
   const fetchProfile = async () => {
     try {
@@ -405,6 +437,39 @@ export default function PatientProfilePage() {
     }
   };
 
+  const handleSaveAvatar = async () => {
+    if (!authUser?.id || !selectedAvatarForUpdate) {
+      setAvatarSnackbar({ open: true, message: 'Please select an avatar first.', severity: 'error' });
+      return;
+    }
+    setLoading(prev => ({ ...prev, savingAvatar: true }));
+    setAvatarSnackbar(null);
+
+    try {
+      const result = await updateUserAvatar(authUser.id, selectedAvatarForUpdate);
+      if (result.success) {
+        setAvatarSnackbar({ open: true, message: 'Avatar updated successfully!', severity: 'success' });
+        await fetchAndSetProfile(authUser.id);
+      } else {
+        setAvatarSnackbar({ open: true, message: result.error || 'Failed to update avatar.', severity: 'error' });
+      }
+    } catch (err: any) {
+      console.error("Error saving avatar:", err);
+      setAvatarSnackbar({ open: true, message: err.message || 'An unexpected error occurred.', severity: 'error' });
+    } finally {
+      setLoading(prev => ({ ...prev, savingAvatar: false }));
+    }
+  };
+
+  const handleCloseAvatarSnackbar = () => {
+    setAvatarSnackbar(null);
+  };
+
+  // Determine current avatar display URL
+  const currentAvatarDisplayUrl = authProfile?.avatar_filename 
+    ? `/images/avatar/${authProfile.avatar_filename}` 
+    : gravatarUrl;
+
   if (loading.initial) {
     return (
       <Box sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 200px)' }}>
@@ -447,7 +512,8 @@ export default function PatientProfilePage() {
           <Grid item xs={12} sm={8} sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
               <Avatar 
-                src={gravatarUrl}
+                src={currentAvatarDisplayUrl || '/images/avatar/default.png'}
+                alt={authProfile?.first_name || authUser?.email || 'User Avatar'}
                 sx={{ 
                   width: 80, 
                   height: 80, 
@@ -458,7 +524,9 @@ export default function PatientProfilePage() {
                   mr: 3
                 }}
               >
-                {!gravatarUrl && (profile.first_name?.charAt(0) || profile.email?.charAt(0)?.toUpperCase())}
+                {(!currentAvatarDisplayUrl && (authProfile?.first_name || authUser?.email)) 
+                  ? (authProfile?.first_name || authUser?.email)?.[0].toUpperCase() 
+                  : null}
               </Avatar>
               <Box>
                 <Typography variant="h4" fontWeight="bold">
@@ -495,6 +563,84 @@ export default function PatientProfilePage() {
           </Grid>
         </Grid>
       </Box>
+
+      {/* Profile Picture Section - NEW */}
+      <Card elevation={1} sx={{ borderRadius: 2, overflow: 'hidden', mt: 4, mb: 4 }}>
+        <Box sx={{ borderBottom: `1px solid ${theme.palette.divider}`, bgcolor: 'background.subtle', p: 2 }}>
+          <Typography variant="h6" fontWeight="medium" sx={{ display: 'flex', alignItems: 'center' }}>
+            <PersonIcon sx={{ mr: 1, color: theme.palette.primary.main }} fontSize="small" />
+            Profile Picture
+          </Typography>
+        </Box>
+        <CardContent sx={{ p: 3 }}>
+          <Grid container spacing={3} alignItems="center">
+            <Grid item xs={12} md={3} sx={{ textAlign: 'center' }}>
+              <Typography variant="subtitle1" gutterBottom>Current Avatar</Typography>
+              <Avatar
+                src={currentAvatarDisplayUrl || '/images/avatar/default.png'}
+                alt={authProfile?.first_name || authUser?.email || 'User Avatar'}
+                sx={{ width: 120, height: 120, margin: '0 auto', mb: 2, fontSize: '3rem', bgcolor: 'secondary.main' }}
+              >
+                {(!currentAvatarDisplayUrl && (authProfile?.first_name || authUser?.email)) 
+                  ? (authProfile?.first_name || authUser?.email)?.[0].toUpperCase() 
+                  : null}
+              </Avatar>
+            </Grid>
+            <Grid item xs={12} md={9}>
+              <Typography variant="subtitle1" gutterBottom>Choose a new Avatar</Typography>
+              {availableAvatars.length > 0 ? (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                  {availableAvatars.map((avatarFile) => (
+                    <Box 
+                      key={avatarFile} 
+                      onClick={() => setSelectedAvatarForUpdate(avatarFile)}
+                      sx={{ 
+                        cursor: 'pointer', 
+                        position: 'relative',
+                        border: selectedAvatarForUpdate === avatarFile ? `3px solid ${theme.palette.primary.main}` : `3px solid transparent`,
+                        borderRadius: '50%',
+                        padding: '2px',
+                        transition: 'border-color 0.2s ease-in-out'
+                      }}
+                    >
+                      <Image 
+                        src={`/images/avatar/${avatarFile}`} 
+                        alt={`Avatar ${avatarFile}`} 
+                        width={80} 
+                        height={80} 
+                        style={{ borderRadius: '50%', display: 'block' }}
+                      />
+                      {selectedAvatarForUpdate === avatarFile && (
+                        <CheckCircleIcon 
+                          sx={{ 
+                            position: 'absolute', 
+                            bottom: 0, 
+                            right: 0, 
+                            color: theme.palette.success.main,
+                            backgroundColor: 'white',
+                            borderRadius: '50%',
+                            fontSize: '1.5rem'
+                          }} 
+                        />
+                      )}
+                    </Box>
+                  ))}
+                </Box>
+              ) : (
+                <Typography>No other avatars available at the moment.</Typography>
+              )}
+              <Button
+                variant="contained"
+                onClick={handleSaveAvatar}
+                disabled={loading.savingAvatar || !selectedAvatarForUpdate}
+                sx={{ mt: 3 }}
+              >
+                {loading.savingAvatar ? <CircularProgress size={24} /> : 'Save Avatar'}
+              </Button>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
 
       <Stack spacing={3}>
         {/* Personal Information */}
@@ -1107,6 +1253,20 @@ export default function PatientProfilePage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Snackbar for avatar updates */}
+      {avatarSnackbar && (
+        <Snackbar
+          open={avatarSnackbar.open}
+          autoHideDuration={6000}
+          onClose={handleCloseAvatarSnackbar}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert onClose={handleCloseAvatarSnackbar} severity={avatarSnackbar.severity} sx={{ width: '100%' }}>
+            {avatarSnackbar.message}
+          </Alert>
+        </Snackbar>
+      )}
     </Box>
   );
 } 

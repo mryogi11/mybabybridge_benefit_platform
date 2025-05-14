@@ -64,6 +64,16 @@ export default function AdminPackagesPage() {
     const [snackbarMessage, setSnackbarMessage] = useState("");
     const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error' | 'info' | 'warning'>('success');
 
+    // Ref to track mounted state
+    const isMounted = React.useRef(true);
+
+    useEffect(() => {
+        isMounted.current = true;
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
+
     const handleCloseSnackbar = (event?: React.SyntheticEvent | Event, reason?: string) => {
         if (reason === 'clickaway') {
             return;
@@ -78,43 +88,48 @@ export default function AdminPackagesPage() {
     };
 
     const fetchData = useCallback(async () => {
+        if (!isMounted.current) return;
         setLoading(true);
         setPageError(null);
         try {
-            // Fetch both packages and organizations in parallel
             const [packagesResponse, organizationsResponse] = await Promise.all([
                 fetch('/api/admin/packages'),
-                fetch('/api/admin/organizations') // Assuming this endpoint exists and works
+                fetch('/api/admin/organizations')
             ]);
+
+            if (!isMounted.current) return;
 
             if (!packagesResponse.ok) {
                 const errorData = await packagesResponse.json();
                 throw new Error(`Packages: ${errorData.message || 'Failed to load'}`);
             }
-             if (!organizationsResponse.ok) {
+            if (!organizationsResponse.ok) {
                 const errorData = await organizationsResponse.json();
-                // Use errorData.message if available, otherwise default
-                 throw new Error(`Organizations: ${errorData.message || 'Failed to load'}`);
+                throw new Error(`Organizations: ${errorData.message || 'Failed to load'}`);
             }
 
             const packagesData: Package[] = await packagesResponse.json();
-            // Check if org data includes success property (based on org route structure)
             const organizationsDataResponse = await organizationsResponse.json();
-            const organizationsData: Organization[] = organizationsDataResponse.success ? organizationsDataResponse.data : organizationsDataResponse; 
-
-            setPackages(packagesData);
-            setOrganizations(organizationsData);
-
+            const organizationsData: Organization[] = organizationsDataResponse.success ? organizationsDataResponse.data : organizationsDataResponse;
+            
+            if (isMounted.current) {
+                setPackages(packagesData);
+                setOrganizations(organizationsData);
+            }
         } catch (err) {
             console.error("Failed to fetch page data:", err);
-            setPageError(err instanceof Error ? err.message : 'Failed to load page data.');
+            if (isMounted.current) {
+                setPageError(err instanceof Error ? err.message : 'Failed to load page data.');
+            }
         } finally {
-            setLoading(false);
+            if (isMounted.current) {
+                setLoading(false);
+            }
         }
     }, []);
 
     useEffect(() => {
-        fetchData(); // Use combined fetch function
+        fetchData();
     }, [fetchData]);
 
     // --- Modal/Dialog Handlers --- 
@@ -143,12 +158,15 @@ export default function AdminPackagesPage() {
     
     const handleConfirmDelete = async () => {
         if (!deletingPackageId) return;
+        if (!isMounted.current) return; // Check mounted state
         setIsDeletingState(true);
-        setPageError(null); // Clear persistent error, rely on snackbar for immediate feedback
+        setPageError(null);
         try {
             const response = await fetch(`/api/admin/packages/${deletingPackageId}`, {
                 method: 'DELETE',
             });
+
+            if (!isMounted.current) return; // Check after await
 
             if (!response.ok) {
                 let errorMsg = `HTTP error! status: ${response.status}`;
@@ -160,22 +178,27 @@ export default function AdminPackagesPage() {
             }
 
             console.log(`Package ${deletingPackageId} deleted successfully.`);
-            showSnackbar("Package deleted successfully.", "success"); // Show success snackbar
-            await fetchData(); // Refresh all data
+            showSnackbar("Package deleted successfully.", "success");
+            await fetchData(); // fetchData itself has mounted checks
 
         } catch (err) {
             console.error("Failed to delete package:", err);
             const errorMsg = err instanceof Error ? err.message : 'Failed to delete package.';
-            showSnackbar(errorMsg, "error"); // Show error snackbar
+            if (isMounted.current) {
+                showSnackbar(errorMsg, "error");
+            }
         } finally {
-            setIsDeletingState(false); // Stop loading
-            handleCloseDeleteDialog(); // Close dialog regardless of outcome
+            if (isMounted.current) {
+                setIsDeletingState(false);
+                handleCloseDeleteDialog();
+            }
         }
     };
     
     const handleSavePackage = async (packageData: PackageSaveData) => {
+        if (!isMounted.current) return; // Check mounted state
         setIsSaving(true);
-        setPageError(null); // Clear persistent error
+        setPageError(null);
         const isEditing = !!packageData.id;
         const url = isEditing ? `/api/admin/packages/${packageData.id}` : '/api/admin/packages';
         const method = isEditing ? 'PUT' : 'POST';
@@ -183,11 +206,11 @@ export default function AdminPackagesPage() {
         try {
             const response = await fetch(url, {
                 method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(packageData),
             });
+
+            if (!isMounted.current) return; // Check after await
 
             if (!response.ok) {
                 let errorMsg = `HTTP error! status: ${response.status}`;
@@ -206,25 +229,27 @@ export default function AdminPackagesPage() {
             const result = await response.json();
             const successMsg = `Package ${isEditing ? 'updated' : 'created'} successfully.`;
             console.log(successMsg, result);
-            showSnackbar(successMsg, "success"); // Show success snackbar
+            showSnackbar(successMsg, "success");
             
-            // Close the modal immediately
-            if (isEditing) {
-                handleCloseEditModal();
-            } else {
-                handleCloseCreateModal();
+            if (isMounted.current) {
+                if (isEditing) {
+                    handleCloseEditModal();
+                } else {
+                    handleCloseCreateModal();
+                }
             }
-            
-            // Refresh all data in the background
-            fetchData(); 
+            await fetchData(); // fetchData itself has mounted checks
 
         } catch (err) {
              console.error(`Failed to ${isEditing ? 'update' : 'create'} package:`, err);
              const errorMsg = err instanceof Error ? err.message : `Failed to ${isEditing ? 'update' : 'create'} package.`;
-            showSnackbar(errorMsg, "error"); // Show error snackbar
-            // Keep modal open on error so user can see the problem / try again
+            if (isMounted.current) {
+                showSnackbar(errorMsg, "error");
+            }
         } finally {
-            setIsSaving(false);
+            if (isMounted.current) {
+                setIsSaving(false);
+            }
         }
     };
 

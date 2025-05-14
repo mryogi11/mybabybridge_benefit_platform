@@ -82,11 +82,12 @@
 *   [VP] **Improve Data Fetching:** Optimize Server Actions to efficiently join/return related data where needed.
 *   [VP] **Refine Type Safety:** Review widespread usage of `as any` and ensure types accurately reflect fetched data.
 *   [VP] **Standardize Error Handling:** Improve consistency in Server Action error reporting and create more user-facing friendly error messages.
-*   [ ] **Update Documentation:** Keep `README.md`, `PRD.md`, `HANDOVER.md`, `CODE_INDEX.md`, and this `TODO.md` updated as work progresses. *(Ongoing)*
+*   [ ] **Update Documentation:** Keep `README.md`, `PRD.md`, `HANDOVER.md`, `CODE_INDEX.md`, `docs/MATERIO_UI_UPGRADE_PLAN.md`, and this `TODO.md` updated as work progresses. *(Ongoing)*
 *   [VP] **Testing:** Implement unit, integration, and end-to-end tests (Jest, Cypress mentioned in PRD). *(Helper scripts for test users exist, but no formal test suites).*
 *   [✅] **Page Loader for Admin/Provider Roles:** (Implemented and verified across all dashboards)
 
 ## Recently Completed UI/UX Enhancements (May 2025)
+*   [✅] **Materio UI Upgrade - Phase 1 Complete:** Dashboard shell (Navigation & Main Layout) restyled for improved look and feel, aligning with Materio design principles. *(Ref: `docs/MATERIO_UI_UPGRADE_PLAN.md`)*
 *   [✅] **Collapsible Side Drawers:** Implemented for Patient, Provider, and Admin dashboards, providing a consistent, space-saving UI feature on desktop.
 *   [✅] **Standardized Profile Dropdown Menus:** The user profile dropdown (avatar click) UI is now consistent across Patient, Provider, and Admin dashboards, including user info, profile link, and styled logout.
 *   [✅] **Global Page Loader Extended:** Ensured the main navigation page loader is functional and consistent across Patient, Provider, and Admin dashboards.

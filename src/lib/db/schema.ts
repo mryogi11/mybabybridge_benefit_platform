@@ -124,6 +124,7 @@ export const users = pgTable('users', {
   stripe_customer_id: text('stripe_customer_id').unique(),
   theme_preference: themeModeEnum('theme_preference').default('dark'),
   selected_package_id: uuid('selected_package_id').references(() => packages.id, { onDelete: 'set null' }),
+  avatar_filename: text('avatar_filename'),
 });
 
 // --- User Benefit Verification Attempts Table ---

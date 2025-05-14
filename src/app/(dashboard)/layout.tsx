@@ -45,6 +45,8 @@ import {
   CardGiftcard as CardGiftcardIcon, // Added for Packages specifically
   ChevronLeft as ChevronLeftIcon, // For collapse button
   ChevronRight as ChevronRightIcon, // For collapse button
+  Brightness4 as Brightness4Icon, // Moon icon for dark mode
+  Brightness7 as Brightness7Icon, // Sun icon for light mode
 } from '@mui/icons-material';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
@@ -52,6 +54,7 @@ import { supabase } from '@/lib/supabase/client'; // Keep for auth checks
 import { usePageLoading } from '@/contexts/LoadingContext'; // <-- ADD THIS IMPORT
 import Logo from '@/components/Logo'; // Import Logo
 import { createActivityLog } from '@/lib/actions/loggingActions'; // Corrected import path
+import { updateUserThemePreference } from '@/actions/userActions'; // Import action to update theme
 
 // Helper function to check if the loggedIn cookie exists
 const hasLoggedInCookie = () => {
@@ -87,19 +90,20 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading, signOut, profile } = useAuth();
+  const { user, isLoading, signOut, profile, fetchAndSetProfile } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // Add breakpoint check
   const isDesktop = useMediaQuery(theme.breakpoints.up('sm')); // For desktop-specific collapse behavior
-  const { isLoadingPage } = usePageLoading(); // <-- ADD THIS LINE TO GET THE STATE
+  const { isLoadingPage, setIsLoadingPage } = usePageLoading(); // <-- ADD THIS IMPORT (if not already present near other usePageLoading imports)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [hasManuallyCheckedCookie, setHasManuallyCheckedCookie] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorElUser, setAnchorElUser] = useState<null | HTMLElement>(null); // Renamed from anchorEl for clarity
   const [isLoggingOut, setIsLoggingOut] = useState(false); // Added logout loading state
   const [isDrawerCollapsed, setIsDrawerCollapsed] = useState(false); // State for drawer collapse
+  const [isThemeToggling, setIsThemeToggling] = useState(false); // New state
 
   const logoHeight = isMobile ? 46 : 48; // Calculate logo height
 
@@ -248,7 +252,64 @@ export default function DashboardLayout({
       // Optionally redirect even if signout fails, or show an error
       router.push('/login'); 
     } 
-    // Note: We don't set isLoggingOut back to false as we are navigating away.
+  };
+
+  const handleNavigateToProfile = () => {
+    setIsLoadingPage(true); // Set loading state
+    router.push('/dashboard/profile');
+    handleUserMenuClose();
+  };
+
+  const handleThemeToggle = async () => {
+    if (!user?.id || !profile || isThemeToggling) { // Added isThemeToggling check
+      console.warn("Theme toggle skipped in Dashboard layout: User/profile not available or toggle in progress.");
+      return;
+    }
+    setIsThemeToggling(true);
+    const currentMode = theme.palette.mode;
+    const newThemeMode = currentMode === 'dark' ? 'light' : 'dark';
+
+    try {
+      const result = await updateUserThemePreference(newThemeMode as 'light' | 'dark' | 'system');
+      if (result.success) {
+        if (fetchAndSetProfile && user.id) {
+          await fetchAndSetProfile(user.id);
+          if (user.email) { // user.email from refreshed profile
+            await createActivityLog({
+              userId: user.id,
+              userEmail: user.email,
+              actionType: 'THEME_CHANGE',
+              status: 'SUCCESS',
+              description: `User changed theme to ${newThemeMode} (Dashboard).`
+            });
+          }
+        }
+      } else {
+        console.error("Failed to update theme preference (Dashboard):", result.message);
+         if (user.id && user.email) { // user.id and user.email from initial state
+            await createActivityLog({
+                userId: user.id,
+                userEmail: user.email,
+                actionType: 'THEME_CHANGE_FAILED',
+                status: 'FAILURE', // Already corrected
+                description: `Failed to change theme to ${newThemeMode} (Dashboard). Error: ${result.message}`
+            });
+        }
+      }
+    } catch (error) {
+      console.error("Error toggling theme (Dashboard):", error);
+       if (user.id && user.email) { // user.id and user.email from initial state
+            await createActivityLog({
+                userId: user.id,
+                userEmail: user.email,
+                actionType: 'THEME_CHANGE_ERROR',
+                status: 'FAILURE', // Already corrected
+                description: `Error changing theme to ${newThemeMode} (Dashboard). Details: ${(error as Error).message}`
+            });
+        }
+    } finally {
+        setIsThemeToggling(false);
+    }
   };
 
   const effectiveDrawerWidth = isDesktop && isDrawerCollapsed ? COLLAPSED_DRAWER_WIDTH : drawerWidth;
@@ -405,15 +466,45 @@ export default function DashboardLayout({
             </IconButton>
           </Tooltip>
           {/* End Notifications Icon Button */}
+          {/* Theme Toggle Button - NEW */}
+          <Tooltip title={`Switch to ${theme.palette.mode === 'dark' ? 'light' : 'dark'} mode`}>
+            <span>
+              <IconButton
+                onClick={handleThemeToggle}
+                color="inherit" // Ensures icon color matches other AppBar icons
+                aria-label="toggle theme"
+                sx={{ mr: 1 }} // Add some margin if needed
+                disabled={isThemeToggling} // Disable button
+              >
+                {isThemeToggling ? <CircularProgress size={24} color="inherit" /> : (theme.palette.mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />)}
+              </IconButton>
+            </span>
+          </Tooltip>
+          {/* User Avatar & Menu */}
           <Tooltip title="Account settings">
             <IconButton
               onClick={handleUserMenuOpen}
               sx={{ p: 0 }}
               size="small"
             >
-              <Avatar alt={user?.email || 'Patient'} sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontSize: '0.875rem' }}>
-                {user?.email ? user.email[0].toUpperCase() : <ProfileIcon fontSize="small" />}
-              </Avatar>
+              {/* Conditionally render Avatar based on profile and avatar_filename */}
+              {profile?.avatar_filename ? (
+                <Avatar 
+                  alt={profile.first_name || user?.email || 'User'}
+                  src={`/images/avatar/${profile.avatar_filename}`}
+                  sx={{ width: 32, height: 32 }}
+                />
+              ) : (
+                <Avatar 
+                  alt={profile?.first_name || user?.email || 'User'}
+                  sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontSize: '0.875rem' }}
+                >
+                  {/* Ensure robust check for initials generation */}
+                  {(profile?.first_name || user?.email) 
+                    ? ( (profile?.first_name || user?.email || '')?.[0] || '' ).toUpperCase() 
+                    : <ProfileIcon fontSize="small" />}
+                </Avatar>
+              )}
             </IconButton>
           </Tooltip>
           <Menu
@@ -446,7 +537,7 @@ export default function DashboardLayout({
               </Typography>
             </Box>
             <Divider sx={{ borderStyle: 'dashed' }} />
-            <MenuItem component={Link} href="/dashboard/profile" onClick={handleUserMenuClose} sx={{ py: 1, px: 2 }}>
+            <MenuItem onClick={handleNavigateToProfile} sx={{ py: 1, px: 2 }}>
               <ListItemIcon sx={{ minWidth: 'auto', mr: 1.5 }}><ProfileIcon fontSize="small" /></ListItemIcon>
               <Typography variant="body2">Profile</Typography>
             </MenuItem>

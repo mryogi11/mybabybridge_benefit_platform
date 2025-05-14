@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useRef } from 'r
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 import { createActivityLog } from '@/lib/actions/loggingActions';
+import { assignRandomAvatar } from '@/actions/userActions'; // Ensure this import is present
 
 // Define a simple Profile type (adjust based on your actual profiles table)
 interface Profile {
@@ -11,8 +12,9 @@ interface Profile {
   first_name?: string;
   last_name?: string;
   role?: string;
-  theme_preference?: 'light' | 'dark' | 'system' | null; // Added optional theme preference
-  benefit_status?: 'pending_verification' | 'verified' | 'declined' | 'not_applicable' | 'not_started' | null; // Added benefit_status
+  theme_preference?: 'light' | 'dark' | 'system' | null; 
+  benefit_status?: 'pending_verification' | 'verified' | 'declined' | 'not_applicable' | 'not_started' | null; 
+  avatar_filename?: string | null; // Ensure this is string | null
   // Add other profile fields as needed
 }
 
@@ -71,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('users') 
-        .select('id, first_name, last_name, role, theme_preference, benefit_status')
+        .select('id, first_name, last_name, role, theme_preference, benefit_status, avatar_filename') 
         .eq('id', userId)
         .single();
 
@@ -80,7 +82,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(null);
       } else if (data) {
         debugLog('User profile fetched successfully:', data);
-        setProfile(data as Profile); 
+        let userProfile = data as unknown as Profile; // Cast to unknown first
+
+        if (!userProfile.avatar_filename) { // Check if avatar_filename is missing
+          debugLog('User has no avatar, assigning random one for user ID:', userId);
+          try {
+            const newAvatarFilename = await assignRandomAvatar(userId); // Call server action
+            if (newAvatarFilename) {
+              userProfile = { ...userProfile, avatar_filename: newAvatarFilename }; // Update local profile
+              debugLog('Random avatar assigned and profile updated locally:', newAvatarFilename);
+            }
+          } catch (avatarError) {
+            debugLog('Error assigning random avatar:', avatarError);
+            // Proceed with profile without avatar if assignment fails
+          }
+        }
+        setProfile(userProfile); // Set the potentially updated profile
       } else {
         debugLog('User profile not found for ID:', userId);
         setProfile(null);
@@ -123,7 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             debugLog('SIGNED_OUT event detected, clearing profile.');
             setProfile(null);
             // Add logout activity log
-            if (user) {
+            if (user) { // Use the 'user' state from before it's cleared by this event if possible
               createActivityLog({
                 userId: user.id,
                 userEmail: user.email,
@@ -150,17 +167,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }).then(() => {
               if (typeof window !== 'undefined') {
                 sessionStorage.setItem(loginEventKey, 'true');
-                // Optional: Set a timeout to clear this flag after a short period,
-                // e.g., 5-10 seconds, to allow for legitimate quick re-logins
-                // if needed, but prevent rapid duplicate logs from the same event.
-                // setTimeout(() => sessionStorage.removeItem(loginEventKey), 10000);
               }
             });
           } else if (typeof window !== 'undefined') {
             debugLog('USER_LOGIN_SUCCESS already logged for this session event or sessionStorage not available.', loginEventKey);
           }
         }
-
         debugLog(`<<< Auth state change event END: ${event} (Session/User state updated)`);
       }
     );
@@ -172,23 +184,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []); // Runs once on mount
 
-  // --- End Simplified Initialization ---
-
   // Effect specifically for fetching/clearing the profile based on user state
   useEffect(() => {
-    // Only run after initial loading is complete
     if (!isLoading) { 
       if (user && (!profile || profile.id !== user.id)) {
-        // If we have a user, and either no profile or the wrong profile, fetch it.
         debugLog('Profile Fetch Effect: User detected and profile needs fetching/update. User ID:', user.id);
         fetchAndSetProfile(user.id);
       } else if (!user && profile) {
-        // If we have no user, but still have a profile state, clear it.
         debugLog('Profile Fetch Effect: No user detected, clearing profile state.');
         setProfile(null);
       }
     }
-  }, [user, profile, isLoading]); // Depend on user, profile, and isLoading
+  }, [user, profile, isLoading]); // Removed fetchAndSetProfile from dependencies as it's stable
 
   const signIn = async (email: string, password: string) => {
     debugLog('Attempting sign in for:', email);
@@ -240,7 +247,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         password,
         options: {
-          // Pass first_name and last_name in the data object
           data: { 
             first_name: firstName,
             last_name: lastName,
@@ -250,20 +256,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         debugLog('Sign up error:', error);
-        // Propagate error to UI if needed
         throw error;
       } else if (data.user) {
         debugLog('Sign up successful:', data.user.email);
-        // Note: The onAuthStateChange listener will handle setting user/session/profile state
         return { user: data.user, session: data.session };
       } else {
-        // Handle cases like user already exists but unconfirmed, etc.
          debugLog('Sign up returned no user but no error (e.g., needs confirmation):', data);
-         return { user: null, session: null }; // Or handle as appropriate
+         return { user: null, session: null }; 
       }
     } catch (err) {
       debugLog('Error during sign up:', err);
-      throw err; // Re-throw to be caught by caller
+      throw err; 
     } finally {
       setIsLoading(false);
     }
@@ -273,29 +276,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       debugLog('Signing out...');
+      const { data: { session: currentSessionB }, error: sessionErrorB } = await supabase.auth.getSession();
+      if (sessionErrorB) { debugLog('Error fetching session before sign out (B):', sessionErrorB); }
+      if (!currentSessionB) { debugLog('Supabase client reports no active session before calling signOut (B).'); } 
+      else { debugLog('Supabase client confirms active session before calling signOut (B).'); }
 
-      // Explicitly try to get session right before signing out
-      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
-
-      if (sessionError) {
-        debugLog('Error fetching session before sign out:', sessionError);
-        // Decide if we should proceed or throw here? Let's proceed but log.
-      }
-
-      if (!currentSession) {
-          debugLog('Supabase client reports no active session before calling signOut.');
-          // If no session, maybe we don't even need to call signOut?
-          // Or we call it anyway and expect the AuthSessionMissingError?
-          // For now, let's just log and proceed to call signOut, mirroring current behavior.
-      } else {
-           debugLog('Supabase client confirms active session before calling signOut.');
-      }
-
-      // Proceed with the actual sign out call
       const { error } = await supabase.auth.signOut();
       
       if (error) {
-        // Log the specific error from signOut
         debugLog('Error returned from supabase.auth.signOut():', error); 
         setIsLoading(false);
         throw error; 
@@ -304,7 +292,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       debugLog('Sign out seems successful based on supabase.auth.signOut() return.');
       setIsLoading(false);
     } catch (error) {
-      // Catch any error from getSession or signOut
       debugLog('Error during sign out process:', error); 
       setIsLoading(false);
       throw error; 
@@ -328,4 +315,4 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export const useAuth = () => {
   return useContext(AuthContext);
-}; 
+};

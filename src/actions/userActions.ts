@@ -12,6 +12,8 @@ import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { ThemeModeSetting } from '@/components/ThemeRegistry/ClientThemeProviders'; // Import the type
 import { createActivityLog } from '@/lib/actions/loggingActions'; // Added import
+import fs from 'fs/promises'; // Node.js file system module
+import path from 'path'; // Node.js path module
 
 // Interface for NewUserData
 interface NewUserData {
@@ -189,7 +191,7 @@ async function getAuthenticatedUser() {
                 },
                 remove(name: string, options: CookieOptions) { 
                     try { 
-                        cookieStore.delete(name, options); 
+                        cookieStore.delete(name); // Corrected usage
                     } catch (e) { 
                         // The `delete` method was called from a Server Component.
                         // This can be ignored if you have middleware refreshing
@@ -214,24 +216,28 @@ export async function updateUserThemePreference(theme: string): Promise<{
     message: string;
     newTheme?: typeof themeModeEnum.enumValues[number];
 }> {
+    let authUserId: string | undefined;
+    let authUserEmail: string | undefined;
     try {
         const authUser = await getAuthenticatedUser();
+        authUserId = authUser.id;
+        authUserEmail = authUser.email;
         const validatedTheme = ThemePreferenceSchema.parse(theme);
 
         await db.update(users)
             .set({ theme_preference: validatedTheme, updated_at: new Date() })
-            .where(eq(users.id, authUser.id));
+            .where(eq(users.id, authUserId));
 
         revalidatePath('/admin/settings');
         revalidatePath('/profile');
         revalidatePath('/'); // Revalidate root layout as well for theme changes
 
         await createActivityLog({
-          userId: authUser.id,
-          userEmail: authUser.email, // Assuming getAuthenticatedUser() returns email
+          userId: authUserId,
+          userEmail: authUserEmail, 
           actionType: 'THEME_PREFERENCE_UPDATE',
           targetEntityType: 'USER_SETTINGS',
-          targetEntityId: authUser.id,
+          targetEntityId: authUserId,
           details: { oldTheme: /* need a way to get old theme if desired */ null, newTheme: validatedTheme },
           status: 'SUCCESS',
           description: `User updated theme preference to ${validatedTheme}.`
@@ -241,8 +247,8 @@ export async function updateUserThemePreference(theme: string): Promise<{
     } catch (error) {
         console.error("[User Action] Error updating theme preference:", error);
         await createActivityLog({
-          userId: authUser ? authUser.id : undefined, // authUser might not be defined if getAuthenticatedUser() failed
-          userEmail: authUser ? authUser.email : undefined,
+          userId: authUserId, 
+          userEmail: authUserEmail,
           actionType: 'THEME_PREFERENCE_UPDATE',
           targetEntityType: 'USER_SETTINGS',
           status: 'FAILURE',
@@ -268,18 +274,20 @@ export type AdminProfileUpdateData = z.infer<typeof AdminProfileUpdateSchema>;
 export async function updateAdminProfile(
     data: AdminProfileUpdateData
 ): Promise<{ success: boolean; error?: string; data?: AdminProfileUpdateData }> {
+    let authUserIdForLog: string | undefined;
     try {
         const authUser = await getAuthenticatedUser();
+        authUserIdForLog = authUser.id;
 
         // Double-check role from DB for critical operations if user_metadata isn't fully trusted
-        const userRecord = await db.query.users.findFirst({ where: eq(users.id, authUser.id) });
+        const userRecord = await db.query.users.findFirst({ where: eq(users.id, authUserIdForLog) });
         if (userRecord?.role !== 'admin') {
-            console.warn(`[User Action] Unauthorized attempt to update admin profile by user ${authUser.id}. DB role: ${userRecord?.role}`);
+            console.warn(`[User Action] Unauthorized attempt to update admin profile by user ${authUserIdForLog}. DB role: ${userRecord?.role}`);
             return { success: false, error: "Unauthorized: Insufficient privileges." };
         }
 
         const validatedData = AdminProfileUpdateSchema.parse(data);
-        console.log(`[User Action] Attempting to update admin profile for user ${authUser.id} with data:`, validatedData);
+        console.log(`[User Action] Attempting to update admin profile for user ${authUserIdForLog} with data:`, validatedData);
 
         const updatePayload: Partial<typeof users.$inferInsert> = {
             first_name: validatedData.first_name,
@@ -289,9 +297,9 @@ export async function updateAdminProfile(
 
         await db.update(users)
             .set(updatePayload)
-            .where(eq(users.id, authUser.id));
+            .where(eq(users.id, authUserIdForLog));
 
-        console.log(`[User Action] Admin profile for user ${authUser.id} updated successfully.`);
+        console.log(`[User Action] Admin profile for user ${authUserIdForLog} updated successfully.`);
 
         revalidatePath('/admin/settings');
         // Revalidate other paths where admin's first/last name might be displayed
@@ -300,7 +308,7 @@ export async function updateAdminProfile(
         return { success: true, data: validatedData };
 
     } catch (error: any) {
-        console.error(`[User Action] Error updating admin profile for user ${authUser.id}:`, error);
+        console.error(`[User Action] Error updating admin profile for user ${authUserIdForLog || 'unknown'}:`, error);
         if (error instanceof z.ZodError) {
             return { success: false, error: error.errors.map(e => e.message).join(', ') };
         }
@@ -329,7 +337,7 @@ export async function updateUserPassword(
                         try { cookieStore.set(name, value, options); } catch (e) { /* ignore */ } 
                     },
                     remove(name: string, options: CookieOptions) { 
-                        try { cookieStore.delete(name, options); } catch (e) { /* ignore */ } 
+                        try { cookieStore.delete(name); } catch (e) { /* ignore */ } // Corrected usage
                     },
                 },
             }
@@ -369,4 +377,138 @@ export async function updateUserPassword(
         }
         return { success: false, error: error.message || "An unexpected error occurred while updating password." };
     }
+}
+
+export async function assignRandomAvatar(userId: string): Promise<string | null> {
+  if (!userId) {
+    console.error('[Server Action - assignRandomAvatar] No userId provided.');
+    return null;
+  }
+  let randomAvatarFilename: string | undefined; // To ensure it's in scope for catch block logging
+  try {
+    const avatarDir = path.join(process.cwd(), 'public/images/avatar');
+    const files = await fs.readdir(avatarDir);
+    const imageFiles = files.filter(file => /\.(jpg|jpeg|png|gif)$/i.test(file));
+
+    if (imageFiles.length === 0) {
+      console.warn('[Server Action - assignRandomAvatar] No images found in avatar directory:', avatarDir);
+      return null;
+    }
+
+    randomAvatarFilename = imageFiles[Math.floor(Math.random() * imageFiles.length)];
+    
+    console.log(`[Server Action - assignRandomAvatar] Attempting to assign avatar '${randomAvatarFilename}' to user ${userId}`);
+
+    await db
+      .update(users)
+      .set({ avatar_filename: randomAvatarFilename, updated_at: new Date() })
+      .where(eq(users.id, userId));
+
+    // If we reach here, the DB update was successful (or didn't throw an error recognized by this structure)
+    console.log(`[Server Action - assignRandomAvatar] Successfully assigned avatar '${randomAvatarFilename}' to user ${userId}`);
+    await createActivityLog({
+      userId,
+      actionType: 'AVATAR_ASSIGNMENT_SUCCESS',
+      status: 'SUCCESS',
+      description: `Successfully assigned random avatar ${randomAvatarFilename} to user.`,
+      details: { avatar_filename: randomAvatarFilename },
+    });
+    return randomAvatarFilename;
+
+  } catch (error: any) {
+    console.error('[Server Action - assignRandomAvatar] Error during assignment process:', error);
+    await createActivityLog({
+      userId,
+      actionType: 'AVATAR_ASSIGNMENT_ERROR',
+      status: 'FAILURE', // Corrected status
+      description: `Error during avatar assignment process. Attempted: ${randomAvatarFilename || 'unknown'}`,
+      details: { error: error.message, attempted_avatar: randomAvatarFilename || 'unknown' },
+    });
+    return null;
+  }
+}
+
+export async function getAvatarList(): Promise<string[]> {
+  try {
+    const avatarDir = path.join(process.cwd(), 'public/images/avatar');
+    const files = await fs.readdir(avatarDir);
+    const imageFiles = files.filter(file => /\.(jpg|jpeg|png|gif)$/i.test(file));
+    return imageFiles;
+  } catch (error) {
+    console.error('[Server Action - getAvatarList] Error reading avatar directory:', error);
+    return []; // Return empty list on error
+  }
+}
+
+export async function updateUserAvatar(userId: string, avatarFilename: string): Promise<{ success: boolean; error?: string }> {
+  if (!userId) {
+    return { success: false, error: 'User ID is required.' };
+  }
+  if (!avatarFilename) {
+    return { success: false, error: 'Avatar filename is required.' };
+  }
+
+  let authUserEmail: string | undefined;
+
+  try {
+    // We need the email for logging, but the primary operation is on userId
+    // If we can't get the full authUser, we can still proceed with the update if userId is present.
+    try {
+      const authUser = await getAuthenticatedUser(); // This will throw if not authenticated
+      if (authUser.id !== userId) {
+        // This case should ideally not happen if the frontend sends the correct userId
+        console.warn(`[Server Action - updateUserAvatar] Authenticated user ID (${authUser.id}) does not match provided userId (${userId}). Proceeding with provided userId.`);
+      }
+      authUserEmail = authUser.email || undefined;
+    } catch (authError) {
+      console.warn('[Server Action - updateUserAvatar] Could not get full authenticated user for logging, but proceeding with userId:', userId, authError);
+      // For authUserEmail, we might not have it here if getAuthenticatedUser fails.
+      // Consider fetching email based on userId if strictly needed for logging and getAuthenticatedUser failed.
+      // For now, we'll allow it to be undefined if getAuthenticatedUser fails.
+    }
+    
+    const { error: dbError } = await db
+      .update(users)
+      .set({ avatar_filename: avatarFilename, updated_at: new Date() })
+      .where(eq(users.id, userId));
+
+    if (dbError) {
+      console.error('[Server Action - updateUserAvatar] Error updating user avatar in DB:', dbError);
+      throw new Error(dbError.message || 'Failed to update avatar in database.');
+    }
+
+    await createActivityLog({
+      userId: userId, // Log against the userId being updated
+      userEmail: authUserEmail, // This might be undefined if getAuthenticatedUser failed
+      actionType: 'USER_AVATAR_UPDATE',
+      targetEntityType: 'USER_PROFILE',
+      targetEntityId: userId,
+      details: { avatarFilename },
+      status: 'SUCCESS',
+      description: `User updated avatar to ${avatarFilename}.`
+    });
+    
+    // Revalidate paths where the avatar might be shown
+    revalidatePath('/dashboard/profile'); // Patient profile
+    revalidatePath('/provider/profile');  // Provider profile
+    revalidatePath('/admin/settings');   // Admin settings (where profile might be part of it)
+    // Potentially revalidate root or specific layouts if avatar is in headers
+    // For now, AuthContext refresh on the client should handle header updates.
+
+    return { success: true };
+
+  } catch (error: any) {
+    console.error('[Server Action - updateUserAvatar] Catch-all error:', error);
+    await createActivityLog({
+      userId: userId,
+      userEmail: authUserEmail, // Might be undefined
+      actionType: 'USER_AVATAR_UPDATE',
+      targetEntityType: 'USER_PROFILE',
+      targetEntityId: userId,
+      details: { avatarFilename, error: error.message },
+      status: 'FAILURE',
+      description: `Failed to update user avatar to ${avatarFilename}.`
+    });
+    return { success: false, error: error.message || 'An unexpected error occurred.' };
+  }
 }

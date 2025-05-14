@@ -31,6 +31,7 @@ To incrementally upgrade the existing dashboard UI by adopting design elements, 
 
 ### Phase 1: Dashboard Shell (Navigation & Main Layout)
 
+*   **Status: Complete**
 *   **Key Visual Reference:**
     *   ![Materio Dashboard Reference](./images/materio_dashboard_reference.png) *(Image to be manually added by the user to `docs/images/materio_dashboard_reference.png`)*
 
@@ -46,6 +47,13 @@ To incrementally upgrade the existing dashboard UI by adopting design elements, 
 *   **Verification:** Ensure navigation remains fully functional. Check responsiveness.
 
 ### Phase 2: Common UI Components (Global Styles)
+
+*   **New Functionality: Avatar Implementation**
+    *   **Goal:** Introduce user profile avatars.
+    *   **Assignment:** On login, if a user doesn't have an avatar, assign a random image from `public/images/avatar`.
+    *   **User Control:** Allow users to select a new avatar from the available images in `public/images/avatar` within their profile editing section.
+    *   **Storage:** The selected avatar preference (e.g., filename) should be stored in the user's profile data (e.g., in the `profiles` table or `users` table metadata).
+    *   **Display:** Avatars should be displayed in relevant UI locations (e.g., profile dropdown menu, user profile page).
 
 *   **Target Files:** `src/theme/overrides/` (e.g., `card.ts`, `button.ts`, `input.ts`)
 *   **Action:** Update the default styling for common MUI components used throughout the dashboard to match Materio's aesthetic.
