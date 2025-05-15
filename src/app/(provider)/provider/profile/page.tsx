@@ -256,41 +256,47 @@ export default function ProviderProfilePage() {
               <Typography variant="subtitle1" gutterBottom>Choose a new Avatar</Typography>
               {availableAvatars.length > 0 ? (
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                  {availableAvatars.map((avatarFile) => (
-                    <Box 
-                      key={avatarFile} 
-                      onClick={() => setSelectedAvatarForUpdate(avatarFile)}
-                      sx={{ 
-                        cursor: 'pointer', 
-                        position: 'relative',
-                        border: selectedAvatarForUpdate === avatarFile ? (theme) => `3px solid ${theme.palette.primary.main}` : `3px solid transparent`,
-                        borderRadius: '50%',
-                        padding: '2px',
-                        transition: 'border-color 0.2s ease-in-out'
-                      }}
-                    >
-                      <Image 
-                        src={`/images/avatar/${avatarFile}`} 
-                        alt={`Avatar ${avatarFile}`} 
-                        width={80} 
-                        height={80} 
-                        style={{ borderRadius: '50%', display: 'block' }}
-                      />
-                      {selectedAvatarForUpdate === avatarFile && (
-                        <CheckCircleIcon 
-                          sx={{ 
-                            position: 'absolute', 
-                            bottom: 0, 
-                            right: 0, 
-                            color: (theme) => theme.palette.success.main,
-                            backgroundColor: 'white',
-                            borderRadius: '50%',
-                            fontSize: '1.5rem'
-                          }} 
+                  {availableAvatars.map((avatarFile) => {
+                    const isHighlighted = selectedAvatarForUpdate
+                      ? avatarFile === selectedAvatarForUpdate
+                      : authProfile?.avatar_filename === avatarFile;
+
+                    return (
+                      <Box 
+                        key={avatarFile} 
+                        onClick={() => setSelectedAvatarForUpdate(avatarFile)}
+                        sx={{ 
+                          cursor: 'pointer', 
+                          position: 'relative',
+                          border: isHighlighted ? (theme) => `3px solid ${theme.palette.primary.main}` : `3px solid transparent`,
+                          borderRadius: '50%',
+                          padding: '2px',
+                          transition: 'border-color 0.2s ease-in-out'
+                        }}
+                      >
+                        <Image 
+                          src={`/images/avatar/${avatarFile}`} 
+                          alt={`Avatar ${avatarFile}`} 
+                          width={80} 
+                          height={80} 
+                          style={{ borderRadius: '50%', display: 'block' }}
                         />
-                      )}
-                    </Box>
-                  ))}
+                        {isHighlighted && (
+                          <CheckCircleIcon 
+                            sx={{ 
+                              position: 'absolute', 
+                              bottom: 0, 
+                              right: 0, 
+                              color: (theme) => theme.palette.success.main,
+                              backgroundColor: 'white',
+                              borderRadius: '50%',
+                              fontSize: '1.5rem'
+                            }} 
+                          />
+                        )}
+                      </Box>
+                    );
+                  })}
                 </Box>
               ) : (
                  pageLoadingStates.initialProfile ? <CircularProgress size={24} /> : <Typography>No other avatars available.</Typography>

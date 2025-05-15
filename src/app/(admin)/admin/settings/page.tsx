@@ -345,43 +345,50 @@ function AdminSettingsPageComponent() {
             <Typography variant="subtitle2" gutterBottom>Choose a new Avatar</Typography>
             {availableAvatars.length > 0 ? (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb:2 }}>
-                {availableAvatars.map((avatarFile) => (
-                  <Box 
-                    key={avatarFile} 
-                    onClick={() => setSelectedAvatarForUpdate(avatarFile)}
-                    sx={theme => ({
-                      cursor: 'pointer', 
-                      position: 'relative',
-                      border: selectedAvatarForUpdate === avatarFile ? `3px solid ${theme.palette.primary.main}` : `3px solid transparent`,
-                      borderRadius: '50%',
-                      padding: '2px',
-                      transition: 'border-color 0.2s ease-in-out',
-                      'img': {
-                        borderRadius: '50%', display: 'block'
-                      }
-                    })}
-                  >
-                    <Image 
-                      src={`/images/avatar/${avatarFile}`} 
-                      alt={`Avatar ${avatarFile}`} 
-                      width={70} 
-                      height={70} 
-                    />
-                    {selectedAvatarForUpdate === avatarFile && (
-                      <CheckCircleIcon 
-                        sx={theme =>({
-                          position: 'absolute', 
-                          bottom: 0, 
-                          right: 0, 
-                          color: theme.palette.success.main,
-                          backgroundColor: 'white',
-                          borderRadius: '50%',
-                          fontSize: '1.25rem' // Slightly smaller for smaller avatars
-                        })} 
+                {availableAvatars.map((avatarFile) => {
+                  // Determine if this avatar should be highlighted
+                  const isHighlighted = selectedAvatarForUpdate
+                    ? avatarFile === selectedAvatarForUpdate
+                    : profile?.avatar_filename === avatarFile;
+
+                  return (
+                    <Box 
+                      key={avatarFile} 
+                      onClick={() => setSelectedAvatarForUpdate(avatarFile)}
+                      sx={theme => ({
+                        cursor: 'pointer', 
+                        position: 'relative',
+                        border: isHighlighted ? `3px solid ${theme.palette.primary.main}` : `3px solid transparent`,
+                        borderRadius: '50%',
+                        padding: '2px',
+                        transition: 'border-color 0.2s ease-in-out',
+                        'img': {
+                          borderRadius: '50%', display: 'block'
+                        }
+                      })}
+                    >
+                      <Image 
+                        src={`/images/avatar/${avatarFile}`} 
+                        alt={`Avatar ${avatarFile}`} 
+                        width={70} 
+                        height={70} 
                       />
-                    )}
-                  </Box>
-                ))}
+                      {isHighlighted && (
+                        <CheckCircleIcon 
+                          sx={theme =>({
+                            position: 'absolute', 
+                            bottom: 0, 
+                            right: 0, 
+                            color: theme.palette.success.main,
+                            backgroundColor: 'white',
+                            borderRadius: '50%',
+                            fontSize: '1.25rem' // Slightly smaller for smaller avatars
+                          })} 
+                        />
+                      )}
+                    </Box>
+                  );
+                })}
               </Box>
             ) : (
                <Typography color="textSecondary" sx={{mb:2}}>No other avatars available.</Typography>

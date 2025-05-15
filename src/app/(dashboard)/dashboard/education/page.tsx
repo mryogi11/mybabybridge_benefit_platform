@@ -3,8 +3,9 @@ import React from 'react';
 // import RssParser, { Item as RssItem } from 'rss-parser';
 import { Box, Card, CardContent, Typography, Link as MuiLink, Grid, Container, CardMedia } from '@mui/material';
 import NextLink from 'next/link';
+import { fetchAndParseRssFeed, RssParserItem as ApiRssParserItem } from '@/lib/rssUtils'; // Import the direct fetch function
 
-// Define the structure of a feed item (must match API response structure)
+// Define the structure of a feed item for the page component
 interface FeedItem {
   title: string;
   link: string;
@@ -14,25 +15,6 @@ interface FeedItem {
   imageUrl?: string;
 }
 
-// Define the structure of the API response (matching what RssParser output)
-interface RssParserItem {
-    title: string;
-    link: string;
-    pubDate: string;
-    contentSnippet?: string;
-    guid: string;
-    enclosure?: { url: string; [key: string]: any };
-    'media:content'?: { $: { url: string; [key: string]: any }; [key: string]: any };
-    content?: string; // Added for flexibility
-    'content:encoded'?: string; // Added for flexibility
-    [key: string]: any; // Allow other properties
-}
-
-interface ApiResponse {
-  items: RssParserItem[];
-  // Add other top-level feed properties if needed (title, description, etc.)
-}
-
 // Helper function to extract the first image URL from an HTML string
 function extractFirstImageUrl(htmlContent?: string): string | undefined {
   if (!htmlContent) return undefined;
@@ -40,32 +22,15 @@ function extractFirstImageUrl(htmlContent?: string): string | undefined {
   return match ? match[1] : undefined;
 }
 
-// Helper function to get the base URL (important for server-side fetch)
-function getBaseUrl() {
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  // Use localhost for development
-  return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'; 
-}
-
-async function getFeedItemsFromApi(): Promise<FeedItem[]> {
-  const baseUrl = getBaseUrl();
-  const apiUrl = `${baseUrl}/api/rss-proxy`;
-  console.log(`[EducationPage] Fetching feed from API: ${apiUrl}`); 
-
+async function getProcessedFeedItems(): Promise<FeedItem[]> {
+  console.log('[EducationPage] Fetching feed items directly using rssUtils...');
   try {
-    const response = await fetch(apiUrl, {
-      next: { revalidate: 3600 }, 
-    });
+    // No need for fetch() or revalidate here, as revalidation is handled by Next.js for the page itself if needed
+    // or by the nature of Server Components re-rendering.
+    // If this page is fully static or ISR, Next.js handles its revalidation based on page-level config or defaults.
+    const feedData = await fetchAndParseRssFeed(); // Call the utility function directly
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error(`[EducationPage] API Error (${response.status}): ${errorBody}`);
-      throw new Error(`API request failed with status ${response.status}`);
-    }
-
-    const data: ApiResponse = await response.json();
-    
-    const allItems = data.items.filter(item => item.title && item.link && item.pubDate && item.guid).map(item => {
+    const allItems = feedData.items.filter(item => item.title && item.link && item.pubDate && item.guid).map((item: ApiRssParserItem) => {
       const imageUrlFromMeta = item.enclosure?.url || item['media:content']?.$?.url;
       const imageUrlFromContent = extractFirstImageUrl(item['content:encoded'] || item.content);
       
@@ -79,12 +44,11 @@ async function getFeedItemsFromApi(): Promise<FeedItem[]> {
       };
     });
 
-    // Sort by date (most recent first) and take the top 9
     const sortedItems = allItems.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
     return sortedItems.slice(0, 9);
 
   } catch (error) {
-    console.error("[EducationPage] Failed to fetch or parse feed from API:", error);
+    console.error("[EducationPage] Failed to fetch or parse feed directly:", error);
     return []; // Return empty array on error
   }
 }
@@ -104,7 +68,7 @@ function createSlug(guid: string): string {
 }
 
 export default async function EducationPage() {
-  const items = await getFeedItemsFromApi(); // Fetch from internal API
+  const items = await getProcessedFeedItems(); // Fetch directly using the new function
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -164,5 +128,7 @@ export default async function EducationPage() {
   );
 }
 
-// Remove the previous direct revalidate as it's handled by fetch now
-// export const revalidate = 3600; 
+// The page itself can have revalidation settings if it's intended for ISR
+// For Server Components, data fetching is tied to component rendering. 
+// Revalidation for Server Components that are part of a statically generated page occurs when the page is revalidated.
+export const revalidate = 3600; // Revalidate the page every hour 

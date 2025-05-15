@@ -186,6 +186,7 @@ export default function PatientProfilePage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // TODO: Address Supabase typing error for 'emergency_contacts' (see MATERIO_UI_UPGRADE_PLAN.md)
     const { data, error } = await supabase
       .from('emergency_contacts')
       .select('*')
@@ -204,6 +205,7 @@ export default function PatientProfilePage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // TODO: Address Supabase typing error for 'medical_history' (see MATERIO_UI_UPGRADE_PLAN.md)
     const { data, error } = await supabase
       .from('medical_history')
       .select('*')
@@ -246,6 +248,7 @@ export default function PatientProfilePage() {
     if (editingContact) {
       setLoading(prev => ({ ...prev, emergencyContacts: true }));
       try {
+        // TODO: Address Supabase typing error for 'emergency_contacts' (see MATERIO_UI_UPGRADE_PLAN.md)
         const { error } = await supabase
           .from('emergency_contacts')
           .update({
@@ -275,6 +278,7 @@ export default function PatientProfilePage() {
         phone: newContact.phone || '',
         email: newContact.email || null,
       };
+      // TODO: Address Supabase typing error for 'emergency_contacts' (see MATERIO_UI_UPGRADE_PLAN.md)
       const { error } = await supabase
         .from('emergency_contacts')
         .insert(contactToInsert);
@@ -298,6 +302,7 @@ export default function PatientProfilePage() {
     if (editingHistory) {
       setLoading(prev => ({ ...prev, medicalHistory: true }));
       try {
+        // TODO: Address Supabase typing error for 'medical_history' (see MATERIO_UI_UPGRADE_PLAN.md)
         const { error } = await supabase
           .from('medical_history')
           .update({
@@ -327,6 +332,7 @@ export default function PatientProfilePage() {
         treatment: newHistory.treatment || null,
         notes: newHistory.notes || null,
       };
+      // TODO: Address Supabase typing error for 'medical_history' (see MATERIO_UI_UPGRADE_PLAN.md)
       const { error } = await supabase
         .from('medical_history')
         .insert(historyToInsert as any);
@@ -344,6 +350,7 @@ export default function PatientProfilePage() {
   };
 
   const handleDeleteContact = async (id: string) => {
+    // TODO: Address Supabase typing error for 'emergency_contacts' (see MATERIO_UI_UPGRADE_PLAN.md)
     const { error } = await supabase
       .from('emergency_contacts')
       .delete()
@@ -358,6 +365,7 @@ export default function PatientProfilePage() {
   };
 
   const handleDeleteHistory = async (id: string) => {
+    // TODO: Address Supabase typing error for 'medical_history' (see MATERIO_UI_UPGRADE_PLAN.md)
     const { error } = await supabase
       .from('medical_history')
       .delete()
@@ -385,6 +393,7 @@ export default function PatientProfilePage() {
         email: newContact.email || null,
       };
 
+      // TODO: Address Supabase typing error for 'emergency_contacts' (see MATERIO_UI_UPGRADE_PLAN.md)
       const { error } = await supabase
         .from('emergency_contacts')
         .insert(contactToInsert);
@@ -418,6 +427,7 @@ export default function PatientProfilePage() {
         notes: newHistory.notes || null,
       };
 
+      // TODO: Address Supabase typing error for 'medical_history' (see MATERIO_UI_UPGRADE_PLAN.md)
       const { error } = await supabase
         .from('medical_history')
         .insert(historyToInsert as any);
@@ -590,41 +600,50 @@ export default function PatientProfilePage() {
               <Typography variant="subtitle1" gutterBottom>Choose a new Avatar</Typography>
               {availableAvatars.length > 0 ? (
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                  {availableAvatars.map((avatarFile) => (
-                    <Box 
-                      key={avatarFile} 
-                      onClick={() => setSelectedAvatarForUpdate(avatarFile)}
-                      sx={{ 
-                        cursor: 'pointer', 
-                        position: 'relative',
-                        border: selectedAvatarForUpdate === avatarFile ? `3px solid ${theme.palette.primary.main}` : `3px solid transparent`,
-                        borderRadius: '50%',
-                        padding: '2px',
-                        transition: 'border-color 0.2s ease-in-out'
-                      }}
-                    >
-                      <Image 
-                        src={`/images/avatar/${avatarFile}`} 
-                        alt={`Avatar ${avatarFile}`} 
-                        width={80} 
-                        height={80} 
-                        style={{ borderRadius: '50%', display: 'block' }}
-                      />
-                      {selectedAvatarForUpdate === avatarFile && (
-                        <CheckCircleIcon 
-                          sx={{ 
-                            position: 'absolute', 
-                            bottom: 0, 
-                            right: 0, 
-                            color: theme.palette.success.main,
-                            backgroundColor: 'white',
-                            borderRadius: '50%',
-                            fontSize: '1.5rem'
-                          }} 
+                  {availableAvatars.map((avatarFile) => {
+                    // Determine if this avatar should be highlighted
+                    // Highlight if it's the one selected for update (selectedAvatarForUpdate takes precedence),
+                    // OR if no avatar is selected for update yet, highlight if it's the current profile avatar.
+                    const isHighlighted = selectedAvatarForUpdate
+                      ? avatarFile === selectedAvatarForUpdate
+                      : authProfile?.avatar_filename === avatarFile;
+
+                    return (
+                      <Box
+                        key={avatarFile}
+                        onClick={() => setSelectedAvatarForUpdate(avatarFile)}
+                        sx={{
+                          cursor: 'pointer',
+                          position: 'relative',
+                          border: isHighlighted ? `3px solid ${theme.palette.primary.main}` : `3px solid transparent`,
+                          borderRadius: '50%',
+                          padding: '2px',
+                          transition: 'border-color 0.2s ease-in-out'
+                        }}
+                      >
+                        <Image
+                          src={`/images/avatar/${avatarFile}`}
+                          alt={`Avatar ${avatarFile}`}
+                          width={80}
+                          height={80}
+                          style={{ borderRadius: '50%', display: 'block' }}
                         />
-                      )}
-                    </Box>
-                  ))}
+                        {isHighlighted && (
+                          <CheckCircleIcon
+                            sx={{
+                              position: 'absolute',
+                              bottom: 0,
+                              right: 0,
+                              color: theme.palette.success.main,
+                              backgroundColor: 'white',
+                              borderRadius: '50%',
+                              fontSize: '1.5rem'
+                            }}
+                          />
+                        )}
+                      </Box>
+                    );
+                  })}
                 </Box>
               ) : (
                 <Typography>No other avatars available at the moment.</Typography>

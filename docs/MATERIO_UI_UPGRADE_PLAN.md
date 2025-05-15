@@ -107,25 +107,24 @@ To incrementally upgrade the existing dashboard UI by adopting design elements, 
 
 ## Phase X: Structural Refactor (Post-Materio Implementation)
 
-Consider a structural refactor to a `BaseDashboardLayout` component after the initial Materio UI visual and stylistic implementation is complete across all dashboards.
+- **Goal:** Create a `BaseDashboardLayout` component.
+- **Rationale:** To consolidate the common layout elements (AppBar, Drawer, main content shell) currently duplicated across `AdminLayout.tsx`, `DashboardLayout.tsx`, and `ProviderLayout.tsx` (or their equivalents).
+- **Benefits:** 
+    - Reduced code duplication.
+    - Easier maintenance of shared layout features.
+    - Consistent application of Materio styling across all dashboards.
+- **Approach:**
+    - Identify common JSX structures and styling logic.
+    - Abstract these into a `BaseDashboardLayout` that accepts props for unique elements (e.g., navigation items, specific AppBar actions).
+    - Refactor existing dashboard layouts to use this base component.
 
-**Rationale:**
-*   A very large portion of the JSX structure (beyond just styles) for the `AppBar` and `Drawer` shell is, or will become, identical across the Admin, Patient (Dashboard), and Provider layouts.
-*   The behavioral logic (like handling drawer toggling, collapse states, user menu interactions) is also highly similar.
-*   The primary differences are constrained to the *content* (e.g., navigation links specific to each role, `AppBar` titles, and role-specific action icons in the `AppBar`).
+## Known Issues / Technical Debt
 
-**Proposed Approach:**
-*   **Create `BaseDashboardLayout`:** This component would encapsulate all common structural JSX (for the `AppBar` shell, `Drawer` shell, main content area) and common behavioral logic. It would also include the shared Materio styling applied during the initial phases.
-*   **Props for Specifics:** The `BaseDashboardLayout` would accept props for role-specific parts. Examples include:
-    *   A prop to pass the array of navigation items or a component that renders the navigation list for the drawer.
-    *   A prop for the `AppBar` title.
-    *   Props for any custom action icons or components to be rendered in the `AppBar`.
-*   **Simplify Existing Layouts:** The individual `AdminLayout.tsx`, `src/app/(dashboard)/layout.tsx` (Patient), and `src/components/layouts/ProviderMainLayout.tsx` would then become simpler wrappers. Their main responsibility would be to:
-    1.  Use the `BaseDashboardLayout`.
-    2.  Provide the role-specific data and components to it via props.
-    3.  Handle any truly unique layout logic that cannot be generalized into the `BaseDashboardLayout`.
-
-**Benefits:**
-*   **Improved Maintainability:** Changes to common layout structures or styles would only need to be made in one place (`BaseDashboardLayout`).
-*   **Reduced Code Duplication:** Significantly reduces repeated JSX and logic across the different dashboard layouts.
-*   **Increased Consistency:** Enforces a consistent shell structure and behavior by default. 
+- **Supabase Typing Errors (Patient Profile):**
+  - **Files Affected:** `src/app/(dashboard)/dashboard/profile/page.tsx`
+  - **Issue:** TypeScript errors indicating that table names `emergency_contacts` and `medical_history` are not recognized by the Supabase client's generated types (e.g., `No overload matches this call. Argument of type '"emergency_contacts"' is not assignable to parameter of type '...'`).
+  - **Potential Causes:** Stale Supabase types, misconfiguration in type generation/import, or typos/mismatches between code and actual database schema.
+  - **TODO:** 
+    - Verify table names and schemas in Supabase.
+    - Attempt to regenerate Supabase types (e.g., using `npx supabase gen types typescript ...`).
+    - Investigate Supabase client setup and type import paths if regeneration doesn't resolve the issue. 
